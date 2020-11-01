@@ -1,16 +1,9 @@
 #' Title
 #'
-#' @param mapping test
-#' @param data test
-#' @param stat test
-#' @param position test
-#' @param na.rm test
-#' @param show.legend test
-#' @param inherit.aes test
-#' @param ... test
-#'
-#' @return test
-#'
+#' @inheritParams ggplot2::geom_point
+#' @param grid_x test
+#' @param grid_y test
+#' 
 #' @examples
 #' 
 #' library(ggplot2)
@@ -20,14 +13,14 @@
 #' 
 #' @export
 geom_pointgrid <- function(
-  mapping = NULL, 
-  data = NULL, 
+  mapping = NULL,
+  data = NULL,
   grid_x = 20,
   grid_y = 20,
   stat = "identity",
-  position = "identity", 
+  position = "identity",
   ...,
-  na.rm = FALSE, 
+  na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
 ) {
@@ -103,6 +96,10 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
     y_grid <- grid_y
   }
   xy_grid <- expand.grid(x_grid, y_grid)
+  # size check
+  if (nrow(xy_grid) < nrow(tab)) {
+    stop("The grid is not big enough to accommodate all input points.")
+  }
   # calculate distance between input points and grid
   distance_matrix <- fields::rdist(xy_grid, tab[c("x", "y")])
   distance_long <- setNames(
