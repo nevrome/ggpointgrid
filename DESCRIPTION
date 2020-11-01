@@ -15,6 +15,13 @@ Language: en_GB
 License: GPL-3 | file LICENSE
 Encoding: UTF-8
 Imports:
-  ggplot2
+  checkmate,
+  fields,
+  ggplot2,
+  glue,
+  grid,
+  reshape2,
+  rlang,
+  stats
 RoxygenNote: 7.1.1
 

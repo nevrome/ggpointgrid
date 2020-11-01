@@ -117,7 +117,7 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   }
   # calculate distance between input points and grid
   distance_matrix <- fields::rdist(xy_grid, tab[c("x", "y")])
-  distance_long <- setNames(
+  distance_long <- stats::setNames(
     reshape2::melt(distance_matrix), 
     c('grid_id', 'mean_point_id', 'distance')
   )
@@ -210,7 +210,7 @@ translate_shape_string <- function(shape_string) {
       ""
     }
     
-    abort(glue("Can't find shape name:", collapsed_names, more_problems))
+    rlang::abort(glue::glue("Can't find shape name:", collapsed_names, more_problems))
   }
   
   if (any(nonunique_strings)) {
@@ -234,7 +234,7 @@ translate_shape_string <- function(shape_string) {
       ""
     }
     
-    abort(glue("Shape names must be unambiguous:", collapsed_names, more_problems))
+    rlang::abort(glue::glue("Shape names must be unambiguous:", collapsed_names, more_problems))
   }
   
   unname(pch_table[shape_match])
