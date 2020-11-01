@@ -18,13 +18,14 @@
 #' library(ggplot2)
 #' 
 #' testdata <- data.frame(
-#'   x = c(1, 2, 2, 3, 3, 3, 4, 4, 5),
-#'   y = c(1, 2, 2, 3, 3, 3, 4, 4, 5)
+#'   x = c(1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5),
+#'   y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
 #' )
 #' 
-#' ggplot(testdata) +
-#' geom_point(aes(x, y)) +
-#' geom_pointgrid(aes(x, y), color = "red")
+#' ggplot(testdata, aes(x, y)) +
+#' geom_point(size = 2) +
+#' geom_jitter(color = "green", size = 2, width = 0.1, height = 0.1) +
+#' geom_pointgrid(color = "red", size = 2, grid_x = 40, grid_y = 40)
 #' 
 #' @export
 geom_pointgrid <- function(
