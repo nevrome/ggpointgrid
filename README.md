@@ -17,10 +17,7 @@ ggplot(testdata, aes(x, y)) +
   geom_jitter(color = "green", size = 2, width = 0.1, height = 0.1) +
   ggpointgrid::geom_pointgrid(color = "red", size = 2, grid_x = 40, grid_y = 40)
 ```
-
-<img src="man/figures/01.png" width = 220>
-<img src="man/figures/02.png" width = 220>
-<img src="man/figures/03.png" width = 220>
+<img src="man/figures/01.png" width = 310> <img src="man/figures/02.png" width = 310> <img src="man/figures/03.png" width = 310>
 
 ### Installation
 
