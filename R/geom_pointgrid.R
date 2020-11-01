@@ -5,11 +5,16 @@
 #' @param grid_y test
 #' 
 #' @examples
-#' 
 #' library(ggplot2)
-#' ggplot(mtcars) +
-#' geom_point(aes(hp, mpg)) +
-#' geom_pointgrid(aes(hp, mpg), color = "red")
+#' 
+#' testdata <- data.frame(
+#'   x = c(1, 2, 2, 3, 3, 3, 4, 4, 5),
+#'   y = c(1, 2, 2, 3, 3, 3, 4, 4, 5)
+#' )
+#' 
+#' ggplot(testdata) +
+#' geom_point(aes(x, y)) +
+#' geom_pointgrid(aes(x, y), color = "red")
 #' 
 #' @export
 geom_pointgrid <- function(
