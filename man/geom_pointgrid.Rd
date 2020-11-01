@@ -7,12 +7,14 @@
 geom_pointgrid(
   mapping = NULL,
   data = NULL,
+  grid_x = 20,
+  grid_y = 20,
   stat = "identity",
   position = "identity",
+  ...,
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE,
-  ...
+  inherit.aes = TRUE
 )
 }
 \arguments{
@@ -24,13 +26,13 @@ geom_pointgrid(
 
 \item{position}{test}
 
+\item{...}{test}
+
 \item{na.rm}{test}
 
 \item{show.legend}{test}
 
 \item{inherit.aes}{test}
-
-\item{...}{test}
 }
 \value{
 test
@@ -42,6 +44,7 @@ Title
 
 library(ggplot2)
 ggplot(mtcars) +
-geom_pointgrid(aes(x, y))
+geom_point(aes(hp, mpg)) +
+geom_pointgrid(aes(hp, mpg), color = "blue")
 
 }

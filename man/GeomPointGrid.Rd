@@ -5,7 +5,7 @@
 \alias{GeomPointGrid}
 \title{geom object for use in geom_beeswarm}
 \format{
-An object of class \code{GeomPointGrid} (inherits from \code{Geom}, \code{ggproto}, \code{gg}) of length 5.
+An object of class \code{GeomPointGrid} (inherits from \code{Geom}, \code{ggproto}, \code{gg}) of length 6.
 }
 \usage{
 GeomPointGrid
