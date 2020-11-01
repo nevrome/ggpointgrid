@@ -1,8 +1,18 @@
-#' Title
+#' geom_pointgrid
+#' 
+#' \code{geom_pointgrid} is a copy of \link[ggplot2]{geom_point} with only one 
+#' difference: Points are not plotted to their exact coordinates, but are optimally
+#' rearranged on a regular grid. This rearrangement avoids any overplotting by
+#' attributing each input point its own grid position. The grid properties are 
+#' controlled with the parameters \code{grid_x} and \code{grid_y}.
 #'
 #' @inheritParams ggplot2::geom_point
-#' @param grid_x test
-#' @param grid_y test
+#' @param grid_x Single integer or numeric vector. If a single integer is supplied, 
+#' then the grid's x-axis coordinates are determined as a regular sequence from
+#' \code{min(x)} to \code{max(x)}. If a numeric vector is supplied, then this 
+#' vector is directly used for the grid's x-axis coordinates.
+#' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for the 
+#' y-axis.
 #' 
 #' @examples
 #' library(ggplot2)
@@ -118,6 +128,7 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   return(tab)
 }
 
+# tail-recursive implementation of the rearrangement algorithm
 core_arrange_algorithm <- function(distance_long, grid_df = data.frame()) {
   # sort table by distance
   distance_long_sorted <- distance_long[order(distance_long$distance),]

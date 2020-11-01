@@ -2,7 +2,7 @@
 % Please edit documentation in R/geom_pointgrid.R
 \name{geom_pointgrid}
 \alias{geom_pointgrid}
-\title{Title}
+\title{geom_pointgrid}
 \usage{
 geom_pointgrid(
   mapping = NULL,
@@ -38,9 +38,13 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{grid_x}{test}
+\item{grid_x}{Single integer or numeric vector. If a single integer is supplied, 
+then the grid's x-axis coordinates are determined as a regular sequence from
+\code{min(x)} to \code{max(x)}. If a numeric vector is supplied, then this 
+vector is directly used for the grid's x-axis coordinates.}
 
-\item{grid_y}{test}
+\item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for the 
+y-axis.}
 
 \item{stat}{The statistical transformation to use on the data for this
 layer, as a string.}
@@ -68,13 +72,22 @@ that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
 }
 \description{
-Title
+\code{geom_pointgrid} is a copy of \link[ggplot2]{geom_point} with only one 
+difference: Points are not plotted to their exact coordinates, but are optimally
+rearranged on a regular grid. This rearrangement avoids any overplotting by
+attributing each input point its own grid position. The grid properties are 
+controlled with the parameters \code{grid_x} and \code{grid_y}.
 }
 \examples{
-
 library(ggplot2)
-ggplot(mtcars) +
-geom_point(aes(hp, mpg)) +
-geom_pointgrid(aes(hp, mpg), color = "red")
+
+testdata <- data.frame(
+  x = c(1, 2, 2, 3, 3, 3, 4, 4, 5),
+  y = c(1, 2, 2, 3, 3, 3, 4, 4, 5)
+)
+
+ggplot(testdata) +
+geom_point(aes(x, y)) +
+geom_pointgrid(aes(x, y), color = "red")
 
 }
