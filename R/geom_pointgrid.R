@@ -23,9 +23,9 @@
 #' )
 #' 
 #' ggplot(testdata, aes(x, y)) +
-#' geom_point(size = 2) +
-#' geom_jitter(color = "green", size = 2, width = 0.1, height = 0.1) +
-#' geom_pointgrid(color = "red", size = 2, grid_x = 40, grid_y = 40)
+#' geom_point() +
+#' geom_jitter(color = "green", width = 0.1, height = 0.1) +
+#' geom_pointgrid(color = "red", grid_x = 40, grid_y = 40)
 #' 
 #' @export
 geom_pointgrid <- function(
