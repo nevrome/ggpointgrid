@@ -31,6 +31,10 @@ geom_pointgrid <- function(
   show.legend = NA,
   inherit.aes = TRUE
 ) {
+  # input check
+  checkmate::assert_numeric(grid_x, any.missing = FALSE)
+  checkmate::assert_numeric(grid_y, any.missing = FALSE)
+  # call layer function
   ggplot2::layer(
     mapping = mapping,
     data = data,
@@ -68,7 +72,7 @@ GeomPointGrid <- ggplot2::ggproto(
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
-    data <- arrange_data(data, grid_x, grid_y)
+    data <- arrange_points_on_grid(data, grid_x, grid_y)
     
     coords <- coord$transform(data, panel_params)
     ggname("geom_pointgrid",
@@ -86,25 +90,33 @@ GeomPointGrid <- ggplot2::ggproto(
   }
 )
 
-arrange_data <- function(tab, grid_x, grid_y) {
-  
-  # grid arrangement for mean points
-  x_grid <- seq(min(tab[["x"]]), max(tab[["x"]]), length.out = grid_x)
-  y_grid <- seq(min(tab[["y"]]), max(tab[["y"]]), length.out = grid_y)
+arrange_points_on_grid <- function(tab, grid_x, grid_y) {
+  # define grid the input points should be mapped to
+  if (length(grid_x) == 1) {
+    x_grid <- seq(min(tab[["x"]]), max(tab[["x"]]), length.out = grid_x)
+  } else {
+    x_grid <- grid_x
+  }
+  if (length(grid_y) == 1) {
+    y_grid <- seq(min(tab[["y"]]), max(tab[["y"]]), length.out = grid_y)
+  } else {
+    y_grid <- grid_y
+  }
   xy_grid <- expand.grid(x_grid, y_grid)
-  
+  # calculate distance between input points and grid
   distance_matrix <- fields::rdist(xy_grid, tab[c("x", "y")])
-  distance_long <- setNames(reshape2::melt(distance_matrix), c('grid_id', 'mean_point_id', 'distance'))
-  
-  grid_df <- arrange_on_grid(distance_long)
-  
-  tab[grid_df$mean_point_id,c("x", "y")] <- xy_grid[grid_df$grid_id,]
-  
+  distance_long <- setNames(
+    reshape2::melt(distance_matrix), 
+    c('grid_id', 'mean_point_id', 'distance')
+  )
+  # determine the optimal grid arrangement coordinates
+  grid_df <- core_arrange_algorithm(distance_long)
+  # replace input point coordinates with grid coordinates
+  tab[grid_df$mean_point_id, c("x", "y")] <- xy_grid[grid_df$grid_id,]
   return(tab)
-
 }
 
-arrange_on_grid <- function(distance_long, grid_df = data.frame()) {
+core_arrange_algorithm <- function(distance_long, grid_df = data.frame()) {
   # sort table by distance
   distance_long_sorted <- distance_long[order(distance_long$distance),]
   # get smallest distance grid point by input point
@@ -126,7 +138,7 @@ arrange_on_grid <- function(distance_long, grid_df = data.frame()) {
   if (nrow(distance_long) == 0) {
     return(grid_df)
   } else {
-    arrange_on_grid(distance_long, grid_df)
+    core_arrange_algorithm(distance_long, grid_df)
   }
 }
 
