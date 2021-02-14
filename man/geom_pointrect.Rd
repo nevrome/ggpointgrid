@@ -80,6 +80,10 @@ the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
 rearranges them in rectangular boxes around the actual position. 
 This rearrangement avoids overplotting.
 }
+\details{
+The sorting order within the grid rectangles is: 
+group > colour > fill > shape > size > alpha > stroke
+}
 \examples{
 library(ggplot2)
 

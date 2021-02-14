@@ -3,6 +3,9 @@
 #' \code{geom_pointrect} plots points not to their exact coordinates, but
 #' rearranges them in rectangular boxes around the actual position. 
 #' This rearrangement avoids overplotting.
+#' 
+#' The sorting order within the grid rectangles is: 
+#' group > colour > fill > shape > size > alpha > stroke
 #'
 #' @inheritParams ggplot2::geom_point
 #' @param scale_x Double. Scaling factor for the point grid box x-axis.
