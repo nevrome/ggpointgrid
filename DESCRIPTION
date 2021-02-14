@@ -1,7 +1,7 @@
 Package: ggpointgrid
 Title: Rearrange scatter plot points on a regular grid
 Description: A simple geom (geom_pointgrid) derived from geom_point that rearranges the input points for a scatterplot on a regular grid while strictly avoiding over-plotting.
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: 
   c(person(given = "Clemens",
            family = "Schmid",

@@ -77,13 +77,14 @@ GeomPointGrid <- ggplot2::ggproto(
     if (is.character(data$shape)) {
       data$shape <- translate_shape_string(data$shape)
     }
-    
+    #huhu1 <<- data
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
     data <- arrange_points_on_grid(data, grid_x, grid_y)
-    
+    #huhu2 <<- data
     coords <- coord$transform(data, panel_params)
+    #huhu3 <<- coords
     ggname("geom_pointgrid",
       grid::pointsGrob(
         coords$x, coords$y,
@@ -102,12 +103,22 @@ GeomPointGrid <- ggplot2::ggproto(
 arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   # define grid the input points should be mapped to
   if (length(grid_x) == 1) {
-    x_grid <- seq(min(tab[["x"]]), max(tab[["x"]]), length.out = grid_x)
+    if ("mapped_discrete" %in% class(tab[["x"]])) {
+      unique_x <- length(unique(tab[["x"]]))
+      x_grid <- seq(-0.5, unique_x+0.5, length.out = grid_x)
+    } else {
+      x_grid <- seq(min(tab[["x"]]), max(tab[["x"]]), length.out = grid_x)
+    }
   } else {
     x_grid <- grid_x
   }
   if (length(grid_y) == 1) {
-    y_grid <- seq(min(tab[["y"]]), max(tab[["y"]]), length.out = grid_y)
+    if ("mapped_discrete" %in% class(tab[["y"]])) {
+      unique_y <- length(unique(tab[["y"]]))
+      y_grid <- seq(-0.5, unique_y+0.5, length.out = grid_y)
+    } else {
+      y_grid <- seq(min(tab[["y"]]), max(tab[["y"]]), length.out = grid_y)
+    }
   } else {
     y_grid <- grid_y
   }
