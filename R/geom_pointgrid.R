@@ -1,8 +1,7 @@
 #' geom_pointgrid
 #' 
-#' \code{geom_pointgrid} is a copy of \link[ggplot2]{geom_point} with only one 
-#' difference: Points are not plotted to their exact coordinates, but are optimally
-#' rearranged on a regular grid. This rearrangement avoids any overplotting by
+#' \code{geom_pointgrid} plots points not to their exact coordinates, but 
+#' on a regular grid. This rearrangement avoids any overplotting by
 #' attributing each input point its own grid position. The grid properties are 
 #' controlled with the parameters \code{grid_x} and \code{grid_y}.
 #'
@@ -13,7 +12,6 @@
 #' vector is directly used for the grid's x-axis coordinates.
 #' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for the 
 #' y-axis.
-#' @param grid_method ...
 #' 
 #' @examples
 #' library(ggplot2)
@@ -24,8 +22,6 @@
 #' )
 #' 
 #' ggplot(testdata, aes(x, y)) +
-#' geom_point() +
-#' geom_jitter(color = "green", width = 0.1, height = 0.1) +
 #' geom_pointgrid(color = "red", grid_x = 40, grid_y = 40)
 #' 
 #' @export
@@ -34,7 +30,6 @@ geom_pointgrid <- function(
   data = NULL,
   grid_x = 20,
   grid_y = 20,
-  grid_method = c("box_per_position"),
   stat = "identity",
   position = "identity",
   ...,
@@ -43,19 +38,8 @@ geom_pointgrid <- function(
   inherit.aes = TRUE
 ) {
   # input check
-  checkmate::assert_choice(grid_method, choices = c("general_grid", "box_per_position"))
-  switch(
-    grid_method,
-    general_grid = {
-      checkmate::assert_numeric(grid_x, any.missing = FALSE)
-      checkmate::assert_numeric(grid_y, any.missing = FALSE)
-    },
-    box_per_position = {
-      checkmate::assert_numeric(grid_x, any.missing = FALSE)
-      checkmate::assert_numeric(grid_y, any.missing = FALSE)
-    }
-  )
-
+  checkmate::assert_numeric(grid_x, any.missing = FALSE)
+  checkmate::assert_numeric(grid_y, any.missing = FALSE)
   # call layer function
   ggplot2::layer(
     mapping = mapping,
@@ -69,7 +53,6 @@ geom_pointgrid <- function(
       na.rm = na.rm,
       grid_x = grid_x,
       grid_y = grid_y,
-      grid_method = grid_method,
       ...
     )
   )
@@ -86,25 +69,17 @@ GeomPointGrid <- ggplot2::ggproto(
     alpha = NA, stroke = 0.5
   ),
   draw_key = ggplot2::draw_key_point,
-  draw_panel = function(data, panel_params, coord, grid_x, grid_y, grid_method) {
+  draw_panel = function(data, panel_params, coord, grid_x, grid_y) {
     
     if (is.character(data$shape)) {
       data$shape <- translate_shape_string(data$shape)
     }
-    huhu1 <<- data
+    #huhu1 <<- data
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
-    switch(
-      grid_method,
-      general_grid = {
-        data <- arrange_points_on_grid(data, grid_x, grid_y)
-      },
-      box_per_position = {
-        data <- arrange_points_in_boxes(data, grid_x, grid_y)
-      }
-    )
-    huhu2 <<- data
+    data <- arrange_points_on_grid(data, grid_x, grid_y)
+    #huhu2 <<- data
     coords <- coord$transform(data, panel_params)
     #huhu3 <<- coords
     ggname("geom_pointgrid",
@@ -122,34 +97,6 @@ GeomPointGrid <- ggplot2::ggproto(
   }
 )
 
-arrange_points_in_boxes <- function(tab, grid_x, grid_y) {
-  sorted_tab <- tab[order(tab$group, tab$colour, tab$fill, tab$shape, tab$size, tab$alpha, tab$stroke), ]
-  points_per_position <- split(sorted_tab, interaction(sorted_tab[["x"]], sorted_tab[["y"]]))
-  do.call(rbind, lapply(points_per_position, function(x) {
-    number_of_points <- nrow(x)
-    offsets <- make_box_offsets(number_of_points)
-    x[["x"]] <- x[["x"]] + offsets[["x"]] * grid_x
-    x[["y"]] <- x[["y"]] + offsets[["y"]] * grid_y
-    return(x)
-  }))
-}
-
-make_box_offsets <- function(x) {
-  fact <- sqrt(x)
-  ncols <- ceiling(fact)
-  if (ncols * floor(fact) >= x) {
-    nrows <- floor(fact)
-  } else {
-    nrows <- ceiling(fact)
-  }
-  new_grid <- expand.grid(1:ncols, rev(1:nrows))
-  grid_center <- c((ncols + 1)/2, (nrows + 1)/2)
-  data.frame(
-    x = new_grid[[1]] - grid_center[1],
-    y = new_grid[[2]] - grid_center[2]
-  )[1:x,]
-}
-    
 arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   # define grid the input points should be mapped to
   if (length(grid_x) == 1) {
@@ -215,95 +162,4 @@ core_arrange_algorithm <- function(distance_long, grid_df = data.frame()) {
   } else {
     core_arrange_algorithm(distance_long, grid_df)
   }
-}
-
-
-# copied from https://github.com/tidyverse/ggplot2/blob/v3.3.2/R/geom-point.r
-translate_shape_string <- function(shape_string) {
-  # strings of length 0 or 1 are interpreted as symbols by grid
-  if (nchar(shape_string[1]) <= 1) {
-    return(shape_string)
-  }
-  
-  pch_table <- c(
-    "square open"           = 0,
-    "circle open"           = 1,
-    "triangle open"         = 2,
-    "plus"                  = 3,
-    "cross"                 = 4,
-    "diamond open"          = 5,
-    "triangle down open"    = 6,
-    "square cross"          = 7,
-    "asterisk"              = 8,
-    "diamond plus"          = 9,
-    "circle plus"           = 10,
-    "star"                  = 11,
-    "square plus"           = 12,
-    "circle cross"          = 13,
-    "square triangle"       = 14,
-    "triangle square"       = 14,
-    "square"                = 15,
-    "circle small"          = 16,
-    "triangle"              = 17,
-    "diamond"               = 18,
-    "circle"                = 19,
-    "bullet"                = 20,
-    "circle filled"         = 21,
-    "square filled"         = 22,
-    "diamond filled"        = 23,
-    "triangle filled"       = 24,
-    "triangle down filled"  = 25
-  )
-  
-  shape_match <- charmatch(shape_string, names(pch_table))
-  
-  invalid_strings <- is.na(shape_match)
-  nonunique_strings <- shape_match == 0
-  
-  if (any(invalid_strings)) {
-    bad_string <- unique(shape_string[invalid_strings])
-    n_bad <- length(bad_string)
-    
-    collapsed_names <- sprintf("\n* '%s'", bad_string[1:min(5, n_bad)])
-    
-    more_problems <- if (n_bad > 5) {
-      sprintf("\n* ... and %d more problem%s", n_bad - 5, ifelse(n_bad > 6, "s", ""))
-    } else {
-      ""
-    }
-    
-    rlang::abort(glue::glue("Can't find shape name:", collapsed_names, more_problems))
-  }
-  
-  if (any(nonunique_strings)) {
-    bad_string <- unique(shape_string[nonunique_strings])
-    n_bad <- length(bad_string)
-    
-    n_matches <- vapply(
-      bad_string[1:min(5, n_bad)],
-      function(shape_string) sum(grepl(paste0("^", shape_string), names(pch_table))),
-      integer(1)
-    )
-    
-    collapsed_names <- sprintf(
-      "\n* '%s' partially matches %d shape names",
-      bad_string[1:min(5, n_bad)], n_matches
-    )
-    
-    more_problems <- if (n_bad > 5) {
-      sprintf("\n* ... and %d more problem%s", n_bad - 5, ifelse(n_bad > 6, "s", ""))
-    } else {
-      ""
-    }
-    
-    rlang::abort(glue::glue("Shape names must be unambiguous:", collapsed_names, more_problems))
-  }
-  
-  unname(pch_table[shape_match])
-}
-
-# https://github.com/tidyverse/ggplot2/blob/v3.3.2/R/utilities-grid.r
-ggname <- function(prefix, grob) {
-  grob$name <- grid::grobName(grob, prefix)
-  grob
 }
