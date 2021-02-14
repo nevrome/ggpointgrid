@@ -9,6 +9,7 @@ geom_pointgrid(
   data = NULL,
   grid_x = 20,
   grid_y = 20,
+  grid_method = c("box_per_position"),
   stat = "identity",
   position = "identity",
   ...,
@@ -45,6 +46,8 @@ vector is directly used for the grid's x-axis coordinates.}
 
 \item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for the 
 y-axis.}
+
+\item{grid_method}{...}
 
 \item{stat}{The statistical transformation to use on the data for this
 layer, as a string.}

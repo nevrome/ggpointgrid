@@ -13,6 +13,7 @@
 #' vector is directly used for the grid's x-axis coordinates.
 #' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for the 
 #' y-axis.
+#' @param grid_method ...
 #' 
 #' @examples
 #' library(ggplot2)
@@ -33,6 +34,7 @@ geom_pointgrid <- function(
   data = NULL,
   grid_x = 20,
   grid_y = 20,
+  grid_method = c("box_per_position"),
   stat = "identity",
   position = "identity",
   ...,
@@ -41,8 +43,19 @@ geom_pointgrid <- function(
   inherit.aes = TRUE
 ) {
   # input check
-  checkmate::assert_numeric(grid_x, any.missing = FALSE)
-  checkmate::assert_numeric(grid_y, any.missing = FALSE)
+  checkmate::assert_choice(grid_method, choices = c("general_grid", "box_per_position"))
+  switch(
+    grid_method,
+    general_grid = {
+      checkmate::assert_numeric(grid_x, any.missing = FALSE)
+      checkmate::assert_numeric(grid_y, any.missing = FALSE)
+    },
+    box_per_position = {
+      checkmate::assert_numeric(grid_x, any.missing = FALSE)
+      checkmate::assert_numeric(grid_y, any.missing = FALSE)
+    }
+  )
+
   # call layer function
   ggplot2::layer(
     mapping = mapping,
@@ -56,6 +69,7 @@ geom_pointgrid <- function(
       na.rm = na.rm,
       grid_x = grid_x,
       grid_y = grid_y,
+      grid_method = grid_method,
       ...
     )
   )
@@ -72,17 +86,25 @@ GeomPointGrid <- ggplot2::ggproto(
     alpha = NA, stroke = 0.5
   ),
   draw_key = ggplot2::draw_key_point,
-  draw_panel = function(data, panel_params, coord, grid_x, grid_y) {
+  draw_panel = function(data, panel_params, coord, grid_x, grid_y, grid_method) {
     
     if (is.character(data$shape)) {
       data$shape <- translate_shape_string(data$shape)
     }
-    #huhu1 <<- data
+    huhu1 <<- data
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
-    data <- arrange_points_on_grid(data, grid_x, grid_y)
-    #huhu2 <<- data
+    switch(
+      grid_method,
+      general_grid = {
+        data <- arrange_points_on_grid(data, grid_x, grid_y)
+      },
+      box_per_position = {
+        data <- arrange_points_in_boxes(data, grid_x, grid_y)
+      }
+    )
+    huhu2 <<- data
     coords <- coord$transform(data, panel_params)
     #huhu3 <<- coords
     ggname("geom_pointgrid",
@@ -100,6 +122,34 @@ GeomPointGrid <- ggplot2::ggproto(
   }
 )
 
+arrange_points_in_boxes <- function(tab, grid_x, grid_y) {
+  sorted_tab <- tab[order(tab$group, tab$colour, tab$fill, tab$shape, tab$size, tab$alpha, tab$stroke), ]
+  points_per_position <- split(sorted_tab, interaction(sorted_tab[["x"]], sorted_tab[["y"]]))
+  do.call(rbind, lapply(points_per_position, function(x) {
+    number_of_points <- nrow(x)
+    offsets <- make_box_offsets(number_of_points)
+    x[["x"]] <- x[["x"]] + offsets[["x"]] * grid_x
+    x[["y"]] <- x[["y"]] + offsets[["y"]] * grid_y
+    return(x)
+  }))
+}
+
+make_box_offsets <- function(x) {
+  fact <- sqrt(x)
+  ncols <- ceiling(fact)
+  if (ncols * floor(fact) >= x) {
+    nrows <- floor(fact)
+  } else {
+    nrows <- ceiling(fact)
+  }
+  new_grid <- expand.grid(1:ncols, rev(1:nrows))
+  grid_center <- c((ncols + 1)/2, (nrows + 1)/2)
+  data.frame(
+    x = new_grid[[1]] - grid_center[1],
+    y = new_grid[[2]] - grid_center[2]
+  )[1:x,]
+}
+    
 arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   # define grid the input points should be mapped to
   if (length(grid_x) == 1) {
