@@ -14,6 +14,17 @@
 #' rounded to attribute them to the same position. This is only relevant
 #' for continuously scaled variables.
 #' @param round_y Integer. Like \code{round_x}, but for the y-axis.
+#' @param order_by Character vector. Order of mapped aesthetics by which the 
+#' observations within the rectangle grids should be ordered. Possible values:
+#' \itemize{
+#'  \item{"group"}
+#'  \item{"colour"}
+#'  \item{"fill"}
+#'  \item{"shape"}
+#'  \item{"size"}
+#'  \item{"alpha"}
+#'  \item{"stroke"}
+#' }
 #' 
 #' @examples
 #' library(ggplot2)
@@ -34,6 +45,10 @@ geom_pointrect <- function(
   scale_y = 0.1,
   round_x = 1,
   round_y = 1,
+  order_by = c(
+    "group", "colour", "fill", "shape", 
+    "size", "alpha", "stroke"
+  ),
   stat = "identity",
   position = "identity",
   ...,
@@ -61,6 +76,7 @@ geom_pointrect <- function(
       scale_y = scale_y,
       round_x = round_x,
       round_y = round_y,
+      order_by = order_by,
       ...
     )
   )
@@ -77,7 +93,7 @@ GeomPointRect <- ggplot2::ggproto(
     alpha = NA, stroke = 0.5
   ),
   draw_key = ggplot2::draw_key_point,
-  draw_panel = function(data, panel_params, coord, scale_x, scale_y, round_x, round_y) {
+  draw_panel = function(data, panel_params, coord, scale_x, scale_y, round_x, round_y, order_by) {
     
     if (is.character(data$shape)) {
       data$shape <- translate_shape_string(data$shape)
@@ -86,7 +102,7 @@ GeomPointRect <- ggplot2::ggproto(
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
-    data <- arrange_points_in_boxes(data, scale_x, scale_y, round_x, round_y)
+    data <- arrange_points_in_boxes(data, scale_x, scale_y, round_x, round_y, order_by)
     #huhu2 <<- data
     coords <- coord$transform(data, panel_params)
     #huhu3 <<- coords
@@ -105,9 +121,9 @@ GeomPointRect <- ggplot2::ggproto(
   }
 )
 
-arrange_points_in_boxes <- function(tab, scale_x, scale_y, round_x, round_y) {
+arrange_points_in_boxes <- function(tab, scale_x, scale_y, round_x, round_y, order_by) {
   # sort 
-  sorted_tab <- tab[order(tab$group, tab$colour, tab$fill, tab$shape, tab$size, tab$alpha, tab$stroke), ]
+  sorted_tab <- tab[do.call(order, lapply(order_by, function(x) { tab[x] })), ]
   # round
   sorted_tab[["x"]] <- round(sorted_tab[["x"]], round_x)
   sorted_tab[["y"]] <- round(sorted_tab[["y"]], round_y)

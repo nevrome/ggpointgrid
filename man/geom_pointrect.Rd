@@ -11,6 +11,7 @@ geom_pointrect(
   scale_y = 0.1,
   round_x = 1,
   round_y = 1,
+  order_by = c("group", "colour", "fill", "shape", "size", "alpha", "stroke"),
   stat = "identity",
   position = "identity",
   ...,
@@ -49,6 +50,18 @@ rounded to attribute them to the same position. This is only relevant
 for continuously scaled variables.}
 
 \item{round_y}{Integer. Like \code{round_x}, but for the y-axis.}
+
+\item{order_by}{Character vector. Order of mapped aesthetics by which the 
+observations within the rectangle grids should be ordered. Possible values:
+\itemize{
+ \item{"group"}
+ \item{"colour"}
+ \item{"fill"}
+ \item{"shape"}
+ \item{"size"}
+ \item{"alpha"}
+ \item{"stroke"}
+}}
 
 \item{stat}{The statistical transformation to use on the data for this
 layer, as a string.}
