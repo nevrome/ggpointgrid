@@ -19,24 +19,31 @@ command (in your R console):
 ### Example
 
 ``` r
-mtcars %>%
+library(ggplot2)
+library(magrittr)
+library(palmerpenguins)
+```
+
+``` r
+palmerpenguins::penguins %>%
   ggplot() +
   ggpointgrid::geom_pointgrid(
-    aes(x = mpg, y = disp, shape = factor(carb), color = mpg),
-    grid_x = 15,
-    grid_y = 15
+    aes(x = body_mass_g, y = bill_length_mm, shape = species, color = sex),
+    grid_x = 50,
+    grid_y = 50
   )
 ```
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 ``` r
-mtcars %>%
+palmerpenguins::penguins %>%
+  dplyr::arrange(island) %>%
   ggplot() +
   ggpointgrid::geom_pointrect(
-    aes(x = factor(vs), y = factor(gear), shape = factor(carb), color = mpg), 
+    aes(x = sex, y = species, color = island), 
     scale_x = 0.05, 
-    scale_y = 0.12 
+    scale_y = 0.05
   )
 ```
 

@@ -1,5 +1,7 @@
 ---
 output: github_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
@@ -19,26 +21,28 @@ remotes::install_github("nevrome/ggpointgrid")
 
 ### Example
 
-```{r, echo=FALSE}
+```{r}
 library(ggplot2)
 library(magrittr)
+library(palmerpenguins)
 ```
 
-```{r}
-mtcars %>%
+```{r, warning=FALSE}
+palmerpenguins::penguins %>%
   ggplot() +
   ggpointgrid::geom_pointgrid(
-    aes(x = mpg, y = disp, shape = factor(carb), color = mpg),
-    grid_x = 15,
-    grid_y = 15
+    aes(x = body_mass_g, y = bill_length_mm, shape = species, color = sex),
+    grid_x = 50,
+    grid_y = 50
   )
 
-mtcars %>%
+palmerpenguins::penguins %>%
+  dplyr::arrange(island) %>%
   ggplot() +
   ggpointgrid::geom_pointrect(
-    aes(x = factor(vs), y = factor(gear), shape = factor(carb), color = mpg), 
+    aes(x = sex, y = species, color = island), 
     scale_x = 0.05, 
-    scale_y = 0.12 
+    scale_y = 0.05
   )
 ```
 
