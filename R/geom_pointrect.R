@@ -2,10 +2,8 @@
 #' 
 #' \code{geom_pointrect} plots points not to their exact coordinates, but
 #' rearranges them in rectangular boxes around the actual position. 
-#' This rearrangement avoids overplotting.
-#' 
-#' The sorting order within the grid rectangles is: 
-#' group > colour > fill > shape > size > alpha > stroke
+#' This rearrangement avoids overplotting. The order within each box 
+#' reflects the order of the input data.frame.
 #'
 #' @inheritParams ggplot2::geom_point
 #' @param scale_x Double. Scaling factor for the point grid box x-axis.
@@ -14,17 +12,6 @@
 #' rounded to attribute them to the same position. This is only relevant
 #' for continuously scaled variables.
 #' @param round_y Integer. Like \code{round_x}, but for the y-axis.
-#' @param order_by Character vector. Order of mapped aesthetics by which the 
-#' observations within the rectangle grids should be ordered. Possible values:
-#' \itemize{
-#'  \item{"group"}
-#'  \item{"colour"}
-#'  \item{"fill"}
-#'  \item{"shape"}
-#'  \item{"size"}
-#'  \item{"alpha"}
-#'  \item{"stroke"}
-#' }
 #' 
 #' @examples
 #' library(ggplot2)
@@ -45,10 +32,6 @@ geom_pointrect <- function(
   scale_y = 0.1,
   round_x = 1,
   round_y = 1,
-  order_by = c(
-    "group", "colour", "fill", "shape", 
-    "size", "alpha", "stroke"
-  ),
   stat = "identity",
   position = "identity",
   ...,
@@ -76,7 +59,6 @@ geom_pointrect <- function(
       scale_y = scale_y,
       round_x = round_x,
       round_y = round_y,
-      order_by = order_by,
       ...
     )
   )
@@ -93,7 +75,7 @@ GeomPointRect <- ggplot2::ggproto(
     alpha = NA, stroke = 0.5
   ),
   draw_key = ggplot2::draw_key_point,
-  draw_panel = function(data, panel_params, coord, scale_x, scale_y, round_x, round_y, order_by) {
+  draw_panel = function(data, panel_params, coord, scale_x, scale_y, round_x, round_y) {
     
     if (is.character(data$shape)) {
       data$shape <- translate_shape_string(data$shape)
@@ -102,7 +84,7 @@ GeomPointRect <- ggplot2::ggproto(
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
-    data <- arrange_points_in_boxes(data, scale_x, scale_y, round_x, round_y, order_by)
+    data <- arrange_points_in_boxes(data, scale_x, scale_y, round_x, round_y)
     #huhu2 <<- data
     coords <- coord$transform(data, panel_params)
     #huhu3 <<- coords
@@ -121,14 +103,12 @@ GeomPointRect <- ggplot2::ggproto(
   }
 )
 
-arrange_points_in_boxes <- function(tab, scale_x, scale_y, round_x, round_y, order_by) {
-  # sort 
-  sorted_tab <- tab[do.call(order, lapply(order_by, function(x) { tab[x] })), ]
+arrange_points_in_boxes <- function(tab, scale_x, scale_y, round_x, round_y) {
   # round
-  sorted_tab[["x"]] <- round(sorted_tab[["x"]], round_x)
-  sorted_tab[["y"]] <- round(sorted_tab[["y"]], round_y)
+  tab[["x"]] <- round(tab[["x"]], round_x)
+  tab[["y"]] <- round(tab[["y"]], round_y)
   # arrange in rect
-  points_per_position <- split(sorted_tab, interaction(sorted_tab[["x"]], sorted_tab[["y"]]))
+  points_per_position <- split(tab, interaction(tab[["x"]], tab[["y"]]))
   do.call(rbind, lapply(points_per_position, function(x) {
     number_of_points <- nrow(x)
     offsets <- make_box_offsets(number_of_points)

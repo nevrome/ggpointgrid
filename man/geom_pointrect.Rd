@@ -11,7 +11,6 @@ geom_pointrect(
   scale_y = 0.1,
   round_x = 1,
   round_y = 1,
-  order_by = c("group", "colour", "fill", "shape", "size", "alpha", "stroke"),
   stat = "identity",
   position = "identity",
   ...,
@@ -51,18 +50,6 @@ for continuously scaled variables.}
 
 \item{round_y}{Integer. Like \code{round_x}, but for the y-axis.}
 
-\item{order_by}{Character vector. Order of mapped aesthetics by which the 
-observations within the rectangle grids should be ordered. Possible values:
-\itemize{
- \item{"group"}
- \item{"colour"}
- \item{"fill"}
- \item{"shape"}
- \item{"size"}
- \item{"alpha"}
- \item{"stroke"}
-}}
-
 \item{stat}{The statistical transformation to use on the data for this
 layer, as a string.}
 
@@ -91,11 +78,8 @@ the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
 \description{
 \code{geom_pointrect} plots points not to their exact coordinates, but
 rearranges them in rectangular boxes around the actual position. 
-This rearrangement avoids overplotting.
-}
-\details{
-The sorting order within the grid rectangles is: 
-group > colour > fill > shape > size > alpha > stroke
+This rearrangement avoids overplotting. The order within each box 
+reflects the order of the input data.frame.
 }
 \examples{
 library(ggplot2)
