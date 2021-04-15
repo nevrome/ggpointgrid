@@ -3,7 +3,7 @@
 \docType{data}
 \name{GeomPointGrid}
 \alias{GeomPointGrid}
-\title{geom object for use in geom_beeswarm}
+\title{geom object for use in geom_pointgrid}
 \format{
 An object of class \code{GeomPointGrid} (inherits from \code{Geom}, \code{ggproto}, \code{gg}) of length 6.
 }
@@ -11,6 +11,6 @@ An object of class \code{GeomPointGrid} (inherits from \code{Geom}, \code{ggprot
 GeomPointGrid
 }
 \description{
-geom object for use in geom_beeswarm
+geom object for use in geom_pointgrid
 }
 \keyword{datasets}

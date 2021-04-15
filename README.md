@@ -3,8 +3,7 @@
 
 # ggpointgrid
 
-This package provides some simple geoms (`geom_pointgrid`,
-`geom_pointrect`) derived from geom\_point to rearrange scatterplot
+This package provides some simple geoms derived to rearrange scatterplot
 coordinates on regular grids while strictly avoiding over-plotting. The
 applications might be similar to `geom_jitter`.
 
@@ -24,6 +23,8 @@ library(magrittr)
 library(palmerpenguins)
 ```
 
+#### geom\_pointgrid
+
 ``` r
 palmerpenguins::penguins %>%
   ggplot() +
@@ -36,6 +37,27 @@ palmerpenguins::penguins %>%
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
+#### geom\_textgrid
+
+``` r
+palmerpenguins::penguins %>%
+  ggplot() +
+  ggpointgrid::geom_textgrid(
+    aes(
+      x = body_mass_g, y = bill_length_mm, 
+      label = as.character(as.hexmode(1:nrow(palmerpenguins::penguins))), 
+      color = sex
+    ),
+    size = 2,
+    grid_x = 30,
+    grid_y = 50
+  )
+```
+
+![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
+#### geom\_pointrect
+
 ``` r
 palmerpenguins::penguins %>%
   dplyr::arrange(island) %>%
@@ -47,4 +69,4 @@ palmerpenguins::penguins %>%
   )
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-2-2.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->

@@ -8,7 +8,7 @@ editor_options:
 
 # ggpointgrid
 
-This package provides some simple geoms (`geom_pointgrid`, `geom_pointrect`) derived from geom_point to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting. The applications might be similar to `geom_jitter`.
+This package provides some simple geoms derived to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting. The applications might be similar to `geom_jitter`.
 
 ### Installation
 
@@ -27,6 +27,8 @@ library(magrittr)
 library(palmerpenguins)
 ```
 
+#### geom_pointgrid
+
 ```{r, warning=FALSE}
 palmerpenguins::penguins %>%
   ggplot() +
@@ -35,7 +37,28 @@ palmerpenguins::penguins %>%
     grid_x = 50,
     grid_y = 50
   )
+```
 
+#### geom_textgrid
+
+```{r, warning=FALSE}
+palmerpenguins::penguins %>%
+  ggplot() +
+  ggpointgrid::geom_textgrid(
+    aes(
+      x = body_mass_g, y = bill_length_mm, 
+      label = as.character(as.hexmode(1:nrow(palmerpenguins::penguins))), 
+      color = sex
+    ),
+    size = 2,
+    grid_x = 30,
+    grid_y = 50
+  )
+```
+
+#### geom_pointrect
+
+```{r, warning=FALSE}
 palmerpenguins::penguins %>%
   dplyr::arrange(island) %>%
   ggplot() +

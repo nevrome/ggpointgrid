@@ -58,7 +58,7 @@ geom_pointgrid <- function(
   )
 }
 
-#' geom object for use in geom_beeswarm
+#' geom object for use in geom_pointgrid
 #' @export
 GeomPointGrid <- ggplot2::ggproto(
   "GeomPointGrid", ggplot2::Geom,
@@ -74,15 +74,13 @@ GeomPointGrid <- ggplot2::ggproto(
     if (is.character(data$shape)) {
       data$shape <- translate_shape_string(data$shape)
     }
-    #huhu1 <<- data
     # this line is the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid
     # layout
     data <- arrange_points_on_grid(data, grid_x, grid_y)
-    #huhu2 <<- data
     coords <- coord$transform(data, panel_params)
-    #huhu3 <<- coords
-    ggname("geom_pointgrid",
+    ggname(
+      "geom_pointgrid",
       grid::pointsGrob(
         coords$x, coords$y,
         pch = coords$shape,
