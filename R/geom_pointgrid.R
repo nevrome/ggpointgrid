@@ -140,11 +140,16 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   return(tab)
 }
 
+# test code for the core algorithm
+# distance_matrix <- fields::rdist(expand.grid(1:5, 1:5), data.frame(x = c(2,2,3,3), y = c(2,2,3,3)))
+# distance_long <- stats::setNames(reshape2::melt(distance_matrix), c('grid_id', 'mean_point_id', 'distance'))
+# core_arrange_algorithm(distance_long)
+
 # tail-recursive implementation of the rearrangement algorithm
 core_arrange_algorithm <- function(distance_long, grid_df = data.frame()) {
   # sort table by distance
   distance_long_sorted <- distance_long[order(distance_long$distance),]
-  # get smallest distance grid point by input point
+  # get smallest distance grid point for each input point
   closest_grid_points <- distance_long_sorted[!duplicated(distance_long_sorted$mean_point_id),]
   # find grid point duplicates and create subsets with already uniquely claimed positions
   dups <- unique(closest_grid_points$grid_id[duplicated(closest_grid_points$grid_id)])
