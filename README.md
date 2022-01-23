@@ -19,14 +19,13 @@ command (in your R console):
 
 ``` r
 library(ggplot2)
-library(magrittr)
 library(palmerpenguins)
 ```
 
-#### geom\_pointgrid
+#### geom_pointgrid
 
 ``` r
-palmerpenguins::penguins %>%
+palmerpenguins::penguins |>
   ggplot() +
   ggpointgrid::geom_pointgrid(
     aes(x = body_mass_g, y = bill_length_mm, shape = species, color = sex),
@@ -37,10 +36,10 @@ palmerpenguins::penguins %>%
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
-#### geom\_textgrid
+#### geom_textgrid
 
 ``` r
-palmerpenguins::penguins %>%
+palmerpenguins::penguins |>
   ggplot() +
   ggpointgrid::geom_textgrid(
     aes(
@@ -56,11 +55,11 @@ palmerpenguins::penguins %>%
 
 ![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
-#### geom\_pointrect
+#### geom_pointrect
 
 ``` r
-palmerpenguins::penguins %>%
-  dplyr::arrange(island) %>%
+palmerpenguins::penguins |>
+  dplyr::arrange(island) |>
   ggplot() +
   ggpointgrid::geom_pointrect(
     aes(x = sex, y = species, color = island), 

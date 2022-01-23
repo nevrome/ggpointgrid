@@ -23,14 +23,13 @@ remotes::install_github("nevrome/ggpointgrid")
 
 ```{r}
 library(ggplot2)
-library(magrittr)
 library(palmerpenguins)
 ```
 
 #### geom_pointgrid
 
 ```{r, warning=FALSE}
-palmerpenguins::penguins %>%
+palmerpenguins::penguins |>
   ggplot() +
   ggpointgrid::geom_pointgrid(
     aes(x = body_mass_g, y = bill_length_mm, shape = species, color = sex),
@@ -42,7 +41,7 @@ palmerpenguins::penguins %>%
 #### geom_textgrid
 
 ```{r, warning=FALSE}
-palmerpenguins::penguins %>%
+palmerpenguins::penguins |>
   ggplot() +
   ggpointgrid::geom_textgrid(
     aes(
@@ -59,8 +58,8 @@ palmerpenguins::penguins %>%
 #### geom_pointrect
 
 ```{r, warning=FALSE}
-palmerpenguins::penguins %>%
-  dplyr::arrange(island) %>%
+palmerpenguins::penguins |>
+  dplyr::arrange(island) |>
   ggplot() +
   ggpointgrid::geom_pointrect(
     aes(x = sex, y = species, color = island), 
