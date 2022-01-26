@@ -44,26 +44,29 @@ def getBestGridPointForEachInputPoint [n] (gridIds: [n]i32) (pointIds: [n]i32) (
     let distanceIndexesAmongBests = sortIndexesf64 ds
     in map (\i -> bests[i]) distanceIndexesAmongBests
 
-def arrange (input: [](i32, i32, f64)): [](i32, i32, f64) =
-    let (gridIds, pointIds, distances) = unzip3 input
-    let bestCombs = getBestGridPointForEachInputPoint gridIds pointIds distances
-    let (gs, _, _) = bestCombs |> unzip3
-    -- find what's still in need of love
-    let overloadedGridPoints = getDuplii32 gs |> nubi32
-    let withoutMultipleCandidates = filter (\(x,_,_) -> isIni32 x overloadedGridPoints |> not) bestCombs
-    let withMultipleCandidates = filter (\(x,_,_) -> isIni32 x overloadedGridPoints) bestCombs
-    -- get the best of the best
-    let withMultipleCandidatesDecision = map (\x -> withMultipleCandidates[getFirstIndexi32 x (map (.0) withMultipleCandidates)]) overloadedGridPoints
-    -- combine the already good stuff
-    let good = withoutMultipleCandidates ++ withMultipleCandidatesDecision
-    let (gg, pg, _) = good |> unzip3
-    -- combine the leftovers
-    let leftOvers = filter (\(gi,pi,_) -> (not (isIni32 gi gg)) && (not (isIni32 pi pg))) input
-    in leftOvers
+def arrange (input: ([](i32, i32, f64),[](i32, i32, f64))) : [](i32, i32, f64) =
+    let (_,output) = loop (toHandle, result) = input while (length toHandle > 0) do
+        let (gridIds, pointIds, distances) = unzip3 toHandle
+        let bestCombs = getBestGridPointForEachInputPoint gridIds pointIds distances
+        let (gs, _, _) = bestCombs |> unzip3
+        -- find what's still in need of love
+        let overloadedGridPoints = getDuplii32 gs |> nubi32
+        let withoutMultipleCandidates = filter (\(x,_,_) -> isIni32 x overloadedGridPoints |> not) bestCombs
+        let withMultipleCandidates = filter (\(x,_,_) -> isIni32 x overloadedGridPoints) bestCombs
+        -- get the best of the best
+        let withMultipleCandidatesDecision = map (\x -> withMultipleCandidates[getFirstIndexi32 x (map (.0) withMultipleCandidates)]) overloadedGridPoints
+        -- combine the already good stuff
+        let good = result ++ withoutMultipleCandidates ++ withMultipleCandidatesDecision
+        let (gg, pg, _) = good |> unzip3
+        -- combine the leftovers
+        let leftOvers = filter (\(gi,pi,_) -> (not (isIni32 gi gg)) && (not (isIni32 pi pg))) toHandle
+        in (leftOvers, good)
+    in output
     
 
 def main [n] (gridIds: [n]i32) (pointIds: [n]i32) (distances: [n]f64): [](i32) =
-    arrange (zip3 gridIds pointIds distances) |> map (.1)
+    let hu = arrange ((zip3 gridIds pointIds distances),[])
+    in map (.0) hu ++  map (.1) hu
 
 -- futhark c arrange.fut
 -- echo [1,2,3,4] [1,1,1,2] [0.1,0,0.2,0.1] | ./arrange
