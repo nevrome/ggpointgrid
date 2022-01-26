@@ -145,6 +145,14 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
 # distance_long <- stats::setNames(reshape2::melt(distance_matrix), c('grid_id', 'mean_point_id', 'distance'))
 # core_arrange_algorithm(distance_long)
 
+#' futhark_test
+#' @export
+futhark_test <- function() {
+  
+  futhark_entry_main_cpp(3, c(1,2,3), c(1,2,3), c(0,0,0))
+  
+}
+
 # tail-recursive implementation of the rearrangement algorithm
 core_arrange_algorithm <- function(distance_long, grid_df = data.frame()) {
   # sort table by distance

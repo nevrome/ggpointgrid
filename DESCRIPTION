@@ -20,7 +20,9 @@ Imports:
   ggplot2,
   glue,
   grid,
+  Rcpp (>= 1.0.5),
   reshape2,
   rlang,
   stats
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
+LinkingTo: Rcpp

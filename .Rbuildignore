@@ -4,3 +4,4 @@
 ^README\.Rmd$
 ^NEWS\.md$
 ^playground$
+^build\.R$
