@@ -54,7 +54,10 @@ const int64_t *futhark_shape_i32_1d(struct futhark_context *ctx,
 
 
 // Entry points
-int futhark_entry_main(struct futhark_context *ctx, int32_t *out0, const
+int futhark_entry_main(struct futhark_context *ctx,
+                       struct futhark_i32_1d **out0,
+                       struct futhark_i32_1d **out1,
+                       struct futhark_i32_1d **out2, const
                        struct futhark_i32_1d *in0, const
                        struct futhark_i32_1d *in1, const
                        struct futhark_i32_1d *in2);

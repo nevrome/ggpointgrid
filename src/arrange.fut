@@ -64,9 +64,8 @@ def arrange (input: ([](i32, i32, i32),[](i32, i32, i32))) : [](i32, i32, i32) =
     in output
     
 
-def main [n] (gridIds: [n]i32) (pointIds: [n]i32) (distances: [n]i32): i32 =
-    let hu = arrange ((zip3 gridIds pointIds distances),[])
-    in map (.0) hu ++  map (.1) hu |> head
+def main [n] (gridIds: [n]i32) (pointIds: [n]i32) (distances: [n]i32): ([]i32, []i32, []i32) =
+    arrange ((zip3 gridIds pointIds distances),[]) |> unzip3
 
 -- futhark c arrange.fut
 -- echo [1,2,3,4] [1,1,1,2] [0.1,0,0.2,0.1] | ./arrange
