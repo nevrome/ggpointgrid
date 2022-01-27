@@ -37,3 +37,8 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# futhark context
+*.o
+*.so
+src/lib/
