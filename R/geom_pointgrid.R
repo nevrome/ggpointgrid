@@ -132,9 +132,8 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
     c('grid_id', 'mean_point_id', 'distance')
   )
   distance_long <- distance_long_raw
-  # distance_long <- merge(distance_long_raw, xy_grid, by = "grid_id")
   # determine the optimal grid arrangement coordinates
-  grid_df <- core_arrange_algorithm(distance_long)
+  grid_df <- core_arrange_algorithm2(distance_long)
   # replace input point coordinates with grid coordinates
   tab[grid_df$mean_point_id, c("x", "y")] <- xy_grid[grid_df$grid_id,]
   return(tab)
@@ -144,8 +143,48 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
 # distance_matrix <- fields::rdist(expand.grid(1:5, 1:5), data.frame(x = c(2,2,3,3), y = c(2,2,3,3)))
 # distance_long <- stats::setNames(reshape2::melt(distance_matrix), c('grid_id', 'mean_point_id', 'distance'))
 # core_arrange_algorithm(distance_long)
+# larger test
+# distance_matrix <- fields::rdist(expand.grid(1:100, 1:100), data.frame(x = sample(1:100, 4000, replace = T), y = sample(1:100, 4000, replace = T)))
+# distance_long <- stats::setNames(reshape2::melt(distance_matrix), c('grid_id', 'mean_point_id', 'distance'))
+# core_arrange_algorithm2(distance_long)
 
 # tail-recursive implementation of the rearrangement algorithm
+core_arrange_algorithm2 <- function(distance_long, grid_df = data.frame(), distance_long_is_sorted = FALSE) {
+  # sort table by distance if it's not already sorted
+  if (distance_long_is_sorted) {
+    distance_long_sorted <- distance_long
+  } else {
+    distance_long_sorted <- dplyr::arrange(distance_long, .data[["distance"]])
+  }
+  # get smallest distance grid point for each input point
+  closest_grid_points <- distance_long_sorted[!duplicated(distance_long_sorted$mean_point_id),]
+  # find grid point duplicates and create subsets with already uniquely claimed positions
+  grid_points_dups <- unique(closest_grid_points$grid_id[duplicated(closest_grid_points$grid_id)])
+  has_grid_point_dup <- closest_grid_points$grid_id %in% grid_points_dups
+  without_dups <- closest_grid_points[!has_grid_point_dup,]
+  with_dups <- closest_grid_points[has_grid_point_dup,]
+  # find best input point matches according to distance for duplicated grid points
+  with_dups_better <- with_dups[!duplicated(with_dups$grid_id),]
+  # construct current version of the output grid
+  newly_solved <- dplyr::bind_rows(without_dups, with_dups_better)
+  new_grid_df <- dplyr::bind_rows(grid_df, newly_solved)
+  # construct distance table with yet unattributed input and grid points
+  new_distance_long <- dplyr::anti_join(
+    dplyr::anti_join(distance_long_sorted, newly_solved, by = "grid_id"),
+    newly_solved, by = "mean_point_id"
+  )
+  # make decision whether the attribution is ready or not
+  if (nrow(new_distance_long) == 0) {
+    return(new_grid_df)
+  } else {
+    core_arrange_algorithm2(
+      new_distance_long,
+      dplyr::bind_rows(new_grid_df, newly_solved),
+      distance_long_is_sorted = T
+    )
+  }
+}
+
 core_arrange_algorithm <- function(distance_long, grid_df = data.frame()) {
   # sort table by distance
   distance_long_sorted <- distance_long[order(distance_long$distance),]
