@@ -118,9 +118,6 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
     y_grid <- grid_y
   }
   xy_grid <- expand.grid(x_grid, y_grid)
-  #xy_grid$grid_id <- seq_len(nrow(xy_grid))
-  #xy_grid$col <- rep(seq_along(y_grid), times = length(x_grid))
-  #xy_grid$row <- rep(seq_along(x_grid), each = length(y_grid))
   # size check
   if (nrow(xy_grid) < nrow(tab)) {
     stop("The grid is not big enough to accommodate all input points.")
