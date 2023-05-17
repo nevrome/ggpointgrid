@@ -8,7 +8,7 @@ editor_options:
 
 # ggpointgrid
 
-This package provides some simple geoms derived to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting. The applications might be similar to `geom_jitter`.
+This package provides some simple geoms derived to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting. The applications are similar to `geom_jitter`.
 
 ### Installation
 
@@ -23,48 +23,67 @@ remotes::install_github("nevrome/ggpointgrid")
 
 ```{r}
 library(ggplot2)
-library(palmerpenguins)
+set.seed(5)
 ```
 
-#### geom_pointgrid
+#### `geom_pointgrid`
 
 ```{r, warning=FALSE}
-palmerpenguins::penguins |>
+test_data_1 <- tibble::tibble(
+  x = rep(c(1,1,2,3,3), times = 10),
+  y = rep(c(1,3,2,1,3), times = 10),
+  var = sample(c("A", "B", "C"), size = 50, replace = T)
+)
+
+p1 <- test_data_1 |>
+  ggplot() +
+  geom_point(aes(x, y, color = var)) +
+  coord_fixed()
+
+p2 <- test_data_1 |>
+  ggplot() +
+  geom_jitter(aes(x, y, color = var), width = 0.3, height = 0.3) +
+  coord_fixed()
+
+p3 <- test_data_1 |>
   ggplot() +
   ggpointgrid::geom_pointgrid(
-    aes(x = body_mass_g, y = bill_length_mm, shape = species, color = sex),
-    grid_x = 50,
-    grid_y = 50
-  )
+    aes(x, y, color = var),
+    grid_x = 15,
+    grid_y = 15
+  ) +
+  coord_fixed()
+
+cowplot::plot_grid(p1, p2, p3)
 ```
 
-#### geom_textgrid
+`geom_textgrid` performs the same arrangement operation on text data, so can be used in place of `geom_text`.
+
+#### `geom_pointrect`
 
 ```{r, warning=FALSE}
-palmerpenguins::penguins |>
+test_data_2 <- tibble::tibble(
+  x = rep(letters[c(1,1,2,3,3)], times = 10),
+  y = rep(letters[c(1,3,2,1,3)], times = 10),
+  var = sample(c("A", "B", "C"), size = 50, replace = T)
+) |> dplyr::arrange(var)
+
+p4 <- test_data_2 |>
   ggplot() +
-  ggpointgrid::geom_textgrid(
-    aes(
-      x = body_mass_g, y = bill_length_mm, 
-      label = as.character(as.hexmode(1:nrow(palmerpenguins::penguins))), 
-      color = sex
-    ),
-    size = 2,
-    grid_x = 30,
-    grid_y = 50
-  )
-```
+  geom_point(aes(x, y, color = var)) +
+  coord_fixed()
 
-#### geom_pointrect
+p5 <- test_data_2 |>
+  ggplot() +
+  geom_jitter(aes(x, y, color = var), width = 0.3, height = 0.3) +
+  coord_fixed()
 
-```{r, warning=FALSE}
-palmerpenguins::penguins |>
-  dplyr::arrange(island) |>
+p6 <- test_data_2 |>
   ggplot() +
   ggpointgrid::geom_pointrect(
-    aes(x = sex, y = species, color = island), 
-    scale_x = 0.05, 
-    scale_y = 0.05
-  )
-```
+    aes(x, y, color = var)
+  ) +
+  coord_fixed()
 
+cowplot::plot_grid(p4, p5, p6)
+```
