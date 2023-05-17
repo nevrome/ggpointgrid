@@ -29,32 +29,35 @@ set.seed(5)
 #### `geom_pointgrid`
 
 ```{r, warning=FALSE}
-test_data_1 <- tibble::tibble(
+df <- tibble::tibble(
   x = rep(c(1,1,2,3,3), times = 10),
   y = rep(c(1,3,2,1,3), times = 10),
   var = sample(c("A", "B", "C"), size = 50, replace = T)
 )
 
-p1 <- test_data_1 |>
-  ggplot() +
+coord <- coord_fixed(xlim = c(0.5,3.5), ylim = c(0.5,3.5))
+
+p1 <- ggplot(df) +
   geom_point(aes(x, y, color = var)) +
-  coord_fixed()
+  coord + ggtitle("geom_point")
 
-p2 <- test_data_1 |>
-  ggplot() +
+p2 <- ggplot(df) +
   geom_jitter(aes(x, y, color = var), width = 0.3, height = 0.3) +
-  coord_fixed()
+  coord + ggtitle("geom_jitter")
 
-p3 <- test_data_1 |>
-  ggplot() +
+p3 <- ggplot(df) +
+  ggpointgrid::geom_pointgrid(aes(x, y, color = var), grid_x = 15, grid_y = 15) +
+  coord + ggtitle("geom_pointgrid")
+
+p4 <- ggplot(df) +
   ggpointgrid::geom_pointgrid(
     aes(x, y, color = var),
-    grid_x = 15,
-    grid_y = 15
+    grid_x = seq(min(df$x) - 0.3, max(df$x) + 0.3, length.out = 18),
+    grid_y = seq(min(df$y) - 0.3, max(df$y) + 0.3, length.out = 18)
   ) +
-  coord_fixed()
+  coord + ggtitle("geom_pointgrid, grid specified")
 
-cowplot::plot_grid(p1, p2, p3)
+cowplot::plot_grid(p1, p2, p3, p4)
 ```
 
 `geom_textgrid` performs the same arrangement operation on text data, so can be used in place of `geom_text`.
@@ -62,28 +65,33 @@ cowplot::plot_grid(p1, p2, p3)
 #### `geom_pointrect`
 
 ```{r, warning=FALSE}
-test_data_2 <- tibble::tibble(
+df <- tibble::tibble(
   x = rep(letters[c(1,1,2,3,3)], times = 10),
   y = rep(letters[c(1,3,2,1,3)], times = 10),
   var = sample(c("A", "B", "C"), size = 50, replace = T)
 ) |> dplyr::arrange(var)
 
-p4 <- test_data_2 |>
-  ggplot() +
+coord <- coord_fixed()
+
+p4 <- ggplot(df) +
   geom_point(aes(x, y, color = var)) +
-  coord_fixed()
+  coord + ggtitle("geom_point")
 
-p5 <- test_data_2 |>
-  ggplot() +
+p5 <- ggplot(df) +
   geom_jitter(aes(x, y, color = var), width = 0.3, height = 0.3) +
-  coord_fixed()
+  coord + ggtitle("geom_jitter")
 
-p6 <- test_data_2 |>
-  ggplot() +
+p6 <- ggplot(df) +
+  ggpointgrid::geom_pointrect(aes(x, y, color = var)) +
+  coord + ggtitle("geom_pointrect")
+
+p7 <- ggplot(df) +
   ggpointgrid::geom_pointrect(
-    aes(x, y, color = var)
+    aes(x, y, color = var),
+    scale_x = 0.2,
+    scale_y = 0.2
   ) +
-  coord_fixed()
+  coord + ggtitle("geom_pointrect, scaling set")
 
-cowplot::plot_grid(p4, p5, p6)
+cowplot::plot_grid(p4, p5, p6, p7)
 ```
