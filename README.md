@@ -3,9 +3,9 @@
 
 # ggpointgrid
 
-This package provides some simple geoms derived to rearrange scatterplot
-coordinates on regular grids while strictly avoiding over-plotting. The
-applications might be similar to `geom_jitter`.
+This package provides geoms to rearrange scatter-plot coordinates on
+regular grids while strictly avoiding over-plotting. The applications
+are similar to `geom_jitter`.
 
 ### Installation
 
@@ -15,57 +15,106 @@ command (in your R console):
     if(!require('remotes')) install.packages('remotes')
     remotes::install_github("nevrome/ggpointgrid")
 
-### Example
+### Examples
 
 ``` r
 library(ggplot2)
-library(palmerpenguins)
+set.seed(5)
 ```
 
-#### geom_pointgrid
+#### `geom_pointgrid`
+
+`geom_pointgrid` aims to optimize the arrangement of observations on a
+regular grid. This works well for figures with continuously scaled x-
+and y-axes, so for scatter-plots or even map plots. Just as in
+`geom_jitter` the rearrangement of the points reduces accuracy and
+precision of positional information on x and y in favour of making
+**every** observation visible.
+
+The grid properties are controlled with the parameters `grid_x` and
+`grid_y`, which allow to precisely specify the desired graticules.
 
 ``` r
-palmerpenguins::penguins |>
-  ggplot() +
+df <- tibble::tibble(
+  x = rep(c(1,1,2,3,3), times = 10),
+  y = rep(c(1,3,2,1,3), times = 10),
+  var = sample(c("A", "B", "C"), size = 50, replace = T)
+)
+
+coord <- coord_fixed(xlim = c(0.5,3.5), ylim = c(0.5,3.5))
+
+p1 <- ggplot(df) +
+  geom_point(aes(x, y, color = var)) +
+  coord + ggtitle("geom_point")
+
+p2 <- ggplot(df) +
+  geom_jitter(aes(x, y, color = var), width = 0.3, height = 0.3) +
+  coord + ggtitle("geom_jitter")
+
+p3 <- ggplot(df) +
+  ggpointgrid::geom_pointgrid(aes(x, y, color = var), grid_x = 15, grid_y = 15) +
+  coord + ggtitle("geom_pointgrid")
+
+p4 <- ggplot(df) +
   ggpointgrid::geom_pointgrid(
-    aes(x = body_mass_g, y = bill_length_mm, shape = species, color = sex),
-    grid_x = 50,
-    grid_y = 50
-  )
+    aes(x, y, color = var),
+    grid_x = seq(min(df$x) - 0.3, max(df$x) + 0.3, length.out = 18),
+    grid_y = seq(min(df$y) - 0.3, max(df$y) + 0.3, length.out = 18)
+  ) +
+  coord + ggtitle("geom_pointgrid, grid specified")
+
+cowplot::plot_grid(p1, p2, p3, p4)
 ```
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
-#### geom_textgrid
+`geom_textgrid` performs the same arrangement operation on text data. It
+is to `geom_text` what `geom_pointgrid` is to `geom_point`.
+
+#### `geom_pointrect`
+
+`geom_pointrect` was designed for a slightly different use-case than
+`geom_pointgrid`. Here all observations that share the x- and
+y-coordinate are spread out into a rectangular grid, representing only
+this one position. This is especially useful, when the x- and y- axis
+are ordinally scaled.
+
+The order within each rectangle can be set by the order of the input
+data.frame and the arguments `scale_x` and `scale_y` control the size of
+the per-position box. The arguments `round_x` and `round_y` allow to
+specify how data on continuously scaled x- and y-axes should be
+aggregated.
 
 ``` r
-palmerpenguins::penguins |>
-  ggplot() +
-  ggpointgrid::geom_textgrid(
-    aes(
-      x = body_mass_g, y = bill_length_mm, 
-      label = as.character(as.hexmode(1:nrow(palmerpenguins::penguins))), 
-      color = sex
-    ),
-    size = 2,
-    grid_x = 30,
-    grid_y = 50
-  )
+df <- tibble::tibble(
+  x = rep(letters[c(1,1,2,3,3)], times = 10),
+  y = rep(letters[c(1,3,2,1,3)], times = 10),
+  var = sample(c("A", "B", "C"), size = 50, replace = T)
+) |> dplyr::arrange(var)
+
+coord <- coord_fixed()
+
+p4 <- ggplot(df) +
+  geom_point(aes(x, y, color = var)) +
+  coord + ggtitle("geom_point")
+
+p5 <- ggplot(df) +
+  geom_jitter(aes(x, y, color = var), width = 0.3, height = 0.3) +
+  coord + ggtitle("geom_jitter")
+
+p6 <- ggplot(df) +
+  ggpointgrid::geom_pointrect(aes(x, y, color = var)) +
+  coord + ggtitle("geom_pointrect")
+
+p7 <- ggplot(df) +
+  ggpointgrid::geom_pointrect(
+    aes(x, y, color = var),
+    scale_x = 0.2,
+    scale_y = 0.2
+  ) +
+  coord + ggtitle("geom_pointrect, scaling set")
+
+cowplot::plot_grid(p4, p5, p6, p7)
 ```
 
 ![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
-
-#### geom_pointrect
-
-``` r
-palmerpenguins::penguins |>
-  dplyr::arrange(island) |>
-  ggplot() +
-  ggpointgrid::geom_pointrect(
-    aes(x = sex, y = species, color = island), 
-    scale_x = 0.05, 
-    scale_y = 0.05
-  )
-```
-
-![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
