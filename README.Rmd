@@ -8,7 +8,7 @@ editor_options:
 
 # ggpointgrid
 
-This package provides some simple geoms derived to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting. The applications are similar to `geom_jitter`.
+This package provides geoms to rearrange scatter-plot coordinates on regular grids while strictly avoiding over-plotting. The applications are similar to `geom_jitter`.
 
 ### Installation
 
@@ -19,7 +19,7 @@ if(!require('remotes')) install.packages('remotes')
 remotes::install_github("nevrome/ggpointgrid")
 ```
 
-### Example
+### Examples
 
 ```{r}
 library(ggplot2)
@@ -27,6 +27,10 @@ set.seed(5)
 ```
 
 #### `geom_pointgrid`
+
+`geom_pointgrid` aims to optimize the arrangement of observations on a regular grid. This works well for figures with continuously scaled x- and y-axes, so for scatter-plots or even map plots. Just as in `geom_jitter` the rearrangement of the points reduces accuracy and precision of positional information on x and y in favour of making **every** observation visible.
+
+The grid properties are controlled with the parameters `grid_x` and `grid_y`, which allow to precisely specify the desired graticules.
 
 ```{r, warning=FALSE}
 df <- tibble::tibble(
@@ -60,9 +64,13 @@ p4 <- ggplot(df) +
 cowplot::plot_grid(p1, p2, p3, p4)
 ```
 
-`geom_textgrid` performs the same arrangement operation on text data, so can be used in place of `geom_text`.
+`geom_textgrid` performs the same arrangement operation on text data. It is to `geom_text` what `geom_pointgrid` is to `geom_point`.
 
 #### `geom_pointrect`
+
+`geom_pointrect` was designed for a slightly different use-case than `geom_pointgrid`. Here all observations that share the x- and y-coordinate are spread out into a rectangular grid, representing only this one position. This is especially useful, when the x- and y- axis are ordinally scaled.
+
+The order within each rectangle can be set by the order of the input data.frame and the arguments `scale_x` and `scale_y` control the size of the per-position box. The arguments `round_x` and `round_y` allow to specify how data on continuously scaled x- and y-axes should be aggregated.
 
 ```{r, warning=FALSE}
 df <- tibble::tibble(
