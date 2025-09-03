@@ -93,8 +93,9 @@ def arrange_with_distances
       in (leftOvers, good)
   in output
 
--- returns per-point assigned grid coordinates (same order as input points).
-def arrange_from_coordinates
+-- returns per-point assigned grid coordinates (same order as input points)
+-- this is the main function that gets called from R
+entry arrange_from_coordinates
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64) (pts_y: []f64)
   : ([]f64, []f64) =
@@ -119,5 +120,5 @@ def arrange_points_on_grid_from_gridvectors
 -- futhark c arrange.fut
 -- echo [1,2,3,4] [1,1,1,2] [0.1,0,0.2,0.1] | ./arrange
 
-def main : ([]f64, []f64) =
-    arrange_points_on_grid_from_gridvectors [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1]
+--def main : ([]f64, []f64) =
+--    arrange_points_on_grid_from_gridvectors [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1]

@@ -155,7 +155,7 @@ arrange_points_on_grid <- function(tab, grid_x, grid_y) {
 #' @export
 futhark_test <- function() {
   
-  futhark_entry_main_cpp(3, c(1,2,3), c(1,2,3), c(0,0,0))
+  futhark_entry_arrange_from_coordinates_cpp(c(1,2,3,4), c(1,2,3,4), c(4,4,4), c(4,4,4))
   
 }
 
