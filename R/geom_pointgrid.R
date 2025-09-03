@@ -95,6 +95,12 @@ GeomPointGrid <- ggplot2::ggproto(
   }
 )
 
+# test arrange_points_on_grid
+# tab <- dplyr::transmute(iris, x = Sepal.Length, y = Sepal.Width)
+# grid_x <- 20
+# grid_y <- 20
+# arrange_points_on_grid(tab, grid_x, grid_y)
+
 arrange_points_on_grid <- function(tab, grid_x, grid_y) {
   # define grid the input points should be mapped to
   if (length(grid_x) == 1) {
