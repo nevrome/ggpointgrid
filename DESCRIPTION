@@ -1,7 +1,7 @@
 Package: ggpointgrid
 Title: Rearrange scatter plot points on a regular grid
 Description: Some simple geoms derived from geom_point to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting.
-Version: 1.2.0
+Version: 1.3.0
 Authors@R: 
   c(person(given = "Clemens",
            family = "Schmid",
@@ -16,6 +16,7 @@ License: GPL-3 | file LICENSE
 Encoding: UTF-8
 Imports:
   checkmate,
+  dplyr,
   fields,
   ggplot2,
   glue,
@@ -24,5 +25,5 @@ Imports:
   reshape2,
   rlang,
   stats
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.3
 LinkingTo: Rcpp
