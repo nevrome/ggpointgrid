@@ -2,26 +2,24 @@
 
 library(ggplot2)
 
+n <- 4000
 my_data <- tibble::tibble(
-  x = rnorm(4000),
-  y = rnorm(4000),
-  value = sample(c("A", "B"), 4000, replace = T)
+  x = runif(n, -5, 5),
+  y = runif(n, -5, 5),
+  value = sample(c("A", "B"), n, replace = T)
 )
 
-p1 <- ggplot(my_data, aes(x = x, y = y, color = value)) +
+ggplot(my_data, aes(x = x, y = y, color = value)) +
   geom_point() +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
-
-axes <- ggpointgrid:::make_grid_axes_2D(my_data, grid_x = 80, grid_y = 80)
-arrange_points_on_grid_df(my_data, axis_x = axes[[1]], axis_y = axes[[2]])
-arrange_points_on_grid_legacy(my_data, axis_x = axes[[1]], axis_y = axes[[2]])
 
 ggplot(my_data, aes(x = x, y = y, color = value)) +
   ggpointgrid::geom_pointgrid(grid_x = 80, grid_y = 80) +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
 
-cowplot::plot_grid(p1, p2)
-
+axes <- ggpointgrid:::make_grid_axes_2D(my_data, grid_x = 80, grid_y = 80)
+system.time(arrange_points_on_grid_df(my_data, axis_x = axes[[1]], axis_y = axes[[2]]))
+system.time(arrange_points_on_grid_legacy(my_data, axis_x = axes[[1]], axis_y = axes[[2]]))
 
 #### algorithm test ####
 

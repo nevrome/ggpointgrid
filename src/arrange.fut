@@ -6,13 +6,6 @@ def sortIndicesf64 [n] (xs: [n]f64): [n]i64 =
   |> radix_sort_float_by_key (.0) f64.num_bits f64.get_bit
   |> map (.1)
 
--- expand two 1D axes into a flattened grid (optional helper)
-def expand_grid (xs: []f64) (ys: []f64): ([]f64, []f64) =
-  let gx = length xs
-  let grid_xs_2d = map (\_y -> xs) ys
-  let grid_ys_2d = map (\y  -> replicate gx y) ys
-  in (flatten grid_xs_2d, flatten grid_ys_2d)
-
 -- build all pairwise squared distances between grid cells and points
 def pairwise_squared_distances
   (grid_xs: []f64) (grid_ys: []f64)
@@ -77,6 +70,13 @@ entry arrange_from_coordinates
   let out_y = scatter out_y0 ps ys_assign
   in (out_x, out_y)
 
+-- expand two 1D axes into a flattened grid (optional helper)
+def expand_grid (xs: []f64) (ys: []f64): ([]f64, []f64) =
+  let gx = length xs
+  let grid_xs_2d = map (\_y -> xs) ys
+  let grid_ys_2d = map (\y  -> replicate gx y) ys
+  in (flatten grid_xs_2d, flatten grid_ys_2d)
+  
 -- alternativ interface that also does the grid expansion
 def arrange_points_on_grid_from_gridvectors
   (grid_x: []f64) (grid_y: []f64)

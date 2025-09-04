@@ -6005,7 +6005,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
     bool nonzzero_cert_10788;
     
     if (!nonzzero_10787) {
-        set_error(ctx, msgprintf("Error: %s\n\nBacktrace:\n%s", "division by zero", "-> #0  arrange.fut:26:18-21\n   #1  arrange.fut:31:6-16\n   #2  arrange.fut:63:1-78:20\n"));
+        set_error(ctx, msgprintf("Error: %s\n\nBacktrace:\n%s", "division by zero", "-> #0  arrange.fut:19:18-21\n   #1  arrange.fut:24:6-16\n   #2  arrange.fut:56:1-71:20\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
@@ -6029,7 +6029,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
     bool index_certs_10825;
     
     if (!protect_assert_disj_10824) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) tmp_10819, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_10780, "].", "-> #0  /prelude/array.fut:28:29-37\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:25:24-36\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:53:60-62\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:104:35-37\n   #4  /prelude/functional.fut:9:44-45\n   #5  lib/github.com/diku-dk/sorts/radix_sort.fut:110:56-58\n   #6  /prelude/functional.fut:9:44-45\n   #7  arrange.fut:63:1-78:20\n"));
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) tmp_10819, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_10780, "].", "-> #0  /prelude/array.fut:28:29-37\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:25:24-36\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:53:60-62\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:104:35-37\n   #4  /prelude/functional.fut:9:44-45\n   #5  lib/github.com/diku-dk/sorts/radix_sort.fut:110:56-58\n   #6  /prelude/functional.fut:9:44-45\n   #7  arrange.fut:56:1-71:20\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
@@ -6069,7 +6069,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10796;
         
         if (!bounds_check_10795) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) gi_10791, "] out of bounds for array of shape [", (long long) dz2080U_8930, "].", "-> #0  arrange.fut:28:14-25\n   #1  arrange.fut:31:6-16\n   #2  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) gi_10791, "] out of bounds for array of shape [", (long long) dz2080U_8930, "].", "-> #0  arrange.fut:21:14-25\n   #1  arrange.fut:24:6-16\n   #2  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6080,7 +6080,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10801;
         
         if (!bounds_check_10800) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) pj_10792, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:28:28-37\n   #1  arrange.fut:31:6-16\n   #2  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) pj_10792, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:21:28-37\n   #1  arrange.fut:24:6-16\n   #2  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6090,7 +6090,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10806;
         
         if (!bounds_check_10805) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) gi_10791, "] out of bounds for array of shape [", (long long) dz2081U_8931, "].", "-> #0  arrange.fut:29:14-25\n   #1  arrange.fut:31:6-16\n   #2  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) gi_10791, "] out of bounds for array of shape [", (long long) dz2081U_8931, "].", "-> #0  arrange.fut:22:14-25\n   #1  arrange.fut:24:6-16\n   #2  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6100,7 +6100,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10810;
         
         if (!bounds_check_10809) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) pj_10792, "] out of bounds for array of shape [", (long long) dz2083U_8933, "].", "-> #0  arrange.fut:29:28-37\n   #1  arrange.fut:31:6-16\n   #2  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) pj_10792, "] out of bounds for array of shape [", (long long) dz2083U_8933, "].", "-> #0  arrange.fut:22:28-37\n   #1  arrange.fut:24:6-16\n   #2  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6389,7 +6389,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10950;
         
         if (!bounds_check_10949) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i_10941, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_10780, "].", "-> #0  arrange.fut:49:15-21\n   #1  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i_10941, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_10780, "].", "-> #0  arrange.fut:42:15-21\n   #1  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6401,7 +6401,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10955;
         
         if (!bounds_check_10954) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) j_10951, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_10780, "].", "-> #0  arrange.fut:50:15-25\n   #1  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) j_10951, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_10780, "].", "-> #0  arrange.fut:43:15-25\n   #1  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6416,7 +6416,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_10963;
         
         if (!bounds_check_10962) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_10959, "] out of bounds for array of shape [", (long long) dz2080U_8930, "].", "-> #0  arrange.fut:52:18-31\n   #1  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_10959, "] out of bounds for array of shape [", (long long) dz2080U_8930, "].", "-> #0  arrange.fut:45:18-31\n   #1  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6432,7 +6432,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
             bool index_certs_11199;
             
             if (!bounds_check_11198) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) new_index_10958, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:52:39-53\n   #1  arrange.fut:63:1-78:20\n"));
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) new_index_10958, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:45:39-53\n   #1  arrange.fut:56:1-71:20\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
@@ -6455,7 +6455,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
             bool index_certs_11205;
             
             if (!bounds_check_11204) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) cnt_10946, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:53:26-46\n   #1  arrange.fut:63:1-78:20\n"));
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) cnt_10946, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:46:26-46\n   #1  arrange.fut:56:1-71:20\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
@@ -6466,7 +6466,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
             bool index_certs_11212;
             
             if (!bounds_check_11211) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) new_index_10958, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:56:32-59\n   #1  arrange.fut:63:1-78:20\n"));
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) new_index_10958, "] out of bounds for array of shape [", (long long) dz2082U_8932, "].", "-> #0  arrange.fut:49:32-59\n   #1  arrange.fut:56:1-71:20\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
@@ -6525,7 +6525,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_11045;
         
         if (!bounds_check_11044) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) write_iv_11267, "] out of bounds for array of shape [", (long long) dz2080U_8930, "].", "-> #0  arrange.fut:72:30-40\n   #1  arrange.fut:72:42-44\n   #2  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) write_iv_11267, "] out of bounds for array of shape [", (long long) dz2080U_8930, "].", "-> #0  arrange.fut:65:30-40\n   #1  arrange.fut:65:42-44\n   #2  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
@@ -6535,7 +6535,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool index_certs_11051;
         
         if (!bounds_check_11050) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) write_iv_11267, "] out of bounds for array of shape [", (long long) dz2081U_8931, "].", "-> #0  arrange.fut:73:30-40\n   #1  arrange.fut:73:42-44\n   #2  arrange.fut:63:1-78:20\n"));
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) write_iv_11267, "] out of bounds for array of shape [", (long long) dz2081U_8931, "].", "-> #0  arrange.fut:66:30-40\n   #1  arrange.fut:66:42-44\n   #2  arrange.fut:56:1-71:20\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
