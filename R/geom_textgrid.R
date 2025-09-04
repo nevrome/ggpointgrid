@@ -32,9 +32,6 @@ geom_textgrid <- function(
   show.legend = NA,
   inherit.aes = TRUE
 ) {
-  # input check
-  checkmate::assert_numeric(grid_x, any.missing = FALSE)
-  checkmate::assert_numeric(grid_y, any.missing = FALSE)
   # call layer function
   ggplot2::layer(
     mapping = mapping,
@@ -74,8 +71,11 @@ GeomTextGrid <- ggplot2::ggproto(
       lab <- parse_safe(as.character(lab))
     }
     
+    # these two lines are the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid layout
-    data <- arrange_points_on_grid(data, grid_x, grid_y)
+    axes <- make_grid_axes_2D(data, grid_x, grid_y)
+    data <- arrange_points_on_grid_df(data, axes[["x"]], axes[["y"]])
+
     coords <- coord$transform(data, panel_params)
 
     if (is.character(data$vjust)) {

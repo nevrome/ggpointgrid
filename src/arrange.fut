@@ -94,14 +94,10 @@ def arrange_with_distances
   in output
 
 -- returns per-point assigned grid coordinates (same order as input points)
--- this is the main function that gets called from R
 entry arrange_from_coordinates
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64) (pts_y: []f64)
   : ([]f64, []f64) =
-  let m = length grid_xs
-  let n = length pts_x
-  let _ = assert (m >= n) "The grid is not big enough to accommodate all input points."
   let (gridIds0, pointIds0, distances0) = pairwise_squared_distances grid_xs grid_ys pts_x pts_y
   let solved = arrange_with_distances (zip3 gridIds0 pointIds0 distances0, [])
   let (gs, ps, _) = unzip3 solved
@@ -109,16 +105,17 @@ entry arrange_from_coordinates
   let out_y = scatter (copy pts_y) (map i64.i32 ps) (map (\gid -> grid_ys[i64.i32 gid]) gs)
   in (out_x, out_y)
 
-def arrange_points_on_grid_from_gridvectors
-  (grid_x: []f64) (grid_y: []f64)
+-- alternativ interface that also does the grid expansion
+def arrange_points_on_grid_from_axisvectors
+  (axis_x: []f64) (axis_y: []f64)
   (pts_x: []f64) (pts_y: []f64):
   ([]f64, []f64) =
-  let (gx, gy) = expand_grid grid_x grid_y
+  let (gx, gy) = expand_grid axis_x axis_y
   in arrange_from_coordinates gx gy pts_x pts_y
 
 
--- futhark c arrange.fut
--- echo [1,2,3,4] [1,1,1,2] [0.1,0,0.2,0.1] | ./arrange
-
 --def main : ([]f64, []f64) =
---    arrange_points_on_grid_from_gridvectors [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1]
+--    arrange_points_on_grid_from_axisvectors [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1]
+
+-- futhark c arrange.fut
+-- echo | ./arrange
