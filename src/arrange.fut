@@ -1,12 +1,8 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
 
-def i32iota n = map i32.i64 (iota (i64.i32 n))
-def i32replicate n x = replicate (i64.i32 n) x
-def i32length xs = length xs |> i32.i64
-
 -- sort indices by f32 key (ascending)
-def sortIndicesf32 [n] (xs: [n]f32): [n]i32 =
-  zip xs (iota n |> map i32.i64)
+def sortIndicesf32 [n] (xs: [n]f32): [n]i64 =
+  zip xs (iota n)
   |> radix_sort_float_by_key (.0) f32.num_bits f32.get_bit
   |> map (.1)
 
@@ -14,49 +10,46 @@ def sortIndicesf32 [n] (xs: [n]f32): [n]i32 =
 def pairwise_squared_distances
   (grid_xs: []f32) (grid_ys: []f32)
   (pts_x: []f32) (pts_y: []f32)
-  (m: i32) (n: i32)
-  : ([]i32, []i32, []f32) =
-  let total: i32 = m * n
-  let gridIds_flat: []i32 =
-    map (\(gi: i32) -> i32replicate n gi) (i32iota m) |> flatten
-  let pointIds_flat: []i32 =
-    i32replicate m (i32iota n) |> flatten
-  let dists: []f32 = map (\(idx: i32) ->
-    let gi: i32 = idx / n
-    let pj: i32 = idx % n
+  (m: i64) (n: i64)
+  : ([]i64, []i64, []f32) =
+  let total = m * n
+  let gridIds_flat = map (\gi -> replicate n gi) (iota m) |> flatten
+  let pointIds_flat = replicate m (iota n) |> flatten
+  let dists = map (\idx ->
+    let gi = idx / n
+    let pj = idx % n
     let dx = grid_xs[gi] - pts_x[pj]
     let dy = grid_ys[gi] - pts_y[pj]
     in dx*dx + dy*dy
-  ) (i32iota total)
+  ) (iota total)
   in (gridIds_flat, pointIds_flat, dists)
 
 -- returns exactly n matches when m >= n
 def greedy_match_sorted
-  (gridIds: []i32) (pointIds: []i32) (distances: []f32)
-  (m: i32) (n: i32)
-  : ([]i32, []i32) =
-  let L: i32 = i32length distances
-  let idx: []i32 = sortIndicesf32 distances
-  let out_g0: []i32 = i32replicate n 0i32
-  let out_p0: []i32 = i32replicate n 0i32
-  let grid_taken0: []bool = i32replicate m false
-  let point_taken0: []bool = i32replicate n false
+  (gridIds: []i64) (pointIds: []i64) (distances: []f32)
+  (m: i64) (n: i64)
+  : ([]i64, []i64) =
+  let L = length distances
+  let idx = sortIndicesf32 distances
+  let out_g0 = replicate n 0i64
+  let out_p0 = replicate n 0i64
+  let grid_taken0 = replicate m false
+  let point_taken0 = replicate n false
   let (_, _, _, og, op, _) =
-    loop (i: i32, grid_taken: *[]bool, point_taken: *[]bool,
-          out_g: *[]i32, out_p: *[]i32, cnt: i32) =
-      (0i32, grid_taken0, point_taken0, out_g0, out_p0, 0i32)
+    loop (i, grid_taken, point_taken, out_g, out_p, cnt) =
+      (0i64, grid_taken0, point_taken0, out_g0, out_p0, 0i64)
     while i < L && cnt < n do
-      let j: i32 = idx[i]
-      let g: i32 = gridIds[j]
-      let p: i32 = pointIds[j]
-      in if not grid_taken[g] && not point_taken[p] then
-           let out_g' = out_g with [cnt] = g
-           let out_p' = out_p with [cnt] = p
-           let grid_taken' = grid_taken with [g] = true
-           let point_taken' = point_taken with [p] = true
-           in (i+1i32, grid_taken', point_taken', out_g', out_p', cnt+1i32)
-         else
-           (i+1i32, grid_taken, point_taken, out_g, out_p, cnt)
+      let j = idx[i]
+      let g = gridIds[j]
+      let p = pointIds[j]
+      in  if not grid_taken[g] && not point_taken[p] then
+            let out_g' = out_g with [cnt] = g
+            let out_p' = out_p with [cnt] = p
+            let grid_taken' = grid_taken with [g] = true
+            let point_taken' = point_taken with [p] = true
+            in (i+1, grid_taken', point_taken', out_g', out_p', cnt+1)
+          else
+            (i+1, grid_taken, point_taken, out_g, out_p, cnt)
   in (og, op)
 
 -- returns per-point assigned grid coordinates (same order as input points)
@@ -64,24 +57,24 @@ entry arrange_from_coordinates
   (grid_xs: []f32) (grid_ys: []f32)
   (pts_x: []f32)  (pts_y: []f32)
   : ([]f32, []f32) =
-  let m: i32 = i32length grid_xs
-  let n: i32 = i32length pts_x
+  let m = length grid_xs
+  let n = length pts_x
   let (gridIds0, pointIds0, distances0) =
     pairwise_squared_distances grid_xs grid_ys pts_x pts_y m n
   let (gs, ps) = greedy_match_sorted gridIds0 pointIds0 distances0 m n
-  let xs_assign: []f32 = map (\(g: i32) -> grid_xs[g]) gs
-  let ys_assign: []f32 = map (\(g: i32) -> grid_ys[g]) gs
-  let out_x0: []f32 = i32replicate n 0.0f32
-  let out_y0: []f32 = i32replicate n 0.0f32
-  let out_x: []f32 = scatter out_x0 (map i64.i32 ps) xs_assign
-  let out_y: []f32 = scatter out_y0 (map i64.i32 ps) ys_assign
+  let xs_assign = map (\g -> grid_xs[g]) gs
+  let ys_assign = map (\g -> grid_ys[g]) gs
+  let out_x0 = replicate n 0.0
+  let out_y0 = replicate n 0.0
+  let out_x = scatter out_x0 ps xs_assign
+  let out_y = scatter out_y0 ps ys_assign
   in (out_x, out_y)
 
 -- expand two 1D axes into a flattened grid (optional helper)
 def expand_grid (xs: []f32) (ys: []f32): ([]f32, []f32) =
-  let gx: i32 = i32length xs
+  let gx = length xs
   let grid_xs_2d = map (\_y -> xs) ys
-  let grid_ys_2d = map (\(y: f32) -> i32replicate gx y) ys
+  let grid_ys_2d = map (\y  -> replicate gx y) ys
   in (flatten grid_xs_2d, flatten grid_ys_2d)
   
 -- alternativ interface that also does the grid expansion
