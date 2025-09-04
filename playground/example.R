@@ -2,7 +2,7 @@
 
 library(ggplot2)
 
-n <- 1000
+n <- 2000
 my_data <- tibble::tibble(
   x = runif(n, -5, 5),
   y = runif(n, -5, 5),
@@ -32,13 +32,8 @@ zu <- paste(
 system(paste("time", zu))
 hu <- system(zu, intern = T)
 
-myprint(zu)
-myprint(hu[[1]])
-myprint<- function(somestring,idelimit=100) {
-  for(i in seq(1,nchar(somestring),idelimit+1)) {
-    print(substr(somestring,i,i+idelimit));
-  }
-}
+writeLines(zu, "futhark_test.txt")
+writeLines(hu[[1]] "futhark_test.txt")
 
 #### algorithm test ####
 

@@ -87,10 +87,22 @@ def arrange_points_on_grid_from_gridvectors
 
 -- only there for testing purposes
 def main 
-  (grid_xs: []f64) (grid_ys: []f64)
-  (pts_x: []f64)  (pts_y: []f64)
-  : ([]f64, []f64) =
-    arrange_points_on_grid_from_gridvectors grid_xs grid_ys pts_x pts_y
+   (grid_xs: []f64) (grid_ys: []f64)
+   (pts_x: []f64)  (pts_y: []f64)
+   : ([]f64, []f64) =
+     arrange_points_on_grid_from_gridvectors grid_xs grid_ys pts_x pts_y
 
+-- running on the command line
 -- futhark c arrange.fut
 -- echo [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1] | ./arrange
+
+-- profiling
+-- see https://futhark.readthedocs.io/en/latest/man/futhark-profile.html
+-- futhark bench -v --backend=multicore --profile --json result.json arrange.fut
+-- futhark profile result.json
+
+-- profiling runs
+-- https://futhark-lang.org/examples/benchmarking.html
+-- ==
+-- compiled input { [1.0,2.0,3.0,4.0] [1.0,2.0,3.0,4.0] [1.0,1.0,1.0,1.0] [1.0,1.0,1.0,1.0] }
+
