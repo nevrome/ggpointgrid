@@ -74,8 +74,10 @@ entry arrange_from_coordinates
   let ps_i64 = map i64.i32 ps
   let xs_assign = map (\g -> grid_xs[i64.i32 g]) gs
   let ys_assign = map (\g -> grid_ys[i64.i32 g]) gs
-  let out_x = scatter (copy pts_x) ps_i64 xs_assign
-  let out_y = scatter (copy pts_y) ps_i64 ys_assign
+  let out_x0 = replicate n 0.0
+  let out_y0 = replicate n 0.0
+  let out_x = scatter out_x0 ps_i64 xs_assign
+  let out_y = scatter out_y0 ps_i64 ys_assign
   in (out_x, out_y)
 
 -- alternativ interface that also does the grid expansion
