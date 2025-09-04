@@ -18,10 +18,10 @@ def pairwise_squared_distances
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64) (pts_y: []f64)
   (m: i64) (n: i64)
-  : ([]i32, []i32, []f64) =
+  : ([]i64, []i64, []f64) =
   let total = m * n
-  let gridIds_flat = map (\gi -> replicate n (i32.i64 gi)) (iota m) |> flatten
-  let pointIds_flat = replicate m (map i32.i64 (iota n)) |> flatten
+  let gridIds_flat = map (\gi -> replicate n gi) (iota m) |> flatten
+  let pointIds_flat = replicate m (iota n) |> flatten
   let dists = map (\idx ->
     let gi = idx / n
     let pj = idx % n
@@ -33,13 +33,13 @@ def pairwise_squared_distances
 
 -- returns exactly n matches when m >= n
 def greedy_match_sorted
-  (gridIds: []i32) (pointIds: []i32) (distances: []f64)
+  (gridIds: []i64) (pointIds: []i64) (distances: []f64)
   (m: i64) (n: i64)
-  : ([]i32, []i32) =
+  : ([]i64, []i64) =
   let L = length distances
   let idx = sortIndicesf64 distances
-  let out_g0 = replicate n 0i32
-  let out_p0 = replicate n 0i32
+  let out_g0 = replicate n 0i64
+  let out_p0 = replicate n 0i64
   let grid_taken0 = replicate m false
   let point_taken0 = replicate n false
   let (_, _, _, og, op, _) =
@@ -49,13 +49,11 @@ def greedy_match_sorted
       let j = idx[i]
       let g = gridIds[j]
       let p = pointIds[j]
-      let gi = i64.i32 g
-      let pi = i64.i32 p
-      in  if not grid_taken[gi] && not point_taken[pi] then
+      in  if not grid_taken[g] && not point_taken[p] then
             let out_g' = out_g with [cnt] = g
             let out_p' = out_p with [cnt] = p
-            let grid_taken' = grid_taken with [gi] = true
-            let point_taken' = point_taken with [pi] = true
+            let grid_taken' = grid_taken with [g] = true
+            let point_taken' = point_taken with [p] = true
             in (i+1, grid_taken', point_taken', out_g', out_p', cnt+1)
           else
             (i+1, grid_taken, point_taken, out_g, out_p, cnt)
@@ -71,13 +69,12 @@ entry arrange_from_coordinates
   let (gridIds0, pointIds0, distances0) =
     pairwise_squared_distances grid_xs grid_ys pts_x pts_y m n
   let (gs, ps) = greedy_match_sorted gridIds0 pointIds0 distances0 m n
-  let ps_i64 = map i64.i32 ps
-  let xs_assign = map (\g -> grid_xs[i64.i32 g]) gs
-  let ys_assign = map (\g -> grid_ys[i64.i32 g]) gs
+  let xs_assign = map (\g -> grid_xs[g]) gs
+  let ys_assign = map (\g -> grid_ys[g]) gs
   let out_x0 = replicate n 0.0
   let out_y0 = replicate n 0.0
-  let out_x = scatter out_x0 ps_i64 xs_assign
-  let out_y = scatter out_y0 ps_i64 ys_assign
+  let out_x = scatter out_x0 ps xs_assign
+  let out_y = scatter out_y0 ps ys_assign
   in (out_x, out_y)
 
 -- alternativ interface that also does the grid expansion
