@@ -85,8 +85,12 @@ def arrange_points_on_grid_from_gridvectors
   let (gx, gy) = expand_grid grid_x grid_y
   in arrange_from_coordinates gx gy pts_x pts_y
 
---def main : ([]f64, []f64) =
---    arrange_points_on_grid_from_axisvectors [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1]
+-- only there for testing purposes
+def main 
+  (grid_xs: []f64) (grid_ys: []f64)
+  (pts_x: []f64)  (pts_y: []f64)
+  : ([]f64, []f64) =
+    arrange_points_on_grid_from_gridvectors grid_xs grid_ys pts_x pts_y
 
 -- futhark c arrange.fut
--- echo | ./arrange
+-- echo [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1] | ./arrange
