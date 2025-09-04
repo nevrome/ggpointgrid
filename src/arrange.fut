@@ -16,22 +16,20 @@ def expand_grid (xs: []f64) (ys: []f64): ([]f64, []f64) =
 -- build all pairwise squared distances between grid cells and points
 def pairwise_squared_distances
   (grid_xs: []f64) (grid_ys: []f64)
-  (pts_x: []f64)  (pts_y: []f64)
+  (pts_x: []f64) (pts_y: []f64)
   (m: i64) (n: i64)
   : ([]i32, []i32, []f64) =
-  let dmat: [][]f64 =
-    map (\gi ->
-      map (\pj ->
-        let dx = grid_xs[gi] - pts_x[pj]
-        let dy = grid_ys[gi] - pts_y[pj]
-        in dx*dx + dy*dy
-      ) (iota n)
-    ) (iota m)
-  let grid_ids_row: []i32 = map i32.i64 (iota m)
-  let grid_ids_2d: [][]i32 = map (\gi -> replicate n gi) grid_ids_row
-  let point_ids_col: []i32 = map i32.i64 (iota n)
-  let point_ids_2d: [][]i32 = replicate m point_ids_col
-  in (flatten grid_ids_2d, flatten point_ids_2d, flatten dmat)
+  let total = m * n
+  let gridIds_flat = map (\gi -> replicate n (i32.i64 gi)) (iota m) |> flatten
+  let pointIds_flat = replicate m (map i32.i64 (iota n)) |> flatten
+  let dists = map (\idx ->
+    let gi = idx / n
+    let pj = idx % n
+    let dx = grid_xs[gi] - pts_x[pj]
+    let dy = grid_ys[gi] - pts_y[pj]
+    in dx*dx + dy*dy
+  ) (iota total)
+  in (gridIds_flat, pointIds_flat, dists)
 
 -- returns exactly n matches when m >= n
 def greedy_match_sorted
