@@ -3,17 +3,21 @@
 library(ggplot2)
 
 my_data <- tibble::tibble(
-  x = rnorm(500),
-  y = rnorm(500),
-  value = sample(c("A", "B"), 500, replace = T)
+  x = rnorm(4000),
+  y = rnorm(4000),
+  value = sample(c("A", "B"), 4000, replace = T)
 )
 
 p1 <- ggplot(my_data, aes(x = x, y = y, color = value)) +
   geom_point() +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
 
-p2 <- ggplot(my_data, aes(x = x, y = y, color = value)) +
-  ggpointgrid::geom_pointgrid(grid_x = 50, grid_y = 50) +
+axes <- ggpointgrid:::make_grid_axes_2D(my_data, grid_x = 80, grid_y = 80)
+arrange_points_on_grid_df(my_data, axis_x = axes[[1]], axis_y = axes[[2]])
+arrange_points_on_grid_legacy(my_data, axis_x = axes[[1]], axis_y = axes[[2]])
+
+ggplot(my_data, aes(x = x, y = y, color = value)) +
+  ggpointgrid::geom_pointgrid(grid_x = 80, grid_y = 80) +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
 
 cowplot::plot_grid(p1, p2)
