@@ -42,3 +42,4 @@ vignettes/*.pdf
 *.o
 *.so
 src/lib/
+src/arrange
