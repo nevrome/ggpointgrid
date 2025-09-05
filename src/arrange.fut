@@ -1,36 +1,30 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
 
--- sort indices by f32 key (ascending)
-def sortIndicesf32 [n] (xs: [n]f32): [n]i64 =
+-- sort indices by f64 key (ascending)
+def sortIndicesf64 [n] (xs: [n]f64): [n]i64 =
   zip xs (iota n)
-  |> radix_sort_float_by_key (.0) f32.num_bits f32.get_bit
+  |> radix_sort_float_by_key (.0) f64.num_bits f64.get_bit
   |> map (.1)
 
 -- build all pairwise squared distances between grid cells and points
 def pairwise_squared_distances
-  (grid_xs: []f32) (grid_ys: []f32)
-  (pts_x: []f32) (pts_y: []f32)
+  (grid_xs: []f64) (grid_ys: []f64)
+  (pts_x: []f64) (pts_y: []f64)
   (m: i64) (n: i64)
-  : ([]i64, []i64, []f32) =
-  let total = m * n
-  let gridIds_flat = map (\gi -> replicate n gi) (iota m) |> flatten
-  let pointIds_flat = replicate m (iota n) |> flatten
-  let dists = map (\idx ->
-    let gi = idx / n
-    let pj = idx % n
-    let dx = grid_xs[gi] - pts_x[pj]
-    let dy = grid_ys[gi] - pts_y[pj]
+  : []f64 =
+  map (\j ->
+    let g = j / n
+    let p = j % n
+    let dx = grid_xs[g] - pts_x[p]
+    let dy = grid_ys[g] - pts_y[p]
     in dx*dx + dy*dy
-  ) (iota total)
-  in (gridIds_flat, pointIds_flat, dists)
+  ) (iota (m*n))
 
 -- returns exactly n matches when m >= n
-def greedy_match_sorted
-  (gridIds: []i64) (pointIds: []i64) (distances: []f32)
-  (m: i64) (n: i64)
+def greedy_match_from_sorted_idx
+  (idx: []i64) (m: i64) (n: i64)
   : ([]i64, []i64) =
-  let L = length distances
-  let idx = sortIndicesf32 distances
+  let L = length idx
   let out_g0 = replicate n 0i64
   let out_p0 = replicate n 0i64
   let grid_taken0 = replicate m false
@@ -40,8 +34,8 @@ def greedy_match_sorted
       (0i64, grid_taken0, point_taken0, out_g0, out_p0, 0i64)
     while i < L && cnt < n do
       let j = idx[i]
-      let g = gridIds[j]
-      let p = pointIds[j]
+      let g = j / n -- works, because the order is as in pairwise_squared_distances
+      let p = j % n
       in  if not grid_taken[g] && not point_taken[p] then
             let out_g' = out_g with [cnt] = g
             let out_p' = out_p with [cnt] = p
@@ -54,24 +48,22 @@ def greedy_match_sorted
 
 -- returns per-point assigned grid coordinates (same order as input points)
 entry arrange_from_coordinates
-  (grid_xs: []f32) (grid_ys: []f32)
-  (pts_x: []f32)  (pts_y: []f32)
-  : ([]f32, []f32) =
+  (grid_xs: []f64) (grid_ys: []f64)
+  (pts_x: []f64)  (pts_y: []f64)
+  : ([]f64, []f64) =
   let m = length grid_xs
   let n = length pts_x
-  let (gridIds0, pointIds0, distances0) =
-    pairwise_squared_distances grid_xs grid_ys pts_x pts_y m n
-  let (gs, ps) = greedy_match_sorted gridIds0 pointIds0 distances0 m n
+  let dists = pairwise_squared_distances grid_xs grid_ys pts_x pts_y m n
+  let idx = sortIndicesf64 dists
+  let (gs, ps) = greedy_match_from_sorted_idx idx m n
   let xs_assign = map (\g -> grid_xs[g]) gs
   let ys_assign = map (\g -> grid_ys[g]) gs
-  let out_x0 = replicate n 0.0
-  let out_y0 = replicate n 0.0
-  let out_x = scatter out_x0 ps xs_assign
-  let out_y = scatter out_y0 ps ys_assign
+  let out_x = scatter (replicate n 0.0) ps xs_assign
+  let out_y = scatter (replicate n 0.0) ps ys_assign
   in (out_x, out_y)
 
 -- expand two 1D axes into a flattened grid (optional helper)
-def expand_grid (xs: []f32) (ys: []f32): ([]f32, []f32) =
+def expand_grid (xs: []f64) (ys: []f64): ([]f64, []f64) =
   let gx = length xs
   let grid_xs_2d = map (\_y -> xs) ys
   let grid_ys_2d = map (\y  -> replicate gx y) ys
@@ -79,17 +71,17 @@ def expand_grid (xs: []f32) (ys: []f32): ([]f32, []f32) =
   
 -- alternativ interface that also does the grid expansion
 def arrange_points_on_grid_from_gridvectors
-  (grid_x: []f32) (grid_y: []f32)
-  (pts_x: []f32) (pts_y: []f32)
-  : ([]f32, []f32) =
+  (grid_x: []f64) (grid_y: []f64)
+  (pts_x: []f64) (pts_y: []f64)
+  : ([]f64, []f64) =
   let (gx, gy) = expand_grid grid_x grid_y
   in arrange_from_coordinates gx gy pts_x pts_y
 
 -- only there for testing purposes
 def main 
-   (grid_xs: []f32) (grid_ys: []f32)
-   (pts_x: []f32)  (pts_y: []f32)
-   : ([]f32, []f32) =
+   (grid_xs: []f64) (grid_ys: []f64)
+   (pts_x: []f64)  (pts_y: []f64)
+   : ([]f64, []f64) =
      arrange_points_on_grid_from_gridvectors grid_xs grid_ys pts_x pts_y
 
 -- running on the command line
