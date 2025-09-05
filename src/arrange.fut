@@ -29,9 +29,9 @@ def greedy_match_from_sorted_idx
   let out_p0 = replicate n 0i64
   let grid_taken0 = replicate m false
   let point_taken0 = replicate n false
-  let (_, _, _, og, op, _) =
-    loop (i, grid_taken, point_taken, out_g, out_p, cnt) =
-      (0i64, grid_taken0, point_taken0, out_g0, out_p0, 0i64)
+  let (_, _, _, _, og, op) =
+    loop (i, cnt, grid_taken, point_taken, out_g, out_p) =
+      (0i64, 0i64, grid_taken0, point_taken0, out_g0, out_p0)
     while i < L && cnt < n do
       let j = idx[i]
       let g = j / n -- works, because the order is as in pairwise_squared_distances
@@ -41,9 +41,9 @@ def greedy_match_from_sorted_idx
             let out_p' = out_p with [cnt] = p
             let grid_taken' = grid_taken with [g] = true
             let point_taken' = point_taken with [p] = true
-            in (i+1, grid_taken', point_taken', out_g', out_p', cnt+1)
+            in (i+1, cnt+1, grid_taken', point_taken', out_g', out_p')
           else
-            (i+1, grid_taken, point_taken, out_g, out_p, cnt)
+               (i+1, cnt, grid_taken, point_taken, out_g, out_p)
   in (og, op)
 
 -- returns per-point assigned grid coordinates (same order as input points)
