@@ -1,9 +1,10 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
 
+-- sorting is the major cost factor!
 -- sort indices by distance key (ascending)
-def sortIndicesf16 [n] (xs: [n]f16): [n]i64 =
+def sortIndicesf32 [n] (xs: [n]f32): [n]i64 =
   zip xs (iota n)
-  |> radix_sort_float_by_key (.0) f16.num_bits f16.get_bit
+  |> blocked_radix_sort_float_by_key 256 (.0) f32.num_bits f32.get_bit
   |> map (.1)
 
 -- build all pairwise squared distances between grid cells and points
@@ -11,13 +12,13 @@ def pairwise_squared_distances
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64) (pts_y: []f64)
   (m: i64) (n: i64)
-  : []f16 =
+  : []f32 =
   map (\j ->
     let g = j / n
     let p = j % n
     let dx = grid_xs[g] - pts_x[p]
     let dy = grid_ys[g] - pts_y[p]
-    in f16.f64 (dx*dx + dy*dy)
+    in f32.f64 (dx*dx + dy*dy)
   ) (iota (m*n))
 
 -- returns exactly n matches when m >= n
@@ -54,7 +55,7 @@ entry arrange_from_coordinates
   let m = length grid_xs
   let n = length pts_x
   let dists = pairwise_squared_distances grid_xs grid_ys pts_x pts_y m n
-  let idx = sortIndicesf16 dists
+  let idx = sortIndicesf32 dists
   let (gs, ps) = greedy_match_from_sorted_idx idx m n
   let xs_assign = map (\g -> grid_xs[g]) gs
   let ys_assign = map (\g -> grid_ys[g]) gs
