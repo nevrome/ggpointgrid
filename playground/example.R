@@ -18,10 +18,13 @@ ggplot(my_data, aes(x = x, y = y, color = value)) +
   ggpointgrid::geom_pointgrid(grid_x = 80, grid_y = 80) +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
 
-axes <- ggpointgrid:::make_grid_axes_2D(my_data, grid_x = 80, grid_y = 80)
-system.time(res1 <- arrange_points_on_grid_df(my_data, axis_x = axes[[1]], axis_y = axes[[2]]))
-system.time(res2 <- arrange_points_on_grid_legacy(my_data, axis_x = axes[[1]], axis_y = axes[[2]]))
-apply(as.matrix(res1 != res2), 2, any)
+axis_x <- make_grid_axis(grid_axis = 80, data_axis = my_data$x)
+axis_y <- make_grid_axis(grid_axis = 80, data_axis = my_data$y)
+
+system.time(res1 <- arrange_points_on_grid(
+  matrix(c(axis_x, axis_y), ncol = 2),
+  as.matrix(my_data[c("x", "y")])
+))
 
 tu <- paste(
   "[", paste(axes[[1]], collapse = ","), "]",
@@ -33,6 +36,7 @@ zu <- paste("echo", tu, "| ./src/arrange")
 system(paste("time", zu))
 hu <- system(zu, intern = T)
 
+# for profiling
 writeLines(tu, "futhark_test.txt")
 
 #### algorithm test ####

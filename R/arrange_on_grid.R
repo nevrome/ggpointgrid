@@ -1,44 +1,49 @@
+#' @title ...
+#' 
+#' @description ...
+#'
+#' @param axes Numeric matrix.
+#' @param pts Numeric matrix.
+#' 
+#' @return ...
+#'
+#' @name core_algorithm
+NULL
 
-# tab <- dplyr::transmute(iris, x = Sepal.Length, y = Sepal.Width)
-# grid_x <- 20
-# grid_y <- 20
-# axes <- ggpointgrid:::make_grid_axes_2D(tab, grid_x, grid_y)
-# axis_x <- axes[["x"]]
-# axis_y <- axes[["y"]]
-# pts_x <- tab[["x"]]
-# pts_y <- tab[["y"]]
-# arrange_points_on_grid(axis_x, axis_y, pts_x, pts_y)
-
-arrange_points_on_grid_df <- function(tab, axis_x, axis_y) {
-  # input checks
-  checkmate::assert_data_frame(tab)
-  checkmate::assert_numeric(tab[["x"]])
-  checkmate::assert_numeric(tab[["y"]])
-  # call arrange algorithm
-  res <- arrange_points_on_grid(axis_x, axis_y, tab[["x"]], tab[["y"]])
-  # overwrite table
-  tab[["x"]] <- res[[1]]
-  tab[["y"]] <- res[[2]]
-  return(tab)
-}
-
-#' futhark_test
+#' @rdname core_algorithm
 #' @export
-arrange_points_on_grid <- function(axis_x, axis_y, pts_x, pts_y) {
+arrange_points_on_grid <- function(axes, pts) {
   # input checks
-  checkmate::assert_numeric(axis_x, any.missing = FALSE)
-  checkmate::assert_numeric(axis_y, any.missing = FALSE)
-  checkmate::assert_numeric(pts_x, any.missing = FALSE)
-  checkmate::assert_numeric(pts_y, any.missing = FALSE)
-  checkmate::assert_true(length(pts_x) == length(pts_y))
+  checkmate::assert_matrix(axes, any.missing = FALSE, ncols = 2)
+  checkmate::assert_matrix(pts, any.missing = FALSE, ncols = 2)
   # creating grid
-  xy_grid <- expand.grid(axis_x, axis_y)
-  if (nrow(xy_grid) < length(pts_x)) {
+  xy_grid <- expand.grid(axes[,1], axes[,2])
+  if (nrow(xy_grid) < nrow(pts)) {
     stop("The grid is not big enough to accommodate all input points.")
   }
   # run arrange algorithm
-  futhark_entry_arrange_from_coordinates_cpp(
-    xy_grid[["Var1"]], xy_grid[["Var2"]],
-    pts_x, pts_y
+  res <- futhark_entry_arrange_from_coordinates_cpp(
+    xy_grid[,1], xy_grid[,2], pts[,1], pts[,2]
   )
+  # compile output
+  return(matrix(c(x = res[[1]], y = res[[2]]), ncol = 2))
+}
+
+#' @rdname core_algorithm
+#' @export
+make_grid_axis <- function(grid_axis, data_axis, mode = "continous") {
+  # input checks
+  checkmate::assert_numeric(grid_axis, any.missing = FALSE)
+  checkmate::assert_numeric(data_axis)
+  # cover options
+  if (length(grid_axis) == 1) {
+    if (mode == "discrete") {
+      unique_x <- length(unique(data_axis))
+      seq(-0.5, unique_x+0.5, length.out = grid_axis)
+    } else {
+      seq(min(data_axis), max(data_axis), length.out = grid_axis)
+    }
+  } else if (mode == "continous") {
+    grid_x
+  }
 }

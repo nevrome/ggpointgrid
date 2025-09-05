@@ -74,8 +74,10 @@ GeomPointGrid <- ggplot2::ggproto(
     
     # these two lines are the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid layout
-    axes <- make_grid_axes_2D(data, grid_x, grid_y)
-    data <- arrange_points_on_grid_df(data, axes[["x"]], axes[["y"]])
+    axes <- make_grid_axes_in_geom(data, grid_x, grid_y)
+    paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
+    data[["x"]] <- paog[,1]
+    data[["y"]] <- paog[,2]
     
     coords <- coord$transform(data, panel_params)
     ggname(
@@ -95,33 +97,26 @@ GeomPointGrid <- ggplot2::ggproto(
 )
 
 # prepare the axes coordinates from the grid input values
-make_grid_axes_2D <- function(tab, grid_x, grid_y) {
+make_grid_axes_in_geom <- function(tab, grid_x, grid_y) {
   # input checks
   checkmate::assert_data_frame(tab)
-  checkmate::assert_numeric(tab[["x"]])
-  checkmate::assert_numeric(tab[["y"]])
-  checkmate::assert_numeric(grid_x, any.missing = FALSE)
-  checkmate::assert_numeric(grid_y, any.missing = FALSE)
   # compile axes
-  if (length(grid_x) == 1) {
-    if ("mapped_discrete" %in% class(tab[["x"]])) {
-      unique_x <- length(unique(tab[["x"]]))
-      axis_x <- seq(-0.5, unique_x+0.5, length.out = grid_x)
-    } else {
-      axis_x <- seq(min(tab[["x"]]), max(tab[["x"]]), length.out = grid_x)
-    }
-  } else {
-    axis_x <- grid_x
-  }
-  if (length(grid_y) == 1) {
-    if ("mapped_discrete" %in% class(tab[["y"]])) {
-      unique_y <- length(unique(tab[["y"]]))
-      axis_y <- seq(-0.5, unique_y+0.5, length.out = grid_y)
-    } else {
-      axis_y <- seq(min(tab[["y"]]), max(tab[["y"]]), length.out = grid_y)
-    }
-  } else {
-    axis_y <- grid_y
-  }
-  return(list(x = axis_x, y = axis_y))
+  axis_x <- make_grid_axis(
+    grid_x, tab[["x"]],
+    ifelse(
+      "mapped_discrete" %in% class(tab[["x"]]),
+      "discrete",
+      "continous"
+    )
+  )
+  axis_y <- make_grid_axis(
+    grid_y, tab[["y"]],
+    ifelse(
+      "mapped_discrete" %in% class(tab[["y"]]),
+      "discrete",
+      "continous"
+    )
+  )
+  # return axes vectors
+  return(matrix(c(axis_x, axis_y), ncol = 2))
 }
