@@ -11,19 +11,14 @@ Authors@R:
 URL: https://github.com/nevrome/ggpointgrid
 BugReports: https://github.com/nevrome/ggpointgrid/issues
 Depends: R (>= 3.4.0)
-Language: en_GB
+Language: en
 License: GPL-3 | file LICENSE
 Encoding: UTF-8
 Imports:
   checkmate,
-  dplyr,
-  fields,
   ggplot2,
-  glue,
   grid,
   Rcpp (>= 1.0.5),
-  reshape2,
-  rlang,
-  stats
+  rlang
 RoxygenNote: 7.3.2
 LinkingTo: Rcpp
