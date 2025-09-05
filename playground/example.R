@@ -18,8 +18,8 @@ ggplot(my_data, aes(x = x, y = y, color = value)) +
   ggpointgrid::geom_pointgrid(grid_x = 80, grid_y = 80) +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
 
-axis_x <- make_grid_axis(grid_axis = 80, data_axis = my_data$x)
-axis_y <- make_grid_axis(grid_axis = 80, data_axis = my_data$y)
+axis_x <- make_grid_sequence(80L, my_data$x)
+axis_y <- make_grid_sequence(80L, my_data$y)
 
 system.time(res1 <- arrange_points_on_grid(
   matrix(c(axis_x, axis_y), ncol = 2),

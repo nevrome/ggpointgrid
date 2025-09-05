@@ -72,7 +72,7 @@ GeomPointGrid <- ggplot2::ggproto(
       data$shape <- translate_shape_string(data$shape)
     }
     
-    # these two lines are the main difference to geom_point!
+    # these lines are the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid layout
     axes <- make_grid_axes_in_geom(data, grid_x, grid_y)
     paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
@@ -101,22 +101,31 @@ make_grid_axes_in_geom <- function(tab, grid_x, grid_y) {
   # input checks
   checkmate::assert_data_frame(tab)
   # compile axes
-  axis_x <- make_grid_axis(
-    grid_x, tab[["x"]],
-    ifelse(
-      "mapped_discrete" %in% class(tab[["x"]]),
-      "discrete",
-      "continous"
+                          # all, because it could be a vector
+  if (length(grid_x) == 1 & all(grid_x %% 1 == 0)) {
+    axis_x <- make_grid_sequence(
+      as.integer(grid_x), tab[["x"]],
+      ifelse(
+        "mapped_discrete" %in% class(tab[["x"]]),
+        "discrete",
+        "continuous"
+      )
     )
-  )
-  axis_y <- make_grid_axis(
-    grid_y, tab[["y"]],
-    ifelse(
-      "mapped_discrete" %in% class(tab[["y"]]),
-      "discrete",
-      "continous"
+  } else {
+    axis_x <- grid_x
+  }
+  if (length(grid_y) == 1 & all(grid_y %% 1 == 0)) {
+    axis_y <- make_grid_sequence(
+      as.integer(grid_y), tab[["y"]],
+      ifelse(
+        "mapped_discrete" %in% class(tab[["y"]]),
+        "discrete",
+        "continuous"
+      )
     )
-  )
+  } else {
+    axis_y <- grid_y
+  }
   # return axes vectors
   return(matrix(c(axis_x, axis_y), ncol = 2))
 }

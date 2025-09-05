@@ -71,7 +71,7 @@ GeomTextGrid <- ggplot2::ggproto(
       lab <- parse_safe(as.character(lab))
     }
     
-    # these two lines are the main difference to geom_point!
+    # these lines are the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid layout
     axes <- make_grid_axes_in_geom(data, grid_x, grid_y)
     paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
