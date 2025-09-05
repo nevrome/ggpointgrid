@@ -32,7 +32,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <float.h>
-#include <pthread.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,7 +45,6 @@ int futhark_context_config_set_tuning_param(struct futhark_context_config *cfg, 
 struct futhark_context;
 struct futhark_context *futhark_context_new(struct futhark_context_config *cfg);
 void futhark_context_free(struct futhark_context *cfg);
-void futhark_context_config_set_num_threads(struct futhark_context_config *cfg, int n);
 void futhark_context_config_set_debugging(struct futhark_context_config *cfg, int flag);
 void futhark_context_config_set_profiling(struct futhark_context_config *cfg, int flag);
 void futhark_context_config_set_logging(struct futhark_context_config *cfg, int flag);
@@ -79,7 +78,7 @@ void futhark_context_pause_profiling(struct futhark_context *ctx);
 void futhark_context_unpause_profiling(struct futhark_context *ctx);
 char *futhark_context_report(struct futhark_context *ctx);
 int futhark_context_clear_caches(struct futhark_context *ctx);
-#define FUTHARK_BACKEND_multicore
+#define FUTHARK_BACKEND_c
 #define FUTHARK_SUCCESS 0
 #define FUTHARK_PROGRAM_ERROR 2
 #define FUTHARK_OUT_OF_MEMORY 3
@@ -1076,7 +1075,7 @@ static int report_events_in_list(struct event_list *l,
 #include <assert.h>
 #include <ctype.h>
 
-#include <pthread.h>
+
 
 #define FUTHARK_F64_ENABLED
 
@@ -5149,1164 +5148,7 @@ static const char *tuning_param_names[] = {NULL};
 static const char *tuning_param_vars[] = {NULL};
 static const char *tuning_param_classes[] = {NULL};
 static int64_t tuning_param_defaults[] = {0};
-// start of scheduler.h
-
-// First, the API that the generated code will access.  In principle,
-// we could then compile the scheduler separately and link an object
-// file with the generated code.  In practice, we will embed all of
-// this in the generated code.
-
-// Scheduler handle.
-struct scheduler;
-
-// Initialise a scheduler (and start worker threads).
-static int scheduler_init(struct scheduler *scheduler,
-                          int num_workers,
-                          double kappa);
-
-// Shut down a scheduler (and destroy worker threads).
-static int scheduler_destroy(struct scheduler *scheduler);
-
-// Figure out the smallest amount of work that amortises task
-// creation.
-static int determine_kappa(double *kappa);
-
-// How a segop should be scheduled.
-enum scheduling {
-  DYNAMIC,
-  STATIC
-};
-
-// How a given task should be executed.  Filled out by the scheduler
-// and passed to the segop function
-struct scheduler_info {
-  int64_t iter_pr_subtask;
-  int64_t remainder;
-  int nsubtasks;
-  enum scheduling sched;
-  int wake_up_threads;
-
-  int64_t *task_time;
-  int64_t *task_iter;
-};
-
-// A segop function.  This is what you hand the scheduler for
-// execution.
-typedef int (*segop_fn)(void* args,
-                        int64_t iterations,
-                        int tid,
-                        struct scheduler_info info);
-
-// A task for the scheduler to execute.
-struct scheduler_segop {
-  void *args;
-  segop_fn top_level_fn;
-  segop_fn nested_fn;
-  int64_t iterations;
-  enum scheduling sched;
-
-  // Pointers to timer and iter associated with the task
-  int64_t *task_time;
-  int64_t *task_iter;
-
-  // For debugging
-  const char* name;
-};
-
-static inline int scheduler_prepare_task(struct scheduler *scheduler,
-                                         struct scheduler_segop *task);
-
-typedef int (*parloop_fn)(void* args,
-                          int64_t start,
-                          int64_t end,
-                          int subtask_id,
-                          int tid);
-
-// A parallel parloop task.
-struct scheduler_parloop {
-  void* args;
-  parloop_fn fn;
-  int64_t iterations;
-  struct scheduler_info info;
-
-  // For debugging
-  const char* name;
-};
-
-static inline int scheduler_execute_task(struct scheduler *scheduler,
-                                         struct scheduler_parloop *task);
-
-// Then the API implementation.
-
-#include <signal.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#elif defined(__APPLE__)
-#include <sys/sysctl.h>
-// For getting cpu usage of threads
-#include <mach/mach.h>
-#include <sys/resource.h>
-#elif defined(__linux__)
-#include <sys/sysinfo.h>
-#include <sys/resource.h>
-#include <signal.h>
-#elif defined(__EMSCRIPTEN__)
-#include <emscripten/threading.h>
-#include <sys/sysinfo.h>
-#include <sys/resource.h>
-#include <signal.h>
-#endif
-
-/* Multicore Utility functions */
-
-/* A wrapper for getting rusage on Linux and MacOS */
-/* TODO maybe figure out this for windows */
-static inline int getrusage_thread(struct rusage *rusage)
-{
-  int err = -1;
-#if  defined(__APPLE__)
-    thread_basic_info_data_t info = { 0 };
-    mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
-    kern_return_t kern_err;
-
-    kern_err = thread_info(mach_thread_self(),
-                           THREAD_BASIC_INFO,
-                           (thread_info_t)&info,
-                           &info_count);
-    if (kern_err == KERN_SUCCESS) {
-        memset(rusage, 0, sizeof(struct rusage));
-        rusage->ru_utime.tv_sec = info.user_time.seconds;
-        rusage->ru_utime.tv_usec = info.user_time.microseconds;
-        rusage->ru_stime.tv_sec = info.system_time.seconds;
-        rusage->ru_stime.tv_usec = info.system_time.microseconds;
-        err = 0;
-    } else {
-        errno = EINVAL;
-    }
-#elif defined(__linux__) || __EMSCRIPTEN__
-    err = getrusage(RUSAGE_THREAD, rusage);
-#endif
-    return err;
-}
-
-/* returns the number of logical cores */
-static int num_processors(void) {
-#if  defined(_WIN32)
-  /* https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info */
-  SYSTEM_INFO sysinfo;
-  GetSystemInfo(&sysinfo);
-  int ncores = sysinfo.dwNumberOfProcessors;
-  fprintf(stderr, "Found %d cores on your Windows machine\n Is that correct?\n", ncores);
-  return ncores;
-#elif defined(__APPLE__)
-  int ncores;
-  size_t ncores_size = sizeof(ncores);
-  CHECK_ERRNO(sysctlbyname("hw.logicalcpu", &ncores, &ncores_size, NULL, 0),
-              "sysctlbyname (hw.logicalcpu)");
-  return ncores;
-#elif defined(__linux__)
-  return get_nprocs();
-#elif __EMSCRIPTEN__
-  return emscripten_num_logical_cores();
-#else
-  fprintf(stderr, "operating system not recognised\n");
-  return -1;
-#endif
-}
-
-static unsigned int g_seed;
-
-// Used to seed the generator.
-static inline void fast_srand(unsigned int seed) {
-    g_seed = seed;
-}
-
-// Compute a pseudorandom integer.
-// Output value in range [0, 32767]
-static inline unsigned int fast_rand(void) {
-    g_seed = (214013*g_seed+2531011);
-    return (g_seed>>16)&0x7FFF;
-}
-
-struct subtask_queue {
-  int capacity;             // Size of the buffer.
-  int first;                // Index of the start of the ring buffer.
-  int num_used;             // Number of used elements in the buffer.
-  struct subtask **buffer;
-
-  pthread_mutex_t mutex;    // Mutex used for synchronisation.
-  pthread_cond_t cond;      // Condition variable used for synchronisation.
-  int dead;
-
-#if defined(MCPROFILE)
-  /* Profiling fields */
-  uint64_t time_enqueue;
-  uint64_t time_dequeue;
-  uint64_t n_dequeues;
-  uint64_t n_enqueues;
-#endif
-};
-
-/* A subtask that can be executed by a worker */
-struct subtask {
-  /* The parloop function */
-  parloop_fn fn;
-  /* Execution parameters */
-  void* args;
-  int64_t start, end;
-  int id;
-
-  /* Dynamic scheduling parameters */
-  int chunkable;
-  int64_t chunk_size;
-
-  /* Shared variables across subtasks */
-  volatile int *counter; // Counter for ongoing subtasks
-  // Shared task timers and iterators
-  int64_t *task_time;
-  int64_t *task_iter;
-
-  /* For debugging */
-  const char *name;
-};
-
-
-struct worker {
-  pthread_t thread;
-  struct scheduler *scheduler;  /* Reference to the scheduler struct the worker belongs to*/
-  struct subtask_queue q;
-  int dead;
-  int tid;                      /* Just a thread id */
-
-  /* "thread local" time fields used for online algorithm */
-  uint64_t timer;
-  uint64_t total;
-  int nested; /* How nested the current computation is */
-
-  // Profiling fields
-  int output_usage;            /* Whether to dump thread usage */
-  uint64_t time_spent_working; /* Time spent in parloop functions */
-};
-
-static inline void output_worker_usage(struct worker *worker)
-{
-  struct rusage usage;
-  CHECK_ERRNO(getrusage_thread(&usage), "getrusage_thread");
-  struct timeval user_cpu_time = usage.ru_utime;
-  struct timeval sys_cpu_time = usage.ru_stime;
-  fprintf(stderr, "tid: %2d - work time %10llu us - user time: %10llu us - sys: %10llu us\n",
-          worker->tid,
-          (long long unsigned)worker->time_spent_working / 1000,
-          (long long unsigned)(user_cpu_time.tv_sec * 1000000 + user_cpu_time.tv_usec),
-          (long long unsigned)(sys_cpu_time.tv_sec * 1000000 + sys_cpu_time.tv_usec));
-}
-
-/* Doubles the size of the queue */
-static inline int subtask_queue_grow_queue(struct subtask_queue *subtask_queue) {
-
-  int new_capacity = 2 * subtask_queue->capacity;
-#ifdef MCDEBUG
-  fprintf(stderr, "Growing queue to %d\n", subtask_queue->capacity * 2);
-#endif
-
-  struct subtask **new_buffer = calloc(new_capacity, sizeof(struct subtask*));
-  for (int i = 0; i < subtask_queue->num_used; i++) {
-    new_buffer[i] = subtask_queue->buffer[(subtask_queue->first + i) % subtask_queue->capacity];
-  }
-
-  free(subtask_queue->buffer);
-  subtask_queue->buffer = new_buffer;
-  subtask_queue->capacity = new_capacity;
-  subtask_queue->first = 0;
-
-  return 0;
-}
-
-// Initialise a job queue with the given capacity.  The queue starts out
-// empty.  Returns non-zero on error.
-static inline int subtask_queue_init(struct subtask_queue *subtask_queue, int capacity)
-{
-  assert(subtask_queue != NULL);
-  memset(subtask_queue, 0, sizeof(struct subtask_queue));
-
-  subtask_queue->capacity = capacity;
-  subtask_queue->buffer = calloc(capacity, sizeof(struct subtask*));
-  if (subtask_queue->buffer == NULL) {
-    return -1;
-  }
-
-  CHECK_ERRNO(pthread_mutex_init(&subtask_queue->mutex, NULL), "pthread_mutex_init");
-  CHECK_ERRNO(pthread_cond_init(&subtask_queue->cond, NULL), "pthread_cond_init");
-
-  return 0;
-}
-
-// Destroy the job queue.  Blocks until the queue is empty before it
-// is destroyed.
-static inline int subtask_queue_destroy(struct subtask_queue *subtask_queue)
-{
-  assert(subtask_queue != NULL);
-
-  CHECK_ERR(pthread_mutex_lock(&subtask_queue->mutex), "pthread_mutex_lock");
-
-  while (subtask_queue->num_used != 0) {
-    CHECK_ERR(pthread_cond_wait(&subtask_queue->cond, &subtask_queue->mutex), "pthread_cond_wait");
-  }
-
-  // Queue is now empty.  Let's kill it!
-  subtask_queue->dead = 1;
-  free(subtask_queue->buffer);
-  CHECK_ERR(pthread_cond_broadcast(&subtask_queue->cond), "pthread_cond_broadcast");
-  CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-
-  return 0;
-}
-
-static inline void dump_queue(struct worker *worker)
-{
-  struct subtask_queue *subtask_queue = &worker->q;
-  CHECK_ERR(pthread_mutex_lock(&subtask_queue->mutex), "pthread_mutex_lock");
-  for (int i = 0; i < subtask_queue->num_used; i++) {
-    struct subtask * subtask = subtask_queue->buffer[(subtask_queue->first + i) % subtask_queue->capacity];
-    printf("queue tid %d with %d task %s\n", worker->tid, i, subtask->name);
-  }
-  CHECK_ERR(pthread_cond_broadcast(&subtask_queue->cond), "pthread_cond_broadcast");
-  CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-}
-
-// Push an element onto the end of the job queue.  Blocks if the
-// subtask_queue is full (its size is equal to its capacity).  Returns
-// non-zero on error.  It is an error to push a job onto a queue that
-// has been destroyed.
-static inline int subtask_queue_enqueue(struct worker *worker, struct subtask *subtask )
-{
-  assert(worker != NULL);
-  struct subtask_queue *subtask_queue = &worker->q;
-
-#ifdef MCPROFILE
-  uint64_t start = get_wall_time();
-#endif
-
-  CHECK_ERR(pthread_mutex_lock(&subtask_queue->mutex), "pthread_mutex_lock");
-  // Wait until there is room in the subtask_queue.
-  while (subtask_queue->num_used == subtask_queue->capacity && !subtask_queue->dead) {
-    if (subtask_queue->num_used == subtask_queue->capacity) {
-      CHECK_ERR(subtask_queue_grow_queue(subtask_queue), "subtask_queue_grow_queue");
-      continue;
-    }
-    CHECK_ERR(pthread_cond_wait(&subtask_queue->cond, &subtask_queue->mutex), "pthread_cond_wait");
-  }
-
-  if (subtask_queue->dead) {
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-    return -1;
-  }
-
-  // If we made it past the loop, there is room in the subtask_queue.
-  subtask_queue->buffer[(subtask_queue->first + subtask_queue->num_used) % subtask_queue->capacity] = subtask;
-  subtask_queue->num_used++;
-
-#ifdef MCPROFILE
-  uint64_t end = get_wall_time();
-  subtask_queue->time_enqueue += (end - start);
-  subtask_queue->n_enqueues++;
-#endif
-  // Broadcast a reader (if any) that there is now an element.
-  CHECK_ERR(pthread_cond_broadcast(&subtask_queue->cond), "pthread_cond_broadcast");
-  CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-
-  return 0;
-}
-
-
-/* Like subtask_queue_dequeue, but with two differences:
-   1) the subtask is stolen from the __front__ of the queue
-   2) returns immediately if there is no subtasks queued,
-      as we dont' want to block on another workers queue and
-*/
-static inline int subtask_queue_steal(struct worker *worker,
-                                      struct subtask **subtask)
-{
-  struct subtask_queue *subtask_queue = &worker->q;
-  assert(subtask_queue != NULL);
-
-#ifdef MCPROFILE
-  uint64_t start = get_wall_time();
-#endif
-  CHECK_ERR(pthread_mutex_lock(&subtask_queue->mutex), "pthread_mutex_lock");
-
-  if (subtask_queue->num_used == 0) {
-    CHECK_ERR(pthread_cond_broadcast(&subtask_queue->cond), "pthread_cond_broadcast");
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-    return 1;
-  }
-
-  if (subtask_queue->dead) {
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-    return -1;
-  }
-
-  // Tasks gets stolen from the "front"
-  struct subtask *cur_back = subtask_queue->buffer[subtask_queue->first];
-  struct subtask *new_subtask = NULL;
-  int remaining_iter = cur_back->end - cur_back->start;
-  // If subtask is chunkable, we steal half of the iterations
-  if (cur_back->chunkable && remaining_iter > 1) {
-      int64_t half = remaining_iter / 2;
-      new_subtask = malloc(sizeof(struct subtask));
-      *new_subtask = *cur_back;
-      new_subtask->start = cur_back->end - half;
-      cur_back->end = new_subtask->start;
-      __atomic_fetch_add(cur_back->counter, 1, __ATOMIC_RELAXED);
-  } else {
-    new_subtask = cur_back;
-    subtask_queue->num_used--;
-    subtask_queue->first = (subtask_queue->first + 1) % subtask_queue->capacity;
-  }
-  *subtask = new_subtask;
-
-  if (*subtask == NULL) {
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthred_mutex_unlock");
-    return 1;
-  }
-
-#ifdef MCPROFILE
-  uint64_t end = get_wall_time();
-  subtask_queue->time_dequeue += (end - start);
-  subtask_queue->n_dequeues++;
-#endif
-
-  // Broadcast a writer (if any) that there is now room for more.
-  CHECK_ERR(pthread_cond_broadcast(&subtask_queue->cond), "pthread_cond_broadcast");
-  CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-
-  return 0;
-}
-
-
-// Pop an element from the back of the job queue.
-// Optional argument can be provided to block or not
-static inline int subtask_queue_dequeue(struct worker *worker,
-                                        struct subtask **subtask, int blocking)
-{
-  assert(worker != NULL);
-  struct subtask_queue *subtask_queue = &worker->q;
-
-#ifdef MCPROFILE
-  uint64_t start = get_wall_time();
-#endif
-
-  CHECK_ERR(pthread_mutex_lock(&subtask_queue->mutex), "pthread_mutex_lock");
-  if (subtask_queue->num_used == 0 && !blocking) {
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-    return 1;
-  }
-  // Try to steal some work while the subtask_queue is empty
-  while (subtask_queue->num_used == 0 && !subtask_queue->dead) {
-    pthread_cond_wait(&subtask_queue->cond, &subtask_queue->mutex);
-  }
-
-  if (subtask_queue->dead) {
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-    return -1;
-  }
-
-  // dequeue pops from the back
-  *subtask = subtask_queue->buffer[(subtask_queue->first + subtask_queue->num_used - 1) % subtask_queue->capacity];
-  subtask_queue->num_used--;
-
-  if (*subtask == NULL) {
-    assert(!"got NULL ptr");
-    CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthred_mutex_unlock");
-    return -1;
-  }
-
-#ifdef MCPROFILE
-  uint64_t end = get_wall_time();
-  subtask_queue->time_dequeue += (end - start);
-  subtask_queue->n_dequeues++;
-#endif
-
-  // Broadcast a writer (if any) that there is now room for more.
-  CHECK_ERR(pthread_cond_broadcast(&subtask_queue->cond), "pthread_cond_broadcast");
-  CHECK_ERR(pthread_mutex_unlock(&subtask_queue->mutex), "pthread_mutex_unlock");
-
-  return 0;
-}
-
-static inline int subtask_queue_is_empty(struct subtask_queue *subtask_queue)
-{
-  return subtask_queue->num_used == 0;
-}
-
-/* Scheduler definitions */
-
-struct scheduler {
-  struct worker *workers;
-  int num_threads;
-  int minimum_chunk_size;
-
-
-  // If there is work to steal => active_work > 0
-  volatile int active_work;
-
-  // Only one error can be returned at the time now.  Maybe we can
-  // provide a stack like structure for pushing errors onto if we wish
-  // to backpropagte multiple errors
-  volatile int error;
-
-  // kappa time unit in nanoseconds
-  double kappa;
-};
-
-
-// Thread local variable worker struct
-// Note that, accesses to tls variables are expensive
-// Minimize direct references to this variable
-__thread struct worker* worker_local = NULL;
-
-static int64_t total_now(int64_t total, int64_t time) {
-  return total + (get_wall_time_ns() - time);
-}
-
-static int random_other_worker(struct scheduler *scheduler, int my_id) {
-  int my_num_workers = scheduler->num_threads;
-  assert(my_num_workers != 1);
-  int i = fast_rand() % (my_num_workers - 1);
-  if (i >= my_id) {
-    i++;
-  }
-#ifdef MCDEBUG
-  assert(i >= 0);
-  assert(i < my_num_workers);
-  assert(i != my_id);
-#endif
-
-  return i;
-}
-
-static inline int64_t compute_chunk_size(int64_t minimum_chunk_size, double kappa, struct subtask* subtask)
-{
-  double C = (double)*subtask->task_time / (double)*subtask->task_iter;
-  if (C == 0.0F) C += DBL_EPSILON;
-  return smax64((int64_t)(kappa / C), minimum_chunk_size);
-}
-
-/* Takes a chunk from subtask and enqueues the remaining iterations onto the worker's queue */
-/* A no-op if the subtask is not chunkable */
-static inline struct subtask* chunk_subtask(struct worker* worker, struct subtask *subtask)
-{
-  if (subtask->chunkable) {
-    // Do we have information from previous runs avaliable
-    if (*subtask->task_iter > 0) {
-      subtask->chunk_size = compute_chunk_size(worker->scheduler->minimum_chunk_size,
-                                               worker->scheduler->kappa,
-                                               subtask);
-      assert(subtask->chunk_size > 0);
-    }
-    int64_t remaining_iter = subtask->end - subtask->start;
-    assert(remaining_iter > 0);
-    if (remaining_iter > subtask->chunk_size) {
-      struct subtask *new_subtask = malloc(sizeof(struct subtask));
-      *new_subtask = *subtask;
-      // increment the subtask join counter to account for new subtask
-      __atomic_fetch_add(subtask->counter, 1, __ATOMIC_RELAXED);
-      // Update range parameters
-      subtask->end = subtask->start + subtask->chunk_size;
-      new_subtask->start = subtask->end;
-      subtask_queue_enqueue(worker, new_subtask);
-    }
-  }
-  return subtask;
-}
-
-static inline int run_subtask(struct worker* worker, struct subtask* subtask)
-{
-  assert(subtask != NULL);
-  assert(worker != NULL);
-
-  subtask = chunk_subtask(worker, subtask);
-  worker->total = 0;
-  worker->timer = get_wall_time_ns();
-#if defined(MCPROFILE)
-  int64_t start = worker->timer;
-#endif
-  worker->nested++;
-  int err = subtask->fn(subtask->args, subtask->start, subtask->end,
-                        subtask->id,
-                        worker->tid);
-  worker->nested--;
-  // Some error occured during some other subtask
-  // so we just clean-up and return
-  if (worker->scheduler->error != 0) {
-    // Even a failed task counts as finished.
-    __atomic_fetch_sub(subtask->counter, 1, __ATOMIC_RELAXED);
-    free(subtask);
-    return 0;
-  }
-  if (err != 0) {
-    __atomic_store_n(&worker->scheduler->error, err, __ATOMIC_RELAXED);
-  }
-  // Total sequential time spent
-  int64_t time_elapsed = total_now(worker->total, worker->timer);
-#if defined(MCPROFILE)
-  worker->time_spent_working += get_wall_time_ns() - start;
-#endif
-  int64_t iter = subtask->end - subtask->start;
-  // report measurements
-  // These updates should really be done using a single atomic CAS operation
-  __atomic_fetch_add(subtask->task_time, time_elapsed, __ATOMIC_RELAXED);
-  __atomic_fetch_add(subtask->task_iter, iter, __ATOMIC_RELAXED);
-  // We need a fence here, since if the counter is decremented before either
-  // of the two above are updated bad things can happen, e.g. if they are stack-allocated
-  __atomic_thread_fence(__ATOMIC_SEQ_CST);
-  __atomic_fetch_sub(subtask->counter, 1, __ATOMIC_RELAXED);
-  free(subtask);
-  return 0;
-}
-
-
-static inline int is_small(struct scheduler_segop *task, struct scheduler *scheduler, int *nsubtasks)
-{
-  int64_t time = *task->task_time;
-  int64_t iter = *task->task_iter;
-
-  if (task->sched == DYNAMIC || iter == 0) {
-    *nsubtasks = scheduler->num_threads;
-    return 0;
-  }
-
-  // Estimate the constant C
-  double C = (double)time / (double)iter;
-  double cur_task_iter = (double) task->iterations;
-
-  // Returns true if the task is small i.e.
-  // if the number of iterations times C is smaller
-  // than the overhead of subtask creation
-  if (C == 0.0F || C * cur_task_iter < scheduler->kappa) {
-    *nsubtasks = 1;
-    return 1;
-  }
-
-  // Else compute how many subtasks this tasks should create
-  int64_t min_iter_pr_subtask = smax64(scheduler->kappa / C, 1);
-  *nsubtasks = smin64(smax64(task->iterations / min_iter_pr_subtask, 1), scheduler->num_threads);
-
-  return 0;
-}
-
-// TODO make this prettier
-static inline struct subtask* create_subtask(parloop_fn fn,
-                                             void* args,
-                                             const char* name,
-                                             volatile int* counter,
-                                             int64_t *timer,
-                                             int64_t *iter,
-                                             int64_t start, int64_t end,
-                                             int chunkable,
-                                             int64_t chunk_size,
-                                             int id)
-{
-  struct subtask* subtask = malloc(sizeof(struct subtask));
-  if (subtask == NULL) {
-    assert(!"malloc failed in create_subtask");
-    return NULL;
-  }
-  subtask->fn         = fn;
-  subtask->args       = args;
-
-  subtask->counter    = counter;
-  subtask->task_time  = timer;
-  subtask->task_iter  = iter;
-
-  subtask->start      = start;
-  subtask->end        = end;
-  subtask->id         = id;
-  subtask->chunkable  = chunkable;
-  subtask->chunk_size = chunk_size;
-
-  subtask->name       = name;
-  return subtask;
-}
-
-static int dummy_counter = 0;
-static int64_t dummy_timer = 0;
-static int64_t dummy_iter = 0;
-
-static int dummy_fn(void *args, int64_t start, int64_t end, int subtask_id, int tid) {
-  (void)args;
-  (void)start;
-  (void)end;
-  (void)subtask_id;
-  (void)tid;
-  return 0;
-}
-
-// Wake up threads, who are blocking by pushing a dummy task
-// onto their queue
-static inline void wake_up_threads(struct scheduler *scheduler, int start_tid, int end_tid) {
-
-#if defined(MCDEBUG)
-  assert(start_tid >= 1);
-  assert(end_tid <= scheduler->num_threads);
-#endif
-  for (int i = start_tid; i < end_tid; i++) {
-    struct subtask *subtask = create_subtask(dummy_fn, NULL, "dummy_fn",
-                                            &dummy_counter,
-                                            &dummy_timer, &dummy_iter,
-                                            0, 0,
-                                            0, 0,
-                                            0);
-    CHECK_ERR(subtask_queue_enqueue(&scheduler->workers[i], subtask), "subtask_queue_enqueue");
-  }
-}
-
-static inline int is_finished(struct worker *worker) {
-  return worker->dead && subtask_queue_is_empty(&worker->q);
-}
-
-// Try to steal from a random queue
-static inline int steal_from_random_worker(struct worker* worker)
-{
-  int my_id = worker->tid;
-  struct scheduler* scheduler = worker->scheduler;
-  int k = random_other_worker(scheduler, my_id);
-  struct worker *worker_k = &scheduler->workers[k];
-  struct subtask* subtask =  NULL;
-  int retval = subtask_queue_steal(worker_k, &subtask);
-  if (retval == 0) {
-    subtask_queue_enqueue(worker, subtask);
-    return 1;
-  }
-  return 0;
-}
-
-
-static inline void *scheduler_worker(void* args)
-{
-  struct worker *worker = (struct worker*) args;
-  struct scheduler *scheduler = worker->scheduler;
-  worker_local = worker;
-  struct subtask *subtask = NULL;
-
-  while(!is_finished(worker)) {
-    if (!subtask_queue_is_empty(&worker->q)) {
-      int retval = subtask_queue_dequeue(worker, &subtask, 0);
-      if (retval == 0) {
-        assert(subtask != NULL);
-        CHECK_ERR(run_subtask(worker, subtask), "run_subtask");
-      } // else someone stole our work
-
-    } else if (scheduler->active_work) { /* steal */
-      while (!is_finished(worker) && scheduler->active_work) {
-        if (steal_from_random_worker(worker)) {
-          break;
-        }
-      }
-    } else { /* go back to sleep and wait for work */
-      int retval = subtask_queue_dequeue(worker, &subtask, 1);
-      if (retval == 0) {
-        assert(subtask != NULL);
-        CHECK_ERR(run_subtask(worker, subtask), "run_subtask");
-      }
-    }
-  }
-
-  assert(subtask_queue_is_empty(&worker->q));
-#if defined(MCPROFILE)
-  if (worker->output_usage)
-    output_worker_usage(worker);
-#endif
-  return NULL;
-}
-
-
-static inline int scheduler_execute_parloop(struct scheduler *scheduler,
-                                            struct scheduler_parloop *task,
-                                            int64_t *timer)
-{
-
-  struct worker *worker = worker_local;
-
-  struct scheduler_info info = task->info;
-  int64_t iter_pr_subtask = info.iter_pr_subtask;
-  int64_t remainder = info.remainder;
-  int nsubtasks = info.nsubtasks;
-  volatile int join_counter = nsubtasks;
-
-  // Shared timer used to sum up all
-  // sequential work from each subtask
-  int64_t task_timer = 0;
-  int64_t task_iter = 0;
-
-  enum scheduling sched = info.sched;
-  /* If each subtasks should be processed in chunks */
-  int chunkable = sched == STATIC ? 0 : 1;
-  int64_t chunk_size = scheduler->minimum_chunk_size; // The initial chunk size when no info is avaliable
-
-
-  if (info.wake_up_threads || sched == DYNAMIC)
-    __atomic_add_fetch(&scheduler->active_work, nsubtasks, __ATOMIC_RELAXED);
-
-  int64_t start = 0;
-  int64_t end = iter_pr_subtask + (int64_t)(remainder != 0);
-  for (int subtask_id = 0; subtask_id < nsubtasks; subtask_id++) {
-    struct subtask *subtask = create_subtask(task->fn, task->args, task->name,
-                                              &join_counter,
-                                              &task_timer, &task_iter,
-                                              start, end,
-                                              chunkable, chunk_size,
-                                              subtask_id);
-    assert(subtask != NULL);
-    // In most cases we will never have more subtasks than workers,
-    // but there can be exceptions (e.g. the kappa tuning function).
-    struct worker *subtask_worker =
-      worker->nested
-      ? &scheduler->workers[worker->tid]
-      : &scheduler->workers[subtask_id % scheduler->num_threads];
-    CHECK_ERR(subtask_queue_enqueue(subtask_worker, subtask),
-              "subtask_queue_enqueue");
-    // Update range params
-    start = end;
-    end += iter_pr_subtask + ((subtask_id + 1) < remainder);
-  }
-
-  if (info.wake_up_threads) {
-    wake_up_threads(scheduler, nsubtasks, scheduler->num_threads);
-  }
-
-  // Join (wait for subtasks to finish)
-  while(join_counter != 0) {
-    if (!subtask_queue_is_empty(&worker->q)) {
-      struct subtask *subtask = NULL;
-      int err = subtask_queue_dequeue(worker, &subtask, 0);
-      if (err == 0 ) {
-        CHECK_ERR(run_subtask(worker, subtask), "run_subtask");
-      }
-    } else {
-      if (steal_from_random_worker(worker)) {
-        struct subtask *subtask = NULL;
-        int err = subtask_queue_dequeue(worker, &subtask, 0);
-        if (err == 0) {
-          CHECK_ERR(run_subtask(worker, subtask), "run_subtask");
-        }
-      }
-    }
-  }
-
-
-  if (info.wake_up_threads || sched == DYNAMIC) {
-    __atomic_sub_fetch(&scheduler->active_work, nsubtasks, __ATOMIC_RELAXED);
-  }
-
-  // Write back timing results of all sequential work
-  (*timer) += task_timer;
-  return scheduler->error;
-}
-
-
-static inline int scheduler_execute_task(struct scheduler *scheduler,
-                                         struct scheduler_parloop *task)
-{
-
-  struct worker *worker = worker_local;
-
-  int err = 0;
-
-  // How much sequential work was performed by the task
-  int64_t task_timer = 0;
-
-  /* Execute task sequential or parallel based on decision made earlier */
-  if (task->info.nsubtasks == 1) {
-    int64_t start = get_wall_time_ns();
-    err = task->fn(task->args, 0, task->iterations, 0, worker->tid);
-    int64_t end = get_wall_time_ns();
-    task_timer = end - start;
-    worker->time_spent_working += task_timer;
-    // Report time measurements
-    // TODO the update of both of these should really be a single atomic!!
-    __atomic_fetch_add(task->info.task_time, task_timer, __ATOMIC_RELAXED);
-    __atomic_fetch_add(task->info.task_iter, task->iterations, __ATOMIC_RELAXED);
-  } else {
-    // Add "before" time if we already are inside a task
-    int64_t time_before = 0;
-    if (worker->nested > 0) {
-      time_before = total_now(worker->total, worker->timer);
-    }
-
-    err = scheduler_execute_parloop(scheduler, task, &task_timer);
-
-    // Report time measurements
-    // TODO the update of both of these should really be a single atomic!!
-    __atomic_fetch_add(task->info.task_time, task_timer, __ATOMIC_RELAXED);
-    __atomic_fetch_add(task->info.task_iter, task->iterations, __ATOMIC_RELAXED);
-
-    // Update timers to account for new timings
-    worker->total = time_before + task_timer;
-    worker->timer = get_wall_time_ns();
-  }
-
-
-  return err;
-}
-
-/* Decide on how schedule the incoming task i.e. how many subtasks and
-   to run sequential or (potentially nested) parallel code body */
-static inline int scheduler_prepare_task(struct scheduler* scheduler,
-                                         struct scheduler_segop *task)
-{
-  assert(task != NULL);
-
-  struct worker *worker = worker_local;
-  struct scheduler_info info;
-  info.task_time = task->task_time;
-  info.task_iter = task->task_iter;
-
-  int nsubtasks;
-  // Decide if task should be scheduled sequentially
-  if (is_small(task, scheduler, &nsubtasks)) {
-    info.iter_pr_subtask = task->iterations;
-    info.remainder = 0;
-    info.nsubtasks = nsubtasks;
-    return task->top_level_fn(task->args, task->iterations, worker->tid, info);
-  } else {
-    info.iter_pr_subtask = task->iterations / nsubtasks;
-    info.remainder = task->iterations % nsubtasks;
-    info.sched = task->sched;
-    switch (task->sched) {
-    case STATIC:
-      info.nsubtasks = info.iter_pr_subtask == 0 ? info.remainder : ((task->iterations - info.remainder) / info.iter_pr_subtask);
-      break;
-    case DYNAMIC:
-      // As any thread can take any subtasks, we are being safe with using
-      // an upper bound on the number of tasks such that the task allocate enough memory
-      info.nsubtasks = info.iter_pr_subtask == 0 ? info.remainder : nsubtasks;
-      break;
-    default:
-      assert(!"Got unknown scheduling");
-    }
-  }
-
-  info.wake_up_threads = 0;
-  // We only use the nested parallel segop function if we can't exchaust all cores
-  // using the outer most level
-  if (task->nested_fn != NULL && info.nsubtasks < scheduler->num_threads && info.nsubtasks == task->iterations) {
-    if (worker->nested == 0)
-      info.wake_up_threads = 1;
-    return task->nested_fn(task->args, task->iterations, worker->tid, info);
-  }
-
-  return task->top_level_fn(task->args, task->iterations, worker->tid, info);
-}
-
-// Now some code for finding the proper value of kappa on a given
-// machine (the smallest amount of work that amortises the cost of
-// task creation).
-
-struct tuning_struct {
-  int32_t *free_tuning_res;
-  int32_t *array;
-};
-
-// Reduction function over an integer array
-static int tuning_loop(void *args, int64_t start, int64_t end,
-                                     int flat_tid, int tid) {
-  (void)flat_tid;
-  (void)tid;
-
-  int err = 0;
-  struct tuning_struct *tuning_struct = (struct tuning_struct *) args;
-  int32_t *array = tuning_struct->array;
-  int32_t *tuning_res = tuning_struct->free_tuning_res;
-
-  int32_t sum = 0;
-  for (int i = start; i < end; i++) {
-    int32_t y = array[i];
-    sum = add32(sum, y);
-  }
-  *tuning_res = sum;
-  return err;
-}
-
-// The main entry point for the tuning process.  Sets the provided
-// variable ``kappa``.
-static int determine_kappa(double *kappa) {
-  int err = 0;
-
-  int64_t iterations = 100000000;
-  int64_t tuning_time = 0;
-  int64_t tuning_iter = 0;
-
-  int32_t *array = malloc(sizeof(int32_t) * iterations);
-  for (int64_t i = 0; i < iterations; i++) {
-    array[i] = fast_rand();
-  }
-
-  int64_t start_tuning = get_wall_time_ns();
-  /* **************************** */
-  /* Run sequential reduce first' */
-  /* **************************** */
-  int64_t tuning_sequentiual_start = get_wall_time_ns();
-  struct tuning_struct tuning_struct;
-  int32_t tuning_res;
-  tuning_struct.free_tuning_res = &tuning_res;
-  tuning_struct.array = array;
-
-  err = tuning_loop(&tuning_struct, 0, iterations, 0, 0);
-  int64_t tuning_sequentiual_end = get_wall_time_ns();
-  int64_t sequential_elapsed = tuning_sequentiual_end - tuning_sequentiual_start;
-
-  double C = (double)sequential_elapsed / (double)iterations;
-  fprintf(stderr, " Time for sequential run is %lld - Found C %f\n", (long long)sequential_elapsed, C);
-
-  /* ********************** */
-  /* Now run tuning process */
-  /* ********************** */
-  // Setup a scheduler with a single worker
-  struct scheduler scheduler;
-  scheduler.num_threads = 1;
-  scheduler.workers = malloc(sizeof(struct worker));
-  worker_local = &scheduler.workers[0];
-  worker_local->tid = 0;
-  CHECK_ERR(subtask_queue_init(&scheduler.workers[0].q, 1024),
-            "failed to init queue for worker %d\n", 0);
-
-  // Start tuning for kappa
-  double kappa_tune = 1000; // Initial kappa is 1 us
-  double ratio;
-  int64_t time_elapsed;
-  while(1) {
-    int64_t min_iter_pr_subtask = (int64_t) (kappa_tune / C) == 0 ? 1 : (kappa_tune / C);
-    int nsubtasks = iterations / min_iter_pr_subtask;
-    struct scheduler_info info;
-    info.iter_pr_subtask = min_iter_pr_subtask;
-
-    info.nsubtasks = iterations / min_iter_pr_subtask;
-    info.remainder = iterations % min_iter_pr_subtask;
-    info.task_time = &tuning_time;
-    info.task_iter = &tuning_iter;
-    info.sched = STATIC;
-
-    struct scheduler_parloop parloop;
-    parloop.name = "tuning_loop";
-    parloop.fn = tuning_loop;
-    parloop.args = &tuning_struct;
-    parloop.iterations = iterations;
-    parloop.info = info;
-
-    int64_t tuning_chunked_start = get_wall_time_ns();
-    int determine_kappa_err =
-      scheduler_execute_task(&scheduler,
-                             &parloop);
-    assert(determine_kappa_err == 0);
-    int64_t tuning_chunked_end = get_wall_time_ns();
-    time_elapsed =  tuning_chunked_end - tuning_chunked_start;
-
-    ratio = (double)time_elapsed / (double)sequential_elapsed;
-    if (ratio < 1.055) {
-      break;
-    }
-    kappa_tune += 100; // Increase by 100 ns at the time
-    fprintf(stderr, "nsubtask %d - kappa %f - ratio %f\n", nsubtasks, kappa_tune, ratio);
-  }
-
-  int64_t end_tuning = get_wall_time_ns();
-  fprintf(stderr, "tuning took %lld ns and found kappa %f - time %lld - ratio %f\n",
-          (long long)end_tuning - start_tuning,
-          kappa_tune,
-          (long long)time_elapsed,
-          ratio);
-  *kappa = kappa_tune;
-
-  // Clean-up
-  CHECK_ERR(subtask_queue_destroy(&scheduler.workers[0].q), "failed to destroy queue");
-  free(array);
-  free(scheduler.workers);
-  return err;
-}
-
-static int scheduler_init(struct scheduler *scheduler,
-                          int num_workers,
-                          double kappa) {
-#ifdef FUTHARK_BACKEND_ispc
-  int64_t get_gang_size();
-  scheduler->minimum_chunk_size = get_gang_size();
-#else
-  scheduler->minimum_chunk_size = 1;
-#endif
-
-  assert(num_workers > 0);
-
-  scheduler->kappa = kappa;
-  scheduler->num_threads = num_workers;
-  scheduler->active_work = 0;
-  scheduler->error = 0;
-
-  scheduler->workers = calloc(num_workers, sizeof(struct worker));
-
-  const int queue_capacity = 1024;
-
-  worker_local = &scheduler->workers[0];
-  worker_local->tid = 0;
-  worker_local->scheduler = scheduler;
-  CHECK_ERR(subtask_queue_init(&worker_local->q, queue_capacity),
-            "failed to init queue for worker %d\n", 0);
-
-  for (int i = 1; i < num_workers; i++) {
-    struct worker *cur_worker = &scheduler->workers[i];
-    memset(cur_worker, 0, sizeof(struct worker));
-    cur_worker->tid = i;
-    cur_worker->output_usage = 0;
-    cur_worker->scheduler = scheduler;
-    CHECK_ERR(subtask_queue_init(&cur_worker->q, queue_capacity),
-              "failed to init queue for worker %d\n", i);
-
-    CHECK_ERR(pthread_create(&cur_worker->thread,
-                             NULL,
-                             &scheduler_worker,
-                             cur_worker),
-              "Failed to create worker %d\n", i);
-  }
-
-  return 0;
-}
-
-static int scheduler_destroy(struct scheduler *scheduler) {
-  // We assume that this function is called by the thread controlling
-  // the first worker, which is why we treat scheduler->workers[0]
-  // specially here.
-
-  // First mark them all as dead.
-  for (int i = 1; i < scheduler->num_threads; i++) {
-    struct worker *cur_worker = &scheduler->workers[i];
-    cur_worker->dead = 1;
-  }
-
-  // Then destroy their task queues (this will wake up the threads and
-  // make them do their shutdown).
-  for (int i = 1; i < scheduler->num_threads; i++) {
-    struct worker *cur_worker = &scheduler->workers[i];
-    subtask_queue_destroy(&cur_worker->q);
-  }
-
-  // Then actually wait for them to stop.
-  for (int i = 1; i < scheduler->num_threads; i++) {
-    struct worker *cur_worker = &scheduler->workers[i];
-    CHECK_ERR(pthread_join(scheduler->workers[i].thread, NULL), "pthread_join");
-  }
-
-  // And then destroy our own queue.
-  subtask_queue_destroy(&scheduler->workers[0].q);
-
-  free(scheduler->workers);
-
-  return 0;
-}
-
-// End of scheduler.h
-
-// Start of backends/multicore.h
+// Start of backends/c.h
 
 struct futhark_context_config {
   int in_use;
@@ -6319,21 +5161,14 @@ struct futhark_context_config {
   const char** tuning_param_names;
   const char** tuning_param_vars;
   const char** tuning_param_classes;
-  // Uniform fields above.
-
-  int num_threads;
 };
 
 static void backend_context_config_setup(struct futhark_context_config* cfg) {
-  cfg->num_threads = 0;
+  (void)cfg;
 }
 
 static void backend_context_config_teardown(struct futhark_context_config* cfg) {
   (void)cfg;
-}
-
-void futhark_context_config_set_num_threads(struct futhark_context_config *cfg, int n) {
-  cfg->num_threads = n;
 }
 
 int futhark_context_config_set_tuning_param(struct futhark_context_config* cfg, const char *param_name, size_t param_value) {
@@ -6359,46 +5194,15 @@ struct futhark_context {
   int64_t cur_mem_usage_default;
   struct program* program;
   bool program_initialised;
-  // Uniform fields above.
-
-  lock_t event_list_lock;
-  struct scheduler scheduler;
-  int total_runs;
-  long int total_runtime;
-  int64_t tuning_timing;
-  int64_t tuning_iter;
 };
 
 int backend_context_setup(struct futhark_context* ctx) {
-  // Initialize rand()
-  fast_srand(time(0));
-
-  int tune_kappa = 0;
-  double kappa = 5.1f * 1000;
-
-  if (tune_kappa) {
-    if (determine_kappa(&kappa) != 0) {
-      ctx->error = strdup("Failed to determine kappa.");
-      return 1;
-    }
-  }
-
-  if (scheduler_init(&ctx->scheduler,
-                     ctx->cfg->num_threads > 0 ?
-                     ctx->cfg->num_threads : num_processors(),
-                     kappa) != 0) {
-    ctx->error = strdup("Failed to initialise scheduler.");
-    return 1;
-  }
-
-  create_lock(&ctx->event_list_lock);
-
+  (void)ctx;
   return 0;
 }
 
 void backend_context_teardown(struct futhark_context* ctx) {
-  (void)scheduler_destroy(&ctx->scheduler);
-  free_lock(&ctx->event_list_lock);
+  (void)ctx;
 }
 
 int futhark_context_sync(struct futhark_context* ctx) {
@@ -6406,70 +5210,10 @@ int futhark_context_sync(struct futhark_context* ctx) {
   return 0;
 }
 
-struct mc_event {
-  // Time in microseconds.
-  uint64_t bef, aft;
-};
-
-static struct mc_event* mc_event_new(struct futhark_context* ctx) {
-  if (ctx->profiling && !ctx->profiling_paused) {
-    struct mc_event* e = malloc(sizeof(struct mc_event));
-    return e;
-  } else {
-    return NULL;
-  }
-}
-
-static int mc_event_report(struct str_builder* sb, struct mc_event* e) {
-  float ms = e->aft - e->bef;
-  str_builder(sb, ",\"duration\":%f", ms);
-  free(e);
-  return 0;
-}
-
-
-// End of backends/multicore.h
+// End of backends/c.h
 
 struct program {
     int dummy;
-    int64_t futhark_mc_segmap_task_18380_total_time;
-    int64_t futhark_mc_segmap_task_18380_total_iter;
-    int64_t futhark_mc_copy_17928_task_18387_total_time;
-    int64_t futhark_mc_copy_17928_task_18387_total_iter;
-    int64_t futhark_mc_segscan_task_18394_total_time;
-    int64_t futhark_mc_segscan_task_18394_total_iter;
-    int64_t futhark_mc_copy_17987_task_18409_total_time;
-    int64_t futhark_mc_copy_17987_task_18409_total_iter;
-    int64_t futhark_mc_copy_17997_task_18416_total_time;
-    int64_t futhark_mc_copy_17997_task_18416_total_iter;
-    int64_t futhark_mc_segmap_task_18423_total_time;
-    int64_t futhark_mc_segmap_task_18423_total_iter;
-    int64_t futhark_mc_segmap_task_18430_total_time;
-    int64_t futhark_mc_segmap_task_18430_total_iter;
-    int64_t futhark_mc_copy_18024_task_18437_total_time;
-    int64_t futhark_mc_copy_18024_task_18437_total_iter;
-    int64_t futhark_mc_copy_18037_task_18444_total_time;
-    int64_t futhark_mc_copy_18037_task_18444_total_iter;
-    int64_t futhark_mc_segmap_task_18451_total_time;
-    int64_t futhark_mc_segmap_task_18451_total_iter;
-    int64_t futhark_mc_segscan_task_18474_total_time;
-    int64_t futhark_mc_segscan_task_18474_total_iter;
-    int64_t futhark_mc_segmap_task_18489_total_time;
-    int64_t futhark_mc_segmap_task_18489_total_iter;
-    int64_t futhark_mc_segmap_task_18496_total_time;
-    int64_t futhark_mc_segmap_task_18496_total_iter;
-    int64_t futhark_mc_copy_18251_task_18503_total_time;
-    int64_t futhark_mc_copy_18251_task_18503_total_iter;
-    int64_t futhark_mc_copy_18261_task_18510_total_time;
-    int64_t futhark_mc_copy_18261_task_18510_total_iter;
-    int64_t futhark_mc_segscan_task_18520_total_time;
-    int64_t futhark_mc_segscan_task_18520_total_iter;
-    int64_t futhark_mc_segmap_task_18532_total_time;
-    int64_t futhark_mc_segmap_task_18532_total_iter;
-    int64_t futhark_mc_segmap_task_18539_total_time;
-    int64_t futhark_mc_segmap_task_18539_total_iter;
-    int64_t futhark_mc_segmap_task_18546_total_time;
-    int64_t futhark_mc_segmap_task_18546_total_iter;
 };
 static void setup_program(struct futhark_context *ctx)
 {
@@ -6479,44 +5223,6 @@ static void setup_program(struct futhark_context *ctx)
     
     (void) error;
     ctx->program = malloc(sizeof(struct program));
-    ctx->program->futhark_mc_segmap_task_18380_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18380_total_iter = 0;
-    ctx->program->futhark_mc_copy_17928_task_18387_total_time = 0;
-    ctx->program->futhark_mc_copy_17928_task_18387_total_iter = 0;
-    ctx->program->futhark_mc_segscan_task_18394_total_time = 0;
-    ctx->program->futhark_mc_segscan_task_18394_total_iter = 0;
-    ctx->program->futhark_mc_copy_17987_task_18409_total_time = 0;
-    ctx->program->futhark_mc_copy_17987_task_18409_total_iter = 0;
-    ctx->program->futhark_mc_copy_17997_task_18416_total_time = 0;
-    ctx->program->futhark_mc_copy_17997_task_18416_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18423_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18423_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18430_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18430_total_iter = 0;
-    ctx->program->futhark_mc_copy_18024_task_18437_total_time = 0;
-    ctx->program->futhark_mc_copy_18024_task_18437_total_iter = 0;
-    ctx->program->futhark_mc_copy_18037_task_18444_total_time = 0;
-    ctx->program->futhark_mc_copy_18037_task_18444_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18451_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18451_total_iter = 0;
-    ctx->program->futhark_mc_segscan_task_18474_total_time = 0;
-    ctx->program->futhark_mc_segscan_task_18474_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18489_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18489_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18496_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18496_total_iter = 0;
-    ctx->program->futhark_mc_copy_18251_task_18503_total_time = 0;
-    ctx->program->futhark_mc_copy_18251_task_18503_total_iter = 0;
-    ctx->program->futhark_mc_copy_18261_task_18510_total_time = 0;
-    ctx->program->futhark_mc_copy_18261_task_18510_total_iter = 0;
-    ctx->program->futhark_mc_segscan_task_18520_total_time = 0;
-    ctx->program->futhark_mc_segscan_task_18520_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18532_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18532_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18539_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18539_total_iter = 0;
-    ctx->program->futhark_mc_segmap_task_18546_total_time = 0;
-    ctx->program->futhark_mc_segmap_task_18546_total_iter = 0;
 }
 static void teardown_program(struct futhark_context *ctx)
 {
@@ -6622,7 +5328,6 @@ char *futhark_context_report(struct futhark_context *ctx)
 int futhark_context_clear_caches(struct futhark_context *ctx)
 {
     lock_lock(&ctx->lock);
-    worker_local = &ctx->scheduler.workers[0];
     ctx->peak_mem_usage_default = 0;
     lock_unlock(&ctx->lock);
     return ctx->error != NULL;
@@ -7106,9 +5811,9 @@ GEN_LMAD_COPY(8b, uint64_t)
 
 #define FUTHARK_FUN_ATTR static
 
-FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_18351, struct memblock *mem_out_p_18352, int64_t *out_prim_out_18353, struct memblock grid_xs_mem_17730, struct memblock grid_ys_mem_17731, struct memblock pts_x_mem_17732, struct memblock pts_y_mem_17733, int64_t dz2080U_12740, int64_t dz2081U_12741, int64_t dz2082U_12742, int64_t dz2083U_12743);
-FUTHARK_FUN_ATTR int futrts_lifted_f_6330(struct futhark_context *ctx, int64_t *out_prim_out_18552, int16_t na_9704, int16_t nb_9705, int16_t nc_9706, int16_t bin_9707, int16_t a_9708, int16_t b_9709, int16_t c_9710, int16_t d_9711);
-FUTHARK_FUN_ATTR int futrts_lifted_lambda_6329(struct futhark_context *ctx, int16_t *out_prim_out_18553, int16_t *out_prim_out_18554, int16_t *out_prim_out_18555, int16_t *out_prim_out_18556, int16_t x_9647);
+FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_18068, struct memblock *mem_out_p_18069, int64_t *out_prim_out_18070, struct memblock grid_xs_mem_17709, struct memblock grid_ys_mem_17710, struct memblock pts_x_mem_17711, struct memblock pts_y_mem_17712, int64_t dz2080U_12740, int64_t dz2081U_12741, int64_t dz2082U_12742, int64_t dz2083U_12743);
+FUTHARK_FUN_ATTR int futrts_lifted_f_6330(struct futhark_context *ctx, int64_t *out_prim_out_18103, int16_t na_9704, int16_t nb_9705, int16_t nc_9706, int16_t bin_9707, int16_t a_9708, int16_t b_9709, int16_t c_9710, int16_t d_9711);
+FUTHARK_FUN_ATTR int futrts_lifted_lambda_6329(struct futhark_context *ctx, int16_t *out_prim_out_18104, int16_t *out_prim_out_18105, int16_t *out_prim_out_18106, int16_t *out_prim_out_18107, int16_t x_9647);
 
 static int init_constants(struct futhark_context *ctx)
 {
@@ -7125,4350 +5830,6 @@ static int free_constants(struct futhark_context *ctx)
     (void) ctx;
     return 0;
 }
-struct futhark_mc_task_18379 {
-    struct futhark_context *ctx;
-    int64_t free_dz2080U_12740;
-    int64_t free_dz2081U_12741;
-    int64_t free_dz2082U_12742;
-    int64_t free_dz2083U_12743;
-    int64_t free_dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    unsigned char *free_grid_xs_mem_17730;
-    unsigned char *free_grid_ys_mem_17731;
-    unsigned char *free_pts_x_mem_17732;
-    unsigned char *free_pts_y_mem_17733;
-    unsigned char *free_mem_17735;
-};
-struct futhark_mc_segmap_parloop_struct_18381 {
-    struct futhark_context *ctx;
-    int64_t free_dz2080U_12740;
-    int64_t free_dz2081U_12741;
-    int64_t free_dz2082U_12742;
-    int64_t free_dz2083U_12743;
-    int64_t free_dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    unsigned char *free_grid_xs_mem_17730;
-    unsigned char *free_grid_ys_mem_17731;
-    unsigned char *free_pts_x_mem_17732;
-    unsigned char *free_pts_y_mem_17733;
-    unsigned char *free_mem_17735;
-};
-static int futhark_mc_segmap_parloop_18382(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18381 *futhark_mc_segmap_parloop_struct_18381 = (struct futhark_mc_segmap_parloop_struct_18381 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18381->ctx;
-    struct mc_event *event_18383 = mc_event_new(ctx);
-    
-    if (event_18383 != NULL)
-        event_18383->bef = get_wall_time();
-    
-    int64_t dz2080U_12740 = futhark_mc_segmap_parloop_struct_18381->free_dz2080U_12740;
-    int64_t dz2081U_12741 = futhark_mc_segmap_parloop_struct_18381->free_dz2081U_12741;
-    int64_t dz2082U_12742 = futhark_mc_segmap_parloop_struct_18381->free_dz2082U_12742;
-    int64_t dz2083U_12743 = futhark_mc_segmap_parloop_struct_18381->free_dz2083U_12743;
-    int64_t dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 = futhark_mc_segmap_parloop_struct_18381->free_dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    struct memblock grid_xs_mem_17730 = {.desc ="grid_xs_mem_17730", .mem =futhark_mc_segmap_parloop_struct_18381->free_grid_xs_mem_17730, .size =0, .references =NULL};
-    struct memblock grid_ys_mem_17731 = {.desc ="grid_ys_mem_17731", .mem =futhark_mc_segmap_parloop_struct_18381->free_grid_ys_mem_17731, .size =0, .references =NULL};
-    struct memblock pts_x_mem_17732 = {.desc ="pts_x_mem_17732", .mem =futhark_mc_segmap_parloop_struct_18381->free_pts_x_mem_17732, .size =0, .references =NULL};
-    struct memblock pts_y_mem_17733 = {.desc ="pts_y_mem_17733", .mem =futhark_mc_segmap_parloop_struct_18381->free_pts_y_mem_17733, .size =0, .references =NULL};
-    struct memblock mem_17735 = {.desc ="mem_17735", .mem =futhark_mc_segmap_parloop_struct_18381->free_mem_17735, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17538;
-    
-    flat_tid_17538 = subtask_id;
-    {
-        int64_t start_17914;
-        int64_t end_17915;
-        
-        start_17914 = start;
-        end_17915 = end;
-        
-        int64_t n_17916 = end_17915 - start_17914;
-        
-        for (int64_t SegMap_i_17917 = start_17914; SegMap_i_17917 < start_17914 + n_17916; SegMap_i_17917++) {
-            int64_t slice_17918 = dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-            int64_t gtid_17539 = SegMap_i_17917;
-            int64_t remnant_17919 = SegMap_i_17917 - gtid_17539;
-            int64_t g_16780 = sdiv64(gtid_17539, dz2082U_12742);
-            int64_t p_16781 = smod64(gtid_17539, dz2082U_12742);
-            bool x_16782 = sle64((int64_t) 0, g_16780);
-            bool y_16783 = slt64(g_16780, dz2080U_12740);
-            bool bounds_check_16784 = x_16782 && y_16783;
-            bool index_certs_16785;
-            
-            if (!bounds_check_16784) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_16780, "] out of bounds for array of shape [", (long long) dz2080U_12740, "].", "-> #0  arrange.fut:19:14-24\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            bool x_16787 = sle64((int64_t) 0, p_16781);
-            bool y_16788 = slt64(p_16781, dz2082U_12742);
-            bool bounds_check_16789 = x_16787 && y_16788;
-            bool index_certs_16790;
-            
-            if (!bounds_check_16789) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_16781, "] out of bounds for array of shape [", (long long) dz2082U_12742, "].", "-> #0  arrange.fut:19:27-35\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            bool y_16793 = slt64(g_16780, dz2081U_12741);
-            bool bounds_check_16794 = x_16782 && y_16793;
-            bool index_certs_16795;
-            
-            if (!bounds_check_16794) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_16780, "] out of bounds for array of shape [", (long long) dz2081U_12741, "].", "-> #0  arrange.fut:20:14-24\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            bool y_16797 = slt64(p_16781, dz2083U_12743);
-            bool bounds_check_16798 = x_16787 && y_16797;
-            bool index_certs_16799;
-            
-            if (!bounds_check_16798) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_16781, "] out of bounds for array of shape [", (long long) dz2083U_12743, "].", "-> #0  arrange.fut:20:27-35\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            double zm_lhs_16786 = ((double *) grid_xs_mem_17730.mem)[g_16780];
-            double zm_rhs_16791 = ((double *) pts_x_mem_17732.mem)[p_16781];
-            double dx_16792 = zm_lhs_16786 - zm_rhs_16791;
-            double zm_lhs_16796 = ((double *) grid_ys_mem_17731.mem)[g_16780];
-            double zm_rhs_16800 = ((double *) pts_y_mem_17733.mem)[p_16781];
-            double dy_16801 = zm_lhs_16796 - zm_rhs_16800;
-            double zp_lhs_16802 = dx_16792 * dx_16792;
-            double zp_rhs_16803 = dy_16801 * dy_16801;
-            double f64_arg0_16804 = zp_lhs_16802 + zp_rhs_16803;
-            float f64_res_16805 = fpconv_f64_f32(f64_arg0_16804);
-            
-            ((float *) mem_17735.mem)[gtid_17539] = f64_res_16805;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18383 != NULL) {
-        event_18383->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18382", strdup("nothing further"), event_18383, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18380(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18379 *futhark_mc_task_18379 = (struct futhark_mc_task_18379 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18379->ctx;
-    struct mc_event *event_18385 = mc_event_new(ctx);
-    
-    if (event_18385 != NULL)
-        event_18385->bef = get_wall_time();
-    
-    int64_t dz2080U_12740 = futhark_mc_task_18379->free_dz2080U_12740;
-    int64_t dz2081U_12741 = futhark_mc_task_18379->free_dz2081U_12741;
-    int64_t dz2082U_12742 = futhark_mc_task_18379->free_dz2082U_12742;
-    int64_t dz2083U_12743 = futhark_mc_task_18379->free_dz2083U_12743;
-    int64_t dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 = futhark_mc_task_18379->free_dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    struct memblock grid_xs_mem_17730 = {.desc ="grid_xs_mem_17730", .mem =futhark_mc_task_18379->free_grid_xs_mem_17730, .size =0, .references =NULL};
-    struct memblock grid_ys_mem_17731 = {.desc ="grid_ys_mem_17731", .mem =futhark_mc_task_18379->free_grid_ys_mem_17731, .size =0, .references =NULL};
-    struct memblock pts_x_mem_17732 = {.desc ="pts_x_mem_17732", .mem =futhark_mc_task_18379->free_pts_x_mem_17732, .size =0, .references =NULL};
-    struct memblock pts_y_mem_17733 = {.desc ="pts_y_mem_17733", .mem =futhark_mc_task_18379->free_pts_y_mem_17733, .size =0, .references =NULL};
-    struct memblock mem_17735 = {.desc ="mem_17735", .mem =futhark_mc_task_18379->free_mem_17735, .size =0, .references =NULL};
-    int32_t nsubtasks_17913;
-    
-    nsubtasks_17913 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18381 futhark_mc_segmap_parloop_struct_18381_;
-    
-    futhark_mc_segmap_parloop_struct_18381_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18381_.free_dz2080U_12740 = dz2080U_12740;
-    futhark_mc_segmap_parloop_struct_18381_.free_dz2081U_12741 = dz2081U_12741;
-    futhark_mc_segmap_parloop_struct_18381_.free_dz2082U_12742 = dz2082U_12742;
-    futhark_mc_segmap_parloop_struct_18381_.free_dz2083U_12743 = dz2083U_12743;
-    futhark_mc_segmap_parloop_struct_18381_.free_dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 = dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    futhark_mc_segmap_parloop_struct_18381_.free_grid_xs_mem_17730 = grid_xs_mem_17730.mem;
-    futhark_mc_segmap_parloop_struct_18381_.free_grid_ys_mem_17731 = grid_ys_mem_17731.mem;
-    futhark_mc_segmap_parloop_struct_18381_.free_pts_x_mem_17732 = pts_x_mem_17732.mem;
-    futhark_mc_segmap_parloop_struct_18381_.free_pts_y_mem_17733 = pts_y_mem_17733.mem;
-    futhark_mc_segmap_parloop_struct_18381_.free_mem_17735 = mem_17735.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18382_task;
-    
-    futhark_mc_segmap_parloop_18382_task.name = "futhark_mc_segmap_parloop_18382";
-    futhark_mc_segmap_parloop_18382_task.fn = futhark_mc_segmap_parloop_18382;
-    futhark_mc_segmap_parloop_18382_task.args = &futhark_mc_segmap_parloop_struct_18381_;
-    futhark_mc_segmap_parloop_18382_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18382_task.info = info;
-    
-    struct mc_event *event_18384 = mc_event_new(ctx);
-    
-    if (event_18384 != NULL)
-        event_18384->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18382_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18382_task);
-    
-    if (futhark_mc_segmap_parloop_18382_err != 0) {
-        err = futhark_mc_segmap_parloop_18382_err;
-        goto cleanup;
-    }
-    if (event_18384 != NULL) {
-        event_18384->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18382_total", strdup("nothing further"), event_18384, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18385 != NULL) {
-        event_18385->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18380", strdup("nothing further"), event_18385, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18386 {
-    struct futhark_context *ctx;
-    int64_t free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    unsigned char *free_mem_17735;
-    unsigned char *free_mem_17737;
-};
-struct futhark_mc_copy_parloop_struct_18388 {
-    struct futhark_context *ctx;
-    int64_t free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    unsigned char *free_mem_17735;
-    unsigned char *free_mem_17737;
-};
-static int futhark_mc_copy_parloop_18389(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18388 *futhark_mc_copy_parloop_struct_18388 = (struct futhark_mc_copy_parloop_struct_18388 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18388->ctx;
-    struct mc_event *event_18390 = mc_event_new(ctx);
-    
-    if (event_18390 != NULL)
-        event_18390->bef = get_wall_time();
-    
-    int64_t dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = futhark_mc_copy_parloop_struct_18388->free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    struct memblock mem_17735 = {.desc ="mem_17735", .mem =futhark_mc_copy_parloop_struct_18388->free_mem_17735, .size =0, .references =NULL};
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_copy_parloop_struct_18388->free_mem_17737, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_17920;
-        int64_t end_17921;
-        
-        start_17920 = start;
-        end_17921 = end;
-        
-        int64_t n_17922 = end_17921 - start_17920;
-        
-        for (int64_t copy_i_17923 = start_17920; copy_i_17923 < start_17920 + n_17922; copy_i_17923++) {
-            int64_t slice_17925 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-            int64_t i_17924 = copy_i_17923;
-            int64_t remnant_17926 = copy_i_17923 - i_17924;
-            float tmp_17927 = ((float *) mem_17735.mem)[i_17924];
-            
-            ((float *) mem_17737.mem)[i_17924] = tmp_17927;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18390 != NULL) {
-        event_18390->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18389", strdup("nothing further"), event_18390, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_17928_task_18387(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18386 *futhark_mc_task_18386 = (struct futhark_mc_task_18386 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18386->ctx;
-    struct mc_event *event_18392 = mc_event_new(ctx);
-    
-    if (event_18392 != NULL)
-        event_18392->bef = get_wall_time();
-    
-    int64_t dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = futhark_mc_task_18386->free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    struct memblock mem_17735 = {.desc ="mem_17735", .mem =futhark_mc_task_18386->free_mem_17735, .size =0, .references =NULL};
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18386->free_mem_17737, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18388 futhark_mc_copy_parloop_struct_18388_;
-    
-    futhark_mc_copy_parloop_struct_18388_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18388_.free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    futhark_mc_copy_parloop_struct_18388_.free_mem_17735 = mem_17735.mem;
-    futhark_mc_copy_parloop_struct_18388_.free_mem_17737 = mem_17737.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18389_task;
-    
-    futhark_mc_copy_parloop_18389_task.name = "futhark_mc_copy_parloop_18389";
-    futhark_mc_copy_parloop_18389_task.fn = futhark_mc_copy_parloop_18389;
-    futhark_mc_copy_parloop_18389_task.args = &futhark_mc_copy_parloop_struct_18388_;
-    futhark_mc_copy_parloop_18389_task.iterations = iterations;
-    futhark_mc_copy_parloop_18389_task.info = info;
-    
-    struct mc_event *event_18391 = mc_event_new(ctx);
-    
-    if (event_18391 != NULL)
-        event_18391->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18389_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18389_task);
-    
-    if (futhark_mc_copy_parloop_18389_err != 0) {
-        err = futhark_mc_copy_parloop_18389_err;
-        goto cleanup;
-    }
-    if (event_18391 != NULL) {
-        event_18391->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18389_total", strdup("nothing further"), event_18391, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18392 != NULL) {
-        event_18392->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_17928_task_18387", strdup("nothing further"), event_18392, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18393 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17747;
-    unsigned char *free_mem_17749;
-    unsigned char *free_mem_17751;
-    unsigned char *free_mem_17753;
-    unsigned char *free_mem_17755;
-};
-struct futhark_mc_scan_stage_1_parloop_struct_18399 {
-    struct futhark_context *ctx;
-    int64_t free_arg_16810;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17747;
-    unsigned char *free_mem_17749;
-    unsigned char *free_mem_17751;
-    unsigned char *free_mem_17753;
-    unsigned char *free_mem_17755;
-};
-static int futhark_mc_scan_stage_1_parloop_18400(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_scan_stage_1_parloop_struct_18399 *futhark_mc_scan_stage_1_parloop_struct_18399 = (struct futhark_mc_scan_stage_1_parloop_struct_18399 *) args;
-    struct futhark_context *ctx = futhark_mc_scan_stage_1_parloop_struct_18399->ctx;
-    struct mc_event *event_18401 = mc_event_new(ctx);
-    
-    if (event_18401 != NULL)
-        event_18401->bef = get_wall_time();
-    
-    int64_t arg_16810 = futhark_mc_scan_stage_1_parloop_struct_18399->free_arg_16810;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_scan_stage_1_parloop_struct_18399->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_scan_stage_1_parloop_struct_18399->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_scan_stage_1_parloop_struct_18399->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_scan_stage_1_parloop_struct_18399->free_cond_f_res_16868;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_scan_stage_1_parloop_struct_18399->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17747 = {.desc ="mem_17747", .mem =futhark_mc_scan_stage_1_parloop_struct_18399->free_mem_17747, .size =0, .references =NULL};
-    struct memblock mem_17749 = {.desc ="mem_17749", .mem =futhark_mc_scan_stage_1_parloop_struct_18399->free_mem_17749, .size =0, .references =NULL};
-    struct memblock mem_17751 = {.desc ="mem_17751", .mem =futhark_mc_scan_stage_1_parloop_struct_18399->free_mem_17751, .size =0, .references =NULL};
-    struct memblock mem_17753 = {.desc ="mem_17753", .mem =futhark_mc_scan_stage_1_parloop_struct_18399->free_mem_17753, .size =0, .references =NULL};
-    struct memblock mem_17755 = {.desc ="mem_17755", .mem =futhark_mc_scan_stage_1_parloop_struct_18399->free_mem_17755, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17540;
-    
-    flat_tid_17540 = subtask_id;
-    
-    int16_t eta_p_16908;
-    int16_t eta_p_16909;
-    int16_t eta_p_16910;
-    int16_t eta_p_16911;
-    int16_t eta_p_16912;
-    int16_t eta_p_16913;
-    int16_t eta_p_16914;
-    int16_t eta_p_16915;
-    
-    eta_p_16908 = (int16_t) 0;
-    eta_p_16909 = (int16_t) 0;
-    eta_p_16910 = (int16_t) 0;
-    eta_p_16911 = (int16_t) 0;
-    {
-        int64_t start_17935;
-        int64_t end_17936;
-        
-        start_17935 = start;
-        end_17936 = end;
-        
-        int64_t n_17937 = end_17936 - start_17935;
-        
-        for (int64_t SegScan_i_17938 = start_17935; SegScan_i_17938 < start_17935 + n_17937; SegScan_i_17938++) {
-            int64_t gtid_17541 = SegScan_i_17938;
-            int64_t slice_17667 = arg_16810 + gtid_17541;
-            float eta_p_17325 = ((float *) mem_17737.mem)[slice_17667];
-            int32_t i32_arg0_17326 = futrts_to_bits32(eta_p_17325);
-            int32_t unsign_arg0_17327 = ashr32(i32_arg0_17326, get_bit_arg0_16866);
-            int32_t unsign_arg0_17328 = 1 & unsign_arg0_17327;
-            int32_t unsign_arg0_17329 = ashr32(i32_arg0_17326, 31);
-            int32_t unsign_arg0_17330 = 1 & unsign_arg0_17329;
-            bool cond_17331 = unsign_arg0_17330 == 1;
-            bool x_17332 = !cond_17331;
-            bool y_17333 = cond_f_res_16867 && x_17332;
-            bool cond_17334 = cond_17331 || y_17333;
-            int32_t defunc_0_get_bit_res_17335;
-            
-            if (cond_17334) {
-                int32_t defunc_0_get_bit_res_t_res_17481 = 1 ^ unsign_arg0_17328;
-                
-                defunc_0_get_bit_res_17335 = defunc_0_get_bit_res_t_res_17481;
-            } else {
-                defunc_0_get_bit_res_17335 = unsign_arg0_17328;
-            }
-            
-            int32_t zp_lhs_17337 = mul32(2, defunc_0_get_bit_res_17335);
-            int32_t unsign_arg0_17338 = ashr32(i32_arg0_17326, blocked_radix_sort_step_arg1_16861);
-            int32_t unsign_arg0_17339 = 1 & unsign_arg0_17338;
-            bool y_17340 = cond_f_res_16868 && x_17332;
-            bool cond_17341 = cond_17331 || y_17340;
-            int32_t defunc_0_get_bit_res_17342;
-            
-            if (cond_17341) {
-                int32_t defunc_0_get_bit_res_t_res_17482 = 1 ^ unsign_arg0_17339;
-                
-                defunc_0_get_bit_res_17342 = defunc_0_get_bit_res_t_res_17482;
-            } else {
-                defunc_0_get_bit_res_17342 = unsign_arg0_17339;
-            }
-            
-            int32_t i32_arg0_17344 = add32(zp_lhs_17337, defunc_0_get_bit_res_17342);
-            int16_t i32_res_17345 = sext_i32_i16(i32_arg0_17344);
-            int16_t defunc_0_f_res_17347;
-            int16_t defunc_0_f_res_17348;
-            int16_t defunc_0_f_res_17349;
-            int16_t defunc_0_f_res_17350;
-            
-            if (futrts_lifted_lambda_6329(ctx, &defunc_0_f_res_17347, &defunc_0_f_res_17348, &defunc_0_f_res_17349, &defunc_0_f_res_17350, i32_res_17345) != 0) {
-                err = 1;
-                goto cleanup;
-            }
-            // write mapped values results to memory
-            {
-                ((int16_t *) mem_17755.mem)[gtid_17541] = i32_res_17345;
-            }
-            // Apply scan op
-            {
-                int64_t uni_i_17939 = 0;
-                
-                {
-                    // Read accumulator
-                    {
-                        eta_p_16908 = eta_p_16908;
-                        eta_p_16909 = eta_p_16909;
-                        eta_p_16910 = eta_p_16910;
-                        eta_p_16911 = eta_p_16911;
-                    }
-                    // Read next values
-                    {
-                        eta_p_16912 = defunc_0_f_res_17347;
-                        eta_p_16913 = defunc_0_f_res_17348;
-                        eta_p_16914 = defunc_0_f_res_17349;
-                        eta_p_16915 = defunc_0_f_res_17350;
-                    }
-                    // Scan op body
-                    {
-                        int16_t defunc_0_op_res_16916 = add16(eta_p_16908, eta_p_16912);
-                        int16_t defunc_0_op_res_16917 = add16(eta_p_16909, eta_p_16913);
-                        int16_t defunc_0_op_res_16918 = add16(eta_p_16910, eta_p_16914);
-                        int16_t defunc_0_op_res_16919 = add16(eta_p_16911, eta_p_16915);
-                        
-                        ((int16_t *) mem_17747.mem)[gtid_17541] = defunc_0_op_res_16916;
-                        eta_p_16908 = defunc_0_op_res_16916;
-                        ((int16_t *) mem_17749.mem)[gtid_17541] = defunc_0_op_res_16917;
-                        eta_p_16909 = defunc_0_op_res_16917;
-                        ((int16_t *) mem_17751.mem)[gtid_17541] = defunc_0_op_res_16918;
-                        eta_p_16910 = defunc_0_op_res_16918;
-                        ((int16_t *) mem_17753.mem)[gtid_17541] = defunc_0_op_res_16919;
-                        eta_p_16911 = defunc_0_op_res_16919;
-                    }
-                }
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18401 != NULL) {
-        event_18401->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_1_parloop_18400", strdup("nothing further"), event_18401, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-struct futhark_mc_scan_stage_3_parloop_struct_18403 {
-    struct futhark_context *ctx;
-    unsigned char *free_mem_17747;
-    unsigned char *free_mem_17749;
-    unsigned char *free_mem_17751;
-    unsigned char *free_mem_17753;
-    unsigned char *free_scan_stage_2_carry_mem_17954;
-    unsigned char *free_scan_stage_2_carry_mem_17956;
-    unsigned char *free_scan_stage_2_carry_mem_17958;
-    unsigned char *free_scan_stage_2_carry_mem_17960;
-};
-static int futhark_mc_scan_stage_3_parloop_18404(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_scan_stage_3_parloop_struct_18403 *futhark_mc_scan_stage_3_parloop_struct_18403 = (struct futhark_mc_scan_stage_3_parloop_struct_18403 *) args;
-    struct futhark_context *ctx = futhark_mc_scan_stage_3_parloop_struct_18403->ctx;
-    struct mc_event *event_18405 = mc_event_new(ctx);
-    
-    if (event_18405 != NULL)
-        event_18405->bef = get_wall_time();
-    
-    struct memblock mem_17747 = {.desc ="mem_17747", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_mem_17747, .size =0, .references =NULL};
-    struct memblock mem_17749 = {.desc ="mem_17749", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_mem_17749, .size =0, .references =NULL};
-    struct memblock mem_17751 = {.desc ="mem_17751", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_mem_17751, .size =0, .references =NULL};
-    struct memblock mem_17753 = {.desc ="mem_17753", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_mem_17753, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_17954 = {.desc ="scan_stage_2_carry_mem_17954", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_scan_stage_2_carry_mem_17954, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_17956 = {.desc ="scan_stage_2_carry_mem_17956", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_scan_stage_2_carry_mem_17956, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_17958 = {.desc ="scan_stage_2_carry_mem_17958", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_scan_stage_2_carry_mem_17958, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_17960 = {.desc ="scan_stage_2_carry_mem_17960", .mem =futhark_mc_scan_stage_3_parloop_struct_18403->free_scan_stage_2_carry_mem_17960, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17540;
-    
-    flat_tid_17540 = subtask_id;
-    {
-        int16_t eta_p_17963;
-        int16_t eta_p_17964;
-        int16_t eta_p_17965;
-        int16_t eta_p_17966;
-        int16_t eta_p_17967;
-        int16_t eta_p_17968;
-        int16_t eta_p_17969;
-        int16_t eta_p_17970;
-        
-        // load carry-in
-        {
-            eta_p_17963 = ((int16_t *) scan_stage_2_carry_mem_17954.mem)[flat_tid_17540];
-            eta_p_17964 = ((int16_t *) scan_stage_2_carry_mem_17956.mem)[flat_tid_17540];
-            eta_p_17965 = ((int16_t *) scan_stage_2_carry_mem_17958.mem)[flat_tid_17540];
-            eta_p_17966 = ((int16_t *) scan_stage_2_carry_mem_17960.mem)[flat_tid_17540];
-        }
-        
-        int64_t start_17975;
-        int64_t end_17976;
-        
-        start_17975 = start;
-        end_17976 = end;
-        
-        int64_t n_17977 = end_17976 - start_17975;
-        
-        for (int64_t SegScan_i_17978 = start_17975; SegScan_i_17978 < start_17975 + n_17977; SegScan_i_17978++) {
-            int64_t gtid_17541 = SegScan_i_17978;
-            
-            // load partial result
-            {
-                eta_p_17967 = ((int16_t *) mem_17747.mem)[gtid_17541];
-                eta_p_17968 = ((int16_t *) mem_17749.mem)[gtid_17541];
-                eta_p_17969 = ((int16_t *) mem_17751.mem)[gtid_17541];
-                eta_p_17970 = ((int16_t *) mem_17753.mem)[gtid_17541];
-            }
-            // combine carry with partial result
-            {
-                int16_t defunc_0_op_res_17971 = add16(eta_p_17963, eta_p_17967);
-                int16_t defunc_0_op_res_17972 = add16(eta_p_17964, eta_p_17968);
-                int16_t defunc_0_op_res_17973 = add16(eta_p_17965, eta_p_17969);
-                int16_t defunc_0_op_res_17974 = add16(eta_p_17966, eta_p_17970);
-                
-                ((int16_t *) mem_17747.mem)[gtid_17541] = defunc_0_op_res_17971;
-                ((int16_t *) mem_17749.mem)[gtid_17541] = defunc_0_op_res_17972;
-                ((int16_t *) mem_17751.mem)[gtid_17541] = defunc_0_op_res_17973;
-                ((int16_t *) mem_17753.mem)[gtid_17541] = defunc_0_op_res_17974;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18405 != NULL) {
-        event_18405->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_3_parloop_18404", strdup("nothing further"), event_18405, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segscan_task_18394(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18393 *futhark_mc_task_18393 = (struct futhark_mc_task_18393 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18393->ctx;
-    struct mc_event *event_18407 = mc_event_new(ctx);
-    
-    if (event_18407 != NULL)
-        event_18407->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_task_18393->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_task_18393->free_arg_16810;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_task_18393->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_task_18393->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_task_18393->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_task_18393->free_cond_f_res_16868;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18393->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17747 = {.desc ="mem_17747", .mem =futhark_mc_task_18393->free_mem_17747, .size =0, .references =NULL};
-    struct memblock mem_17749 = {.desc ="mem_17749", .mem =futhark_mc_task_18393->free_mem_17749, .size =0, .references =NULL};
-    struct memblock mem_17751 = {.desc ="mem_17751", .mem =futhark_mc_task_18393->free_mem_17751, .size =0, .references =NULL};
-    struct memblock mem_17753 = {.desc ="mem_17753", .mem =futhark_mc_task_18393->free_mem_17753, .size =0, .references =NULL};
-    struct memblock mem_17755 = {.desc ="mem_17755", .mem =futhark_mc_task_18393->free_mem_17755, .size =0, .references =NULL};
-    int64_t scan_stage_2_carry_mem_17954_cached_sizze_18395 = 0;
-    unsigned char *scan_stage_2_carry_mem_17954 = NULL;
-    int64_t scan_stage_2_carry_mem_17956_cached_sizze_18396 = 0;
-    unsigned char *scan_stage_2_carry_mem_17956 = NULL;
-    int64_t scan_stage_2_carry_mem_17958_cached_sizze_18397 = 0;
-    unsigned char *scan_stage_2_carry_mem_17958 = NULL;
-    int64_t scan_stage_2_carry_mem_17960_cached_sizze_18398 = 0;
-    unsigned char *scan_stage_2_carry_mem_17960 = NULL;
-    int32_t nsubtasks_17934;
-    
-    nsubtasks_17934 = info.nsubtasks;
-    if (ctx->debugging)
-        fprintf(ctx->log, "%s\n", "nonsegmented segScan");
-    if (ctx->debugging)
-        fprintf(ctx->log, "%s\n", "Scan stage 1");
-    
-    struct futhark_mc_scan_stage_1_parloop_struct_18399 futhark_mc_scan_stage_1_parloop_struct_18399_;
-    
-    futhark_mc_scan_stage_1_parloop_struct_18399_.ctx = ctx;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_arg_16810 = arg_16810;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_cond_f_res_16867 = cond_f_res_16867;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_cond_f_res_16868 = cond_f_res_16868;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_mem_17747 = mem_17747.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_mem_17749 = mem_17749.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_mem_17751 = mem_17751.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_mem_17753 = mem_17753.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18399_.free_mem_17755 = mem_17755.mem;
-    
-    struct scheduler_parloop futhark_mc_scan_stage_1_parloop_18400_task;
-    
-    futhark_mc_scan_stage_1_parloop_18400_task.name = "futhark_mc_scan_stage_1_parloop_18400";
-    futhark_mc_scan_stage_1_parloop_18400_task.fn = futhark_mc_scan_stage_1_parloop_18400;
-    futhark_mc_scan_stage_1_parloop_18400_task.args = &futhark_mc_scan_stage_1_parloop_struct_18399_;
-    futhark_mc_scan_stage_1_parloop_18400_task.iterations = iterations;
-    futhark_mc_scan_stage_1_parloop_18400_task.info = info;
-    
-    struct mc_event *event_18402 = mc_event_new(ctx);
-    
-    if (event_18402 != NULL)
-        event_18402->bef = get_wall_time();
-    
-    int futhark_mc_scan_stage_1_parloop_18400_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_scan_stage_1_parloop_18400_task);
-    
-    if (futhark_mc_scan_stage_1_parloop_18400_err != 0) {
-        err = futhark_mc_scan_stage_1_parloop_18400_err;
-        goto cleanup;
-    }
-    if (event_18402 != NULL) {
-        event_18402->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_1_parloop_18400_total", strdup("nothing further"), event_18402, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (slt32(1, nsubtasks_17934)) {
-        if (ctx->debugging)
-            fprintf(ctx->log, "%s\n", "Scan stage 2");
-        
-        int16_t eta_p_17940;
-        int16_t eta_p_17941;
-        int16_t eta_p_17942;
-        int16_t eta_p_17943;
-        int16_t eta_p_17944;
-        int16_t eta_p_17945;
-        int16_t eta_p_17946;
-        int16_t eta_p_17947;
-        int64_t offset_17952 = (int64_t) 0;
-        int64_t offset_index_17953 = (int64_t) 0;
-        
-        if (scan_stage_2_carry_mem_17954_cached_sizze_18395 < (int64_t) 2 * nsubtasks_17934) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_17954, &scan_stage_2_carry_mem_17954_cached_sizze_18395, (int64_t) 2 * nsubtasks_17934);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (scan_stage_2_carry_mem_17956_cached_sizze_18396 < (int64_t) 2 * nsubtasks_17934) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_17956, &scan_stage_2_carry_mem_17956_cached_sizze_18396, (int64_t) 2 * nsubtasks_17934);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (scan_stage_2_carry_mem_17958_cached_sizze_18397 < (int64_t) 2 * nsubtasks_17934) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_17958, &scan_stage_2_carry_mem_17958_cached_sizze_18397, (int64_t) 2 * nsubtasks_17934);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (scan_stage_2_carry_mem_17960_cached_sizze_18398 < (int64_t) 2 * nsubtasks_17934) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_17960, &scan_stage_2_carry_mem_17960_cached_sizze_18398, (int64_t) 2 * nsubtasks_17934);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        // carry-in for first chunk is neutral
-        {
-            ((int16_t *) scan_stage_2_carry_mem_17954)[(int64_t) 0] = (int16_t) 0;
-            ((int16_t *) scan_stage_2_carry_mem_17956)[(int64_t) 0] = (int16_t) 0;
-            ((int16_t *) scan_stage_2_carry_mem_17958)[(int64_t) 0] = (int16_t) 0;
-            ((int16_t *) scan_stage_2_carry_mem_17960)[(int64_t) 0] = (int16_t) 0;
-        }
-        // scan carries
-        {
-            for (int64_t i_17962 = 0; i_17962 < sext_i32_i64(nsubtasks_17934) - (int64_t) 1; i_17962++) {
-                offset_17952 = squot64(rest_16809, sext_i32_i64(nsubtasks_17934));
-                if (slt64(i_17962, srem64(rest_16809, sext_i32_i64(nsubtasks_17934)))) {
-                    offset_17952 += (int64_t) 1;
-                }
-                offset_index_17953 += offset_17952;
-                
-                int64_t gtid_17541 = offset_index_17953;
-                
-                // Read carry
-                {
-                    eta_p_17940 = ((int16_t *) scan_stage_2_carry_mem_17954)[i_17962];
-                    eta_p_17941 = ((int16_t *) scan_stage_2_carry_mem_17956)[i_17962];
-                    eta_p_17942 = ((int16_t *) scan_stage_2_carry_mem_17958)[i_17962];
-                    eta_p_17943 = ((int16_t *) scan_stage_2_carry_mem_17960)[i_17962];
-                }
-                // Read next values
-                {
-                    eta_p_17944 = ((int16_t *) mem_17747.mem)[offset_index_17953 - (int64_t) 1];
-                    eta_p_17945 = ((int16_t *) mem_17749.mem)[offset_index_17953 - (int64_t) 1];
-                    eta_p_17946 = ((int16_t *) mem_17751.mem)[offset_index_17953 - (int64_t) 1];
-                    eta_p_17947 = ((int16_t *) mem_17753.mem)[offset_index_17953 - (int64_t) 1];
-                }
-                
-                int16_t defunc_0_op_res_17948 = add16(eta_p_17940, eta_p_17944);
-                int16_t defunc_0_op_res_17949 = add16(eta_p_17941, eta_p_17945);
-                int16_t defunc_0_op_res_17950 = add16(eta_p_17942, eta_p_17946);
-                int16_t defunc_0_op_res_17951 = add16(eta_p_17943, eta_p_17947);
-                
-                ((int16_t *) scan_stage_2_carry_mem_17954)[i_17962 + (int64_t) 1] = defunc_0_op_res_17948;
-                ((int16_t *) scan_stage_2_carry_mem_17956)[i_17962 + (int64_t) 1] = defunc_0_op_res_17949;
-                ((int16_t *) scan_stage_2_carry_mem_17958)[i_17962 + (int64_t) 1] = defunc_0_op_res_17950;
-                ((int16_t *) scan_stage_2_carry_mem_17960)[i_17962 + (int64_t) 1] = defunc_0_op_res_17951;
-            }
-        }
-        if (ctx->debugging)
-            fprintf(ctx->log, "%s\n", "Scan stage 3");
-        
-        struct futhark_mc_scan_stage_3_parloop_struct_18403 futhark_mc_scan_stage_3_parloop_struct_18403_;
-        
-        futhark_mc_scan_stage_3_parloop_struct_18403_.ctx = ctx;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_mem_17747 = mem_17747.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_mem_17749 = mem_17749.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_mem_17751 = mem_17751.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_mem_17753 = mem_17753.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_scan_stage_2_carry_mem_17954 = scan_stage_2_carry_mem_17954;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_scan_stage_2_carry_mem_17956 = scan_stage_2_carry_mem_17956;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_scan_stage_2_carry_mem_17958 = scan_stage_2_carry_mem_17958;
-        futhark_mc_scan_stage_3_parloop_struct_18403_.free_scan_stage_2_carry_mem_17960 = scan_stage_2_carry_mem_17960;
-        
-        struct scheduler_parloop futhark_mc_scan_stage_3_parloop_18404_task;
-        
-        futhark_mc_scan_stage_3_parloop_18404_task.name = "futhark_mc_scan_stage_3_parloop_18404";
-        futhark_mc_scan_stage_3_parloop_18404_task.fn = futhark_mc_scan_stage_3_parloop_18404;
-        futhark_mc_scan_stage_3_parloop_18404_task.args = &futhark_mc_scan_stage_3_parloop_struct_18403_;
-        futhark_mc_scan_stage_3_parloop_18404_task.iterations = iterations;
-        futhark_mc_scan_stage_3_parloop_18404_task.info = info;
-        
-        struct mc_event *event_18406 = mc_event_new(ctx);
-        
-        if (event_18406 != NULL)
-            event_18406->bef = get_wall_time();
-        
-        int futhark_mc_scan_stage_3_parloop_18404_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_scan_stage_3_parloop_18404_task);
-        
-        if (futhark_mc_scan_stage_3_parloop_18404_err != 0) {
-            err = futhark_mc_scan_stage_3_parloop_18404_err;
-            goto cleanup;
-        }
-        if (event_18406 != NULL) {
-            event_18406->aft = get_wall_time();
-            lock_lock(&ctx->event_list_lock);
-            add_event(ctx, "futhark_mc_scan_stage_3_parloop_18404_total", strdup("nothing further"), event_18406, (event_report_fn) mc_event_report);
-            lock_unlock(&ctx->event_list_lock);
-        }
-    }
-    
-  cleanup:
-    {
-        free(scan_stage_2_carry_mem_17954);
-        free(scan_stage_2_carry_mem_17956);
-        free(scan_stage_2_carry_mem_17958);
-        free(scan_stage_2_carry_mem_17960);
-    }
-    if (event_18407 != NULL) {
-        event_18407->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segscan_task_18394", strdup("nothing further"), event_18407, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18408 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17757;
-};
-struct futhark_mc_copy_parloop_struct_18410 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17757;
-};
-static int futhark_mc_copy_parloop_18411(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18410 *futhark_mc_copy_parloop_struct_18410 = (struct futhark_mc_copy_parloop_struct_18410 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18410->ctx;
-    struct mc_event *event_18412 = mc_event_new(ctx);
-    
-    if (event_18412 != NULL)
-        event_18412->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_copy_parloop_struct_18410->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_copy_parloop_struct_18410->free_arg_16810;
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_copy_parloop_struct_18410->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17757 = {.desc ="mem_17757", .mem =futhark_mc_copy_parloop_struct_18410->free_mem_17757, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_17979;
-        int64_t end_17980;
-        
-        start_17979 = start;
-        end_17980 = end;
-        
-        int64_t n_17981 = end_17980 - start_17979;
-        
-        for (int64_t copy_i_17982 = start_17979; copy_i_17982 < start_17979 + n_17981; copy_i_17982++) {
-            int64_t slice_17984 = rest_16809;
-            int64_t i_17983 = copy_i_17982;
-            int64_t remnant_17985 = copy_i_17982 - i_17983;
-            int64_t tmp_17986 = ((int64_t *) mem_17739.mem)[(int64_t) 0 + (int64_t) 1 * arg_16810 + i_17983];
-            
-            ((int64_t *) mem_17757.mem)[i_17983] = tmp_17986;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18412 != NULL) {
-        event_18412->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18411", strdup("nothing further"), event_18412, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_17987_task_18409(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18408 *futhark_mc_task_18408 = (struct futhark_mc_task_18408 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18408->ctx;
-    struct mc_event *event_18414 = mc_event_new(ctx);
-    
-    if (event_18414 != NULL)
-        event_18414->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_task_18408->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_task_18408->free_arg_16810;
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18408->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17757 = {.desc ="mem_17757", .mem =futhark_mc_task_18408->free_mem_17757, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18410 futhark_mc_copy_parloop_struct_18410_;
-    
-    futhark_mc_copy_parloop_struct_18410_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18410_.free_rest_16809 = rest_16809;
-    futhark_mc_copy_parloop_struct_18410_.free_arg_16810 = arg_16810;
-    futhark_mc_copy_parloop_struct_18410_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_copy_parloop_struct_18410_.free_mem_17757 = mem_17757.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18411_task;
-    
-    futhark_mc_copy_parloop_18411_task.name = "futhark_mc_copy_parloop_18411";
-    futhark_mc_copy_parloop_18411_task.fn = futhark_mc_copy_parloop_18411;
-    futhark_mc_copy_parloop_18411_task.args = &futhark_mc_copy_parloop_struct_18410_;
-    futhark_mc_copy_parloop_18411_task.iterations = iterations;
-    futhark_mc_copy_parloop_18411_task.info = info;
-    
-    struct mc_event *event_18413 = mc_event_new(ctx);
-    
-    if (event_18413 != NULL)
-        event_18413->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18411_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18411_task);
-    
-    if (futhark_mc_copy_parloop_18411_err != 0) {
-        err = futhark_mc_copy_parloop_18411_err;
-        goto cleanup;
-    }
-    if (event_18413 != NULL) {
-        event_18413->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18411_total", strdup("nothing further"), event_18413, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18414 != NULL) {
-        event_18414->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_17987_task_18409", strdup("nothing further"), event_18414, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18415 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17759;
-};
-struct futhark_mc_copy_parloop_struct_18417 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17759;
-};
-static int futhark_mc_copy_parloop_18418(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18417 *futhark_mc_copy_parloop_struct_18417 = (struct futhark_mc_copy_parloop_struct_18417 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18417->ctx;
-    struct mc_event *event_18419 = mc_event_new(ctx);
-    
-    if (event_18419 != NULL)
-        event_18419->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_copy_parloop_struct_18417->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_copy_parloop_struct_18417->free_arg_16810;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_copy_parloop_struct_18417->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17759 = {.desc ="mem_17759", .mem =futhark_mc_copy_parloop_struct_18417->free_mem_17759, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_17989;
-        int64_t end_17990;
-        
-        start_17989 = start;
-        end_17990 = end;
-        
-        int64_t n_17991 = end_17990 - start_17989;
-        
-        for (int64_t copy_i_17992 = start_17989; copy_i_17992 < start_17989 + n_17991; copy_i_17992++) {
-            int64_t slice_17994 = rest_16809;
-            int64_t i_17993 = copy_i_17992;
-            int64_t remnant_17995 = copy_i_17992 - i_17993;
-            float tmp_17996 = ((float *) mem_17737.mem)[(int64_t) 0 + (int64_t) 1 * arg_16810 + i_17993];
-            
-            ((float *) mem_17759.mem)[i_17993] = tmp_17996;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18419 != NULL) {
-        event_18419->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18418", strdup("nothing further"), event_18419, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_17997_task_18416(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18415 *futhark_mc_task_18415 = (struct futhark_mc_task_18415 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18415->ctx;
-    struct mc_event *event_18421 = mc_event_new(ctx);
-    
-    if (event_18421 != NULL)
-        event_18421->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_task_18415->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_task_18415->free_arg_16810;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18415->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17759 = {.desc ="mem_17759", .mem =futhark_mc_task_18415->free_mem_17759, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18417 futhark_mc_copy_parloop_struct_18417_;
-    
-    futhark_mc_copy_parloop_struct_18417_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18417_.free_rest_16809 = rest_16809;
-    futhark_mc_copy_parloop_struct_18417_.free_arg_16810 = arg_16810;
-    futhark_mc_copy_parloop_struct_18417_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_copy_parloop_struct_18417_.free_mem_17759 = mem_17759.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18418_task;
-    
-    futhark_mc_copy_parloop_18418_task.name = "futhark_mc_copy_parloop_18418";
-    futhark_mc_copy_parloop_18418_task.fn = futhark_mc_copy_parloop_18418;
-    futhark_mc_copy_parloop_18418_task.args = &futhark_mc_copy_parloop_struct_18417_;
-    futhark_mc_copy_parloop_18418_task.iterations = iterations;
-    futhark_mc_copy_parloop_18418_task.info = info;
-    
-    struct mc_event *event_18420 = mc_event_new(ctx);
-    
-    if (event_18420 != NULL)
-        event_18420->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18418_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18418_task);
-    
-    if (futhark_mc_copy_parloop_18418_err != 0) {
-        err = futhark_mc_copy_parloop_18418_err;
-        goto cleanup;
-    }
-    if (event_18420 != NULL) {
-        event_18420->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18418_total", strdup("nothing further"), event_18420, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18421 != NULL) {
-        event_18421->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_17997_task_18416", strdup("nothing further"), event_18421, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18422 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    int16_t free_defunc_0_radix_sort_step_i16_res_16920;
-    int16_t free_defunc_0_radix_sort_step_i16_res_16921;
-    int16_t free_defunc_0_radix_sort_step_i16_res_16922;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17747;
-    unsigned char *free_mem_17749;
-    unsigned char *free_mem_17751;
-    unsigned char *free_mem_17753;
-    unsigned char *free_mem_17755;
-    unsigned char *free_mem_17757;
-    unsigned char *free_mem_17759;
-};
-struct futhark_mc_segmap_parloop_struct_18424 {
-    struct futhark_context *ctx;
-    int64_t free_rest_16809;
-    int64_t free_arg_16810;
-    int16_t free_defunc_0_radix_sort_step_i16_res_16920;
-    int16_t free_defunc_0_radix_sort_step_i16_res_16921;
-    int16_t free_defunc_0_radix_sort_step_i16_res_16922;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17747;
-    unsigned char *free_mem_17749;
-    unsigned char *free_mem_17751;
-    unsigned char *free_mem_17753;
-    unsigned char *free_mem_17755;
-    unsigned char *free_mem_17757;
-    unsigned char *free_mem_17759;
-};
-static int futhark_mc_segmap_parloop_18425(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18424 *futhark_mc_segmap_parloop_struct_18424 = (struct futhark_mc_segmap_parloop_struct_18424 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18424->ctx;
-    struct mc_event *event_18426 = mc_event_new(ctx);
-    
-    if (event_18426 != NULL)
-        event_18426->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_segmap_parloop_struct_18424->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_segmap_parloop_struct_18424->free_arg_16810;
-    int16_t defunc_0_radix_sort_step_i16_res_16920 = futhark_mc_segmap_parloop_struct_18424->free_defunc_0_radix_sort_step_i16_res_16920;
-    int16_t defunc_0_radix_sort_step_i16_res_16921 = futhark_mc_segmap_parloop_struct_18424->free_defunc_0_radix_sort_step_i16_res_16921;
-    int16_t defunc_0_radix_sort_step_i16_res_16922 = futhark_mc_segmap_parloop_struct_18424->free_defunc_0_radix_sort_step_i16_res_16922;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17747 = {.desc ="mem_17747", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17747, .size =0, .references =NULL};
-    struct memblock mem_17749 = {.desc ="mem_17749", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17749, .size =0, .references =NULL};
-    struct memblock mem_17751 = {.desc ="mem_17751", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17751, .size =0, .references =NULL};
-    struct memblock mem_17753 = {.desc ="mem_17753", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17753, .size =0, .references =NULL};
-    struct memblock mem_17755 = {.desc ="mem_17755", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17755, .size =0, .references =NULL};
-    struct memblock mem_17757 = {.desc ="mem_17757", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17757, .size =0, .references =NULL};
-    struct memblock mem_17759 = {.desc ="mem_17759", .mem =futhark_mc_segmap_parloop_struct_18424->free_mem_17759, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17542;
-    
-    flat_tid_17542 = subtask_id;
-    {
-        int64_t start_18000;
-        int64_t end_18001;
-        
-        start_18000 = start;
-        end_18001 = end;
-        
-        int64_t n_18002 = end_18001 - start_18000;
-        
-        for (int64_t SegMap_i_18003 = start_18000; SegMap_i_18003 < start_18000 + n_18002; SegMap_i_18003++) {
-            int64_t slice_18004 = rest_16809;
-            int64_t gtid_17543 = SegMap_i_18003;
-            int64_t remnant_18005 = SegMap_i_18003 - gtid_17543;
-            int16_t eta_p_17302 = ((int16_t *) mem_17755.mem)[gtid_17543];
-            int16_t eta_p_17303 = ((int16_t *) mem_17747.mem)[gtid_17543];
-            int16_t eta_p_17304 = ((int16_t *) mem_17749.mem)[gtid_17543];
-            int16_t eta_p_17305 = ((int16_t *) mem_17751.mem)[gtid_17543];
-            int16_t eta_p_17306 = ((int16_t *) mem_17753.mem)[gtid_17543];
-            int64_t slice_17666 = arg_16810 + gtid_17543;
-            float write_value_17307 = ((float *) mem_17737.mem)[slice_17666];
-            int64_t write_value_17308 = ((int64_t *) mem_17739.mem)[slice_17666];
-            int64_t defunc_0_f_res_17309;
-            
-            if (futrts_lifted_f_6330(ctx, &defunc_0_f_res_17309, defunc_0_radix_sort_step_i16_res_16920, defunc_0_radix_sort_step_i16_res_16921, defunc_0_radix_sort_step_i16_res_16922, eta_p_17302, eta_p_17303, eta_p_17304, eta_p_17305, eta_p_17306) != 0) {
-                err = 1;
-                goto cleanup;
-            }
-            if (sle64((int64_t) 0, defunc_0_f_res_17309) && slt64(defunc_0_f_res_17309, rest_16809)) {
-                ((float *) mem_17759.mem)[defunc_0_f_res_17309] = write_value_17307;
-            }
-            if (sle64((int64_t) 0, defunc_0_f_res_17309) && slt64(defunc_0_f_res_17309, rest_16809)) {
-                ((int64_t *) mem_17757.mem)[defunc_0_f_res_17309] = write_value_17308;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18426 != NULL) {
-        event_18426->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18425", strdup("nothing further"), event_18426, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18423(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18422 *futhark_mc_task_18422 = (struct futhark_mc_task_18422 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18422->ctx;
-    struct mc_event *event_18428 = mc_event_new(ctx);
-    
-    if (event_18428 != NULL)
-        event_18428->bef = get_wall_time();
-    
-    int64_t rest_16809 = futhark_mc_task_18422->free_rest_16809;
-    int64_t arg_16810 = futhark_mc_task_18422->free_arg_16810;
-    int16_t defunc_0_radix_sort_step_i16_res_16920 = futhark_mc_task_18422->free_defunc_0_radix_sort_step_i16_res_16920;
-    int16_t defunc_0_radix_sort_step_i16_res_16921 = futhark_mc_task_18422->free_defunc_0_radix_sort_step_i16_res_16921;
-    int16_t defunc_0_radix_sort_step_i16_res_16922 = futhark_mc_task_18422->free_defunc_0_radix_sort_step_i16_res_16922;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18422->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18422->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17747 = {.desc ="mem_17747", .mem =futhark_mc_task_18422->free_mem_17747, .size =0, .references =NULL};
-    struct memblock mem_17749 = {.desc ="mem_17749", .mem =futhark_mc_task_18422->free_mem_17749, .size =0, .references =NULL};
-    struct memblock mem_17751 = {.desc ="mem_17751", .mem =futhark_mc_task_18422->free_mem_17751, .size =0, .references =NULL};
-    struct memblock mem_17753 = {.desc ="mem_17753", .mem =futhark_mc_task_18422->free_mem_17753, .size =0, .references =NULL};
-    struct memblock mem_17755 = {.desc ="mem_17755", .mem =futhark_mc_task_18422->free_mem_17755, .size =0, .references =NULL};
-    struct memblock mem_17757 = {.desc ="mem_17757", .mem =futhark_mc_task_18422->free_mem_17757, .size =0, .references =NULL};
-    struct memblock mem_17759 = {.desc ="mem_17759", .mem =futhark_mc_task_18422->free_mem_17759, .size =0, .references =NULL};
-    int32_t nsubtasks_17999;
-    
-    nsubtasks_17999 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18424 futhark_mc_segmap_parloop_struct_18424_;
-    
-    futhark_mc_segmap_parloop_struct_18424_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18424_.free_rest_16809 = rest_16809;
-    futhark_mc_segmap_parloop_struct_18424_.free_arg_16810 = arg_16810;
-    futhark_mc_segmap_parloop_struct_18424_.free_defunc_0_radix_sort_step_i16_res_16920 = defunc_0_radix_sort_step_i16_res_16920;
-    futhark_mc_segmap_parloop_struct_18424_.free_defunc_0_radix_sort_step_i16_res_16921 = defunc_0_radix_sort_step_i16_res_16921;
-    futhark_mc_segmap_parloop_struct_18424_.free_defunc_0_radix_sort_step_i16_res_16922 = defunc_0_radix_sort_step_i16_res_16922;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17747 = mem_17747.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17749 = mem_17749.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17751 = mem_17751.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17753 = mem_17753.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17755 = mem_17755.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17757 = mem_17757.mem;
-    futhark_mc_segmap_parloop_struct_18424_.free_mem_17759 = mem_17759.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18425_task;
-    
-    futhark_mc_segmap_parloop_18425_task.name = "futhark_mc_segmap_parloop_18425";
-    futhark_mc_segmap_parloop_18425_task.fn = futhark_mc_segmap_parloop_18425;
-    futhark_mc_segmap_parloop_18425_task.args = &futhark_mc_segmap_parloop_struct_18424_;
-    futhark_mc_segmap_parloop_18425_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18425_task.info = info;
-    
-    struct mc_event *event_18427 = mc_event_new(ctx);
-    
-    if (event_18427 != NULL)
-        event_18427->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18425_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18425_task);
-    
-    if (futhark_mc_segmap_parloop_18425_err != 0) {
-        err = futhark_mc_segmap_parloop_18425_err;
-        goto cleanup;
-    }
-    if (event_18427 != NULL) {
-        event_18427->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18425_total", strdup("nothing further"), event_18427, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18428 != NULL) {
-        event_18428->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18423", strdup("nothing further"), event_18428, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18429 {
-    struct futhark_context *ctx;
-    unsigned char *free_mem_17760;
-    unsigned char *free_mem_17761;
-};
-struct futhark_mc_segmap_parloop_struct_18431 {
-    struct futhark_context *ctx;
-    unsigned char *free_mem_17760;
-    unsigned char *free_mem_17761;
-};
-static int futhark_mc_segmap_parloop_18432(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18431 *futhark_mc_segmap_parloop_struct_18431 = (struct futhark_mc_segmap_parloop_struct_18431 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18431->ctx;
-    struct mc_event *event_18433 = mc_event_new(ctx);
-    
-    if (event_18433 != NULL)
-        event_18433->bef = get_wall_time();
-    
-    struct memblock mem_17760 = {.desc ="mem_17760", .mem =futhark_mc_segmap_parloop_struct_18431->free_mem_17760, .size =0, .references =NULL};
-    struct memblock mem_17761 = {.desc ="mem_17761", .mem =futhark_mc_segmap_parloop_struct_18431->free_mem_17761, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17544;
-    
-    flat_tid_17544 = subtask_id;
-    {
-        int64_t start_18007;
-        int64_t end_18008;
-        
-        start_18007 = start;
-        end_18008 = end;
-        
-        int64_t n_18009 = end_18008 - start_18007;
-        
-        for (int64_t SegMap_i_18010 = start_18007; SegMap_i_18010 < start_18007 + n_18009; SegMap_i_18010++) {
-            int64_t slice_18011 = (int64_t) 4;
-            int64_t gtid_17545 = SegMap_i_18010;
-            int64_t remnant_18012 = SegMap_i_18010 - gtid_17545;
-            int16_t eta_p_16944 = ((int16_t *) mem_17760.mem)[gtid_17545];
-            int64_t i16_res_16945 = sext_i16_i64(eta_p_16944);
-            
-            ((int64_t *) mem_17761.mem)[gtid_17545] = i16_res_16945;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18433 != NULL) {
-        event_18433->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18432", strdup("nothing further"), event_18433, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18430(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18429 *futhark_mc_task_18429 = (struct futhark_mc_task_18429 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18429->ctx;
-    struct mc_event *event_18435 = mc_event_new(ctx);
-    
-    if (event_18435 != NULL)
-        event_18435->bef = get_wall_time();
-    
-    struct memblock mem_17760 = {.desc ="mem_17760", .mem =futhark_mc_task_18429->free_mem_17760, .size =0, .references =NULL};
-    struct memblock mem_17761 = {.desc ="mem_17761", .mem =futhark_mc_task_18429->free_mem_17761, .size =0, .references =NULL};
-    int32_t nsubtasks_18006;
-    
-    nsubtasks_18006 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18431 futhark_mc_segmap_parloop_struct_18431_;
-    
-    futhark_mc_segmap_parloop_struct_18431_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18431_.free_mem_17760 = mem_17760.mem;
-    futhark_mc_segmap_parloop_struct_18431_.free_mem_17761 = mem_17761.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18432_task;
-    
-    futhark_mc_segmap_parloop_18432_task.name = "futhark_mc_segmap_parloop_18432";
-    futhark_mc_segmap_parloop_18432_task.fn = futhark_mc_segmap_parloop_18432;
-    futhark_mc_segmap_parloop_18432_task.args = &futhark_mc_segmap_parloop_struct_18431_;
-    futhark_mc_segmap_parloop_18432_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18432_task.info = info;
-    
-    struct mc_event *event_18434 = mc_event_new(ctx);
-    
-    if (event_18434 != NULL)
-        event_18434->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18432_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18432_task);
-    
-    if (futhark_mc_segmap_parloop_18432_err != 0) {
-        err = futhark_mc_segmap_parloop_18432_err;
-        goto cleanup;
-    }
-    if (event_18434 != NULL) {
-        event_18434->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18432_total", strdup("nothing further"), event_18434, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18435 != NULL) {
-        event_18435->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18430", strdup("nothing further"), event_18435, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18436 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17765;
-};
-struct futhark_mc_copy_parloop_struct_18438 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17765;
-};
-static int futhark_mc_copy_parloop_18439(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18438 *futhark_mc_copy_parloop_struct_18438 = (struct futhark_mc_copy_parloop_struct_18438 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18438->ctx;
-    struct mc_event *event_18440 = mc_event_new(ctx);
-    
-    if (event_18440 != NULL)
-        event_18440->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_copy_parloop_struct_18438->free_n_blocks_16808;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_copy_parloop_struct_18438->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_copy_parloop_struct_18438->free_mem_17765, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_18013;
-        int64_t end_18014;
-        
-        start_18013 = start;
-        end_18014 = end;
-        
-        int64_t n_18015 = end_18014 - start_18013;
-        
-        for (int64_t copy_i_18016 = start_18013; copy_i_18016 < start_18013 + n_18015; copy_i_18016++) {
-            int64_t slice_18019 = (int64_t) 256;
-            int64_t slice_18020 = n_blocks_16808 * slice_18019;
-            int64_t i_18017 = squot64(copy_i_18016, slice_18019);
-            int64_t remnant_18021 = copy_i_18016 - i_18017 * slice_18019;
-            int64_t i_18018 = remnant_18021;
-            int64_t remnant_18022 = remnant_18021 - i_18018;
-            float tmp_18023 = ((float *) mem_17737.mem)[i_18017 * ((int64_t) 1 * (int64_t) 256) + i_18018];
-            
-            ((float *) mem_17765.mem)[i_18017 * (int64_t) 256 + i_18018] = tmp_18023;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18440 != NULL) {
-        event_18440->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18439", strdup("nothing further"), event_18440, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_18024_task_18437(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18436 *futhark_mc_task_18436 = (struct futhark_mc_task_18436 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18436->ctx;
-    struct mc_event *event_18442 = mc_event_new(ctx);
-    
-    if (event_18442 != NULL)
-        event_18442->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_task_18436->free_n_blocks_16808;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18436->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_task_18436->free_mem_17765, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18438 futhark_mc_copy_parloop_struct_18438_;
-    
-    futhark_mc_copy_parloop_struct_18438_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18438_.free_n_blocks_16808 = n_blocks_16808;
-    futhark_mc_copy_parloop_struct_18438_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_copy_parloop_struct_18438_.free_mem_17765 = mem_17765.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18439_task;
-    
-    futhark_mc_copy_parloop_18439_task.name = "futhark_mc_copy_parloop_18439";
-    futhark_mc_copy_parloop_18439_task.fn = futhark_mc_copy_parloop_18439;
-    futhark_mc_copy_parloop_18439_task.args = &futhark_mc_copy_parloop_struct_18438_;
-    futhark_mc_copy_parloop_18439_task.iterations = iterations;
-    futhark_mc_copy_parloop_18439_task.info = info;
-    
-    struct mc_event *event_18441 = mc_event_new(ctx);
-    
-    if (event_18441 != NULL)
-        event_18441->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18439_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18439_task);
-    
-    if (futhark_mc_copy_parloop_18439_err != 0) {
-        err = futhark_mc_copy_parloop_18439_err;
-        goto cleanup;
-    }
-    if (event_18441 != NULL) {
-        event_18441->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18439_total", strdup("nothing further"), event_18441, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18442 != NULL) {
-        event_18442->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_18024_task_18437", strdup("nothing further"), event_18442, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18443 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17768;
-};
-struct futhark_mc_copy_parloop_struct_18445 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17768;
-};
-static int futhark_mc_copy_parloop_18446(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18445 *futhark_mc_copy_parloop_struct_18445 = (struct futhark_mc_copy_parloop_struct_18445 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18445->ctx;
-    struct mc_event *event_18447 = mc_event_new(ctx);
-    
-    if (event_18447 != NULL)
-        event_18447->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_copy_parloop_struct_18445->free_n_blocks_16808;
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_copy_parloop_struct_18445->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_copy_parloop_struct_18445->free_mem_17768, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_18026;
-        int64_t end_18027;
-        
-        start_18026 = start;
-        end_18027 = end;
-        
-        int64_t n_18028 = end_18027 - start_18026;
-        
-        for (int64_t copy_i_18029 = start_18026; copy_i_18029 < start_18026 + n_18028; copy_i_18029++) {
-            int64_t slice_18032 = (int64_t) 256;
-            int64_t slice_18033 = n_blocks_16808 * slice_18032;
-            int64_t i_18030 = squot64(copy_i_18029, slice_18032);
-            int64_t remnant_18034 = copy_i_18029 - i_18030 * slice_18032;
-            int64_t i_18031 = remnant_18034;
-            int64_t remnant_18035 = remnant_18034 - i_18031;
-            int64_t tmp_18036 = ((int64_t *) mem_17739.mem)[i_18030 * ((int64_t) 1 * (int64_t) 256) + i_18031];
-            
-            ((int64_t *) mem_17768.mem)[i_18030 * (int64_t) 256 + i_18031] = tmp_18036;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18447 != NULL) {
-        event_18447->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18446", strdup("nothing further"), event_18447, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_18037_task_18444(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18443 *futhark_mc_task_18443 = (struct futhark_mc_task_18443 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18443->ctx;
-    struct mc_event *event_18449 = mc_event_new(ctx);
-    
-    if (event_18449 != NULL)
-        event_18449->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_task_18443->free_n_blocks_16808;
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18443->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_task_18443->free_mem_17768, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18445 futhark_mc_copy_parloop_struct_18445_;
-    
-    futhark_mc_copy_parloop_struct_18445_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18445_.free_n_blocks_16808 = n_blocks_16808;
-    futhark_mc_copy_parloop_struct_18445_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_copy_parloop_struct_18445_.free_mem_17768 = mem_17768.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18446_task;
-    
-    futhark_mc_copy_parloop_18446_task.name = "futhark_mc_copy_parloop_18446";
-    futhark_mc_copy_parloop_18446_task.fn = futhark_mc_copy_parloop_18446;
-    futhark_mc_copy_parloop_18446_task.args = &futhark_mc_copy_parloop_struct_18445_;
-    futhark_mc_copy_parloop_18446_task.iterations = iterations;
-    futhark_mc_copy_parloop_18446_task.info = info;
-    
-    struct mc_event *event_18448 = mc_event_new(ctx);
-    
-    if (event_18448 != NULL)
-        event_18448->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18446_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18446_task);
-    
-    if (futhark_mc_copy_parloop_18446_err != 0) {
-        err = futhark_mc_copy_parloop_18446_err;
-        goto cleanup;
-    }
-    if (event_18448 != NULL) {
-        event_18448->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18446_total", strdup("nothing further"), event_18448, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18449 != NULL) {
-        event_18449->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_18037_task_18444", strdup("nothing further"), event_18449, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18450 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17837;
-    unsigned char *free_mem_17840;
-    unsigned char *free_mem_17843;
-    unsigned char *free_mem_17846;
-};
-struct futhark_mc_segmap_parloop_struct_18452 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17837;
-    unsigned char *free_mem_17840;
-    unsigned char *free_mem_17843;
-    unsigned char *free_mem_17846;
-};
-static int futhark_mc_segmap_parloop_18453(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18452 *futhark_mc_segmap_parloop_struct_18452 = (struct futhark_mc_segmap_parloop_struct_18452 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18452->ctx;
-    struct mc_event *event_18461 = mc_event_new(ctx);
-    
-    if (event_18461 != NULL)
-        event_18461->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_segmap_parloop_struct_18452->free_n_blocks_16808;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_segmap_parloop_struct_18452->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_segmap_parloop_struct_18452->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_segmap_parloop_struct_18452->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_segmap_parloop_struct_18452->free_cond_f_res_16868;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17837, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17840, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17843, .size =0, .references =NULL};
-    struct memblock mem_17846 = {.desc ="mem_17846", .mem =futhark_mc_segmap_parloop_struct_18452->free_mem_17846, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t mem_17777_cached_sizze_18454 = 0;
-    unsigned char *mem_17777 = NULL;
-    int64_t mem_17778_cached_sizze_18455 = 0;
-    unsigned char *mem_17778 = NULL;
-    int64_t mem_17779_cached_sizze_18456 = 0;
-    unsigned char *mem_17779 = NULL;
-    int64_t mem_17780_cached_sizze_18457 = 0;
-    unsigned char *mem_17780 = NULL;
-    int64_t mem_17781_cached_sizze_18458 = 0;
-    unsigned char *mem_17781 = NULL;
-    int64_t mem_17826_cached_sizze_18459 = 0;
-    unsigned char *mem_17826 = NULL;
-    int64_t mem_17827_cached_sizze_18460 = 0;
-    unsigned char *mem_17827 = NULL;
-    int64_t flat_tid_17546;
-    
-    flat_tid_17546 = subtask_id;
-    {
-        int64_t start_18104;
-        int64_t end_18105;
-        
-        start_18104 = start;
-        end_18105 = end;
-        
-        int64_t n_18106 = end_18105 - start_18104;
-        
-        if (mem_17777_cached_sizze_18454 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17777, &mem_17777_cached_sizze_18454, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17778_cached_sizze_18455 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17778, &mem_17778_cached_sizze_18455, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17779_cached_sizze_18456 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17779, &mem_17779_cached_sizze_18456, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17780_cached_sizze_18457 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17780, &mem_17780_cached_sizze_18457, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17781_cached_sizze_18458 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17781, &mem_17781_cached_sizze_18458, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17826_cached_sizze_18459 < (int64_t) 8) {
-            err = lexical_realloc(ctx, &mem_17826, &mem_17826_cached_sizze_18459, (int64_t) 8);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17827_cached_sizze_18460 < (int64_t) 32) {
-            err = lexical_realloc(ctx, &mem_17827, &mem_17827_cached_sizze_18460, (int64_t) 32);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        for (int64_t SegMap_i_18107 = start_18104; SegMap_i_18107 < start_18104 + n_18106; SegMap_i_18107++) {
-            int64_t slice_18108 = n_blocks_16808;
-            int64_t gtid_17547 = SegMap_i_18107;
-            int64_t remnant_18109 = SegMap_i_18107 - gtid_17547;
-            int64_t binop_x_17728 = (int64_t) 256 * gtid_17547;
-            int16_t discard_17704;
-            int16_t discard_17705;
-            int16_t discard_17706;
-            int16_t discard_17707;
-            int16_t scanacc_18041;
-            int16_t scanacc_18042;
-            int16_t scanacc_18043;
-            int16_t scanacc_18044;
-            
-            scanacc_18041 = (int16_t) 0;
-            scanacc_18042 = (int16_t) 0;
-            scanacc_18043 = (int16_t) 0;
-            scanacc_18044 = (int16_t) 0;
-            for (int64_t i_18040 = 0; i_18040 < (int64_t) 256; i_18040++) {
-                int64_t new_index_18050 = i_18040 + binop_x_17728;
-                float eta_p_18051 = ((float *) mem_17737.mem)[new_index_18050];
-                int32_t i32_arg0_18052 = futrts_to_bits32(eta_p_18051);
-                int32_t unsign_arg0_18053 = ashr32(i32_arg0_18052, get_bit_arg0_16866);
-                int32_t unsign_arg0_18054 = 1 & unsign_arg0_18053;
-                int32_t unsign_arg0_18055 = ashr32(i32_arg0_18052, 31);
-                int32_t unsign_arg0_18056 = 1 & unsign_arg0_18055;
-                bool cond_18057 = unsign_arg0_18056 == 1;
-                bool x_18058 = !cond_18057;
-                bool y_18059 = cond_f_res_16867 && x_18058;
-                bool cond_18060 = cond_18057 || y_18059;
-                int32_t defunc_0_get_bit_res_18061;
-                
-                if (cond_18060) {
-                    int32_t defunc_0_get_bit_res_t_res_18062 = 1 ^ unsign_arg0_18054;
-                    
-                    defunc_0_get_bit_res_18061 = defunc_0_get_bit_res_t_res_18062;
-                } else {
-                    defunc_0_get_bit_res_18061 = unsign_arg0_18054;
-                }
-                
-                int32_t zp_lhs_18063 = mul32(2, defunc_0_get_bit_res_18061);
-                int32_t unsign_arg0_18064 = ashr32(i32_arg0_18052, blocked_radix_sort_step_arg1_16861);
-                int32_t unsign_arg0_18065 = 1 & unsign_arg0_18064;
-                bool y_18066 = cond_f_res_16868 && x_18058;
-                bool cond_18067 = cond_18057 || y_18066;
-                int32_t defunc_0_get_bit_res_18068;
-                
-                if (cond_18067) {
-                    int32_t defunc_0_get_bit_res_t_res_18069 = 1 ^ unsign_arg0_18065;
-                    
-                    defunc_0_get_bit_res_18068 = defunc_0_get_bit_res_t_res_18069;
-                } else {
-                    defunc_0_get_bit_res_18068 = unsign_arg0_18065;
-                }
-                
-                int32_t i32_arg0_18070 = add32(zp_lhs_18063, defunc_0_get_bit_res_18068);
-                int16_t i32_res_18071 = sext_i32_i16(i32_arg0_18070);
-                int16_t defunc_0_f_res_18072;
-                int16_t defunc_0_f_res_18073;
-                int16_t defunc_0_f_res_18074;
-                int16_t defunc_0_f_res_18075;
-                
-                if (futrts_lifted_lambda_6329(ctx, &defunc_0_f_res_18072, &defunc_0_f_res_18073, &defunc_0_f_res_18074, &defunc_0_f_res_18075, i32_res_18071) != 0) {
-                    err = 1;
-                    goto cleanup;
-                }
-                
-                int16_t defunc_0_op_res_18076 = add16(defunc_0_f_res_18072, scanacc_18041);
-                int16_t defunc_0_op_res_18077 = add16(defunc_0_f_res_18073, scanacc_18042);
-                int16_t defunc_0_op_res_18078 = add16(defunc_0_f_res_18074, scanacc_18043);
-                int16_t defunc_0_op_res_18079 = add16(defunc_0_f_res_18075, scanacc_18044);
-                
-                ((int16_t *) mem_17777)[i_18040] = defunc_0_op_res_18076;
-                ((int16_t *) mem_17778)[i_18040] = defunc_0_op_res_18077;
-                ((int16_t *) mem_17779)[i_18040] = defunc_0_op_res_18078;
-                ((int16_t *) mem_17780)[i_18040] = defunc_0_op_res_18079;
-                ((int16_t *) mem_17781)[i_18040] = i32_res_18071;
-                
-                int16_t scanacc_tmp_18110 = defunc_0_op_res_18076;
-                int16_t scanacc_tmp_18111 = defunc_0_op_res_18077;
-                int16_t scanacc_tmp_18112 = defunc_0_op_res_18078;
-                int16_t scanacc_tmp_18113 = defunc_0_op_res_18079;
-                
-                scanacc_18041 = scanacc_tmp_18110;
-                scanacc_18042 = scanacc_tmp_18111;
-                scanacc_18043 = scanacc_tmp_18112;
-                scanacc_18044 = scanacc_tmp_18113;
-            }
-            discard_17704 = scanacc_18041;
-            discard_17705 = scanacc_18042;
-            discard_17706 = scanacc_18043;
-            discard_17707 = scanacc_18044;
-            
-            int16_t last_res_17012 = ((int16_t *) mem_17777)[(int64_t) 255];
-            int16_t last_res_17013 = ((int16_t *) mem_17778)[(int64_t) 255];
-            int16_t last_res_17014 = ((int16_t *) mem_17779)[(int64_t) 255];
-            int16_t last_res_17015 = ((int16_t *) mem_17780)[(int64_t) 255];
-            
-            for (int64_t write_iter_18085 = 0; write_iter_18085 < (int64_t) 256; write_iter_18085++) {
-                int16_t write_iv_18088 = ((int16_t *) mem_17781)[write_iter_18085];
-                int16_t write_iv_18089 = ((int16_t *) mem_17777)[write_iter_18085];
-                int16_t write_iv_18090 = ((int16_t *) mem_17778)[write_iter_18085];
-                int16_t write_iv_18091 = ((int16_t *) mem_17779)[write_iter_18085];
-                int16_t write_iv_18092 = ((int16_t *) mem_17780)[write_iter_18085];
-                int64_t new_index_18093 = write_iter_18085 + binop_x_17728;
-                float write_iv_18094 = ((float *) mem_17737.mem)[new_index_18093];
-                int64_t write_iv_18095 = ((int64_t *) mem_17739.mem)[new_index_18093];
-                int64_t defunc_0_f_res_18096;
-                
-                if (futrts_lifted_f_6330(ctx, &defunc_0_f_res_18096, last_res_17012, last_res_17013, last_res_17014, write_iv_18088, write_iv_18089, write_iv_18090, write_iv_18091, write_iv_18092) != 0) {
-                    err = 1;
-                    goto cleanup;
-                }
-                if (sle64((int64_t) 0, defunc_0_f_res_18096) && slt64(defunc_0_f_res_18096, (int64_t) 256)) {
-                    ((float *) mem_17765.mem)[binop_x_17728 + defunc_0_f_res_18096] = write_iv_18094;
-                }
-                if (sle64((int64_t) 0, defunc_0_f_res_18096) && slt64(defunc_0_f_res_18096, (int64_t) 256)) {
-                    ((int64_t *) mem_17768.mem)[binop_x_17728 + defunc_0_f_res_18096] = write_iv_18095;
-                }
-            }
-            ((int16_t *) mem_17826)[(int64_t) 0] = last_res_17012;
-            ((int16_t *) mem_17826)[(int64_t) 1] = last_res_17013;
-            ((int16_t *) mem_17826)[(int64_t) 2] = last_res_17014;
-            ((int16_t *) mem_17826)[(int64_t) 3] = last_res_17015;
-            for (int64_t i_18099 = 0; i_18099 < (int64_t) 4; i_18099++) {
-                int16_t eta_p_18101 = ((int16_t *) mem_17826)[i_18099];
-                int64_t i16_res_18102 = sext_i16_i64(eta_p_18101);
-                
-                ((int64_t *) mem_17827)[i_18099] = i16_res_18102;
-            }
-            
-            int16_t tmp_17032 = add16(last_res_17012, last_res_17013);
-            int16_t tmp_17033 = add16(last_res_17014, tmp_17032);
-            
-            ((int16_t *) mem_17846.mem)[gtid_17547 * (int64_t) 4] = (int16_t) 0;
-            ((int16_t *) mem_17846.mem)[gtid_17547 * (int64_t) 4 + (int64_t) 1] = last_res_17012;
-            ((int16_t *) mem_17846.mem)[gtid_17547 * (int64_t) 4 + (int64_t) 2] = tmp_17032;
-            ((int16_t *) mem_17846.mem)[gtid_17547 * (int64_t) 4 + (int64_t) 3] = tmp_17033;
-            lmad_copy_4b(ctx, 1, (uint32_t *) mem_17837.mem, gtid_17547 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_17765.mem, binop_x_17728, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
-            lmad_copy_8b(ctx, 1, (uint64_t *) mem_17840.mem, gtid_17547 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_17768.mem, binop_x_17728, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
-            lmad_copy_8b(ctx, 1, (uint64_t *) mem_17843.mem, gtid_17547 * (int64_t) 4, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_17827, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 4});
-        }
-    }
-    
-  cleanup:
-    {
-        free(mem_17777);
-        free(mem_17778);
-        free(mem_17779);
-        free(mem_17780);
-        free(mem_17781);
-        free(mem_17826);
-        free(mem_17827);
-    }
-    if (event_18461 != NULL) {
-        event_18461->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18453", strdup("nothing further"), event_18461, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18451(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18450 *futhark_mc_task_18450 = (struct futhark_mc_task_18450 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18450->ctx;
-    struct mc_event *event_18463 = mc_event_new(ctx);
-    
-    if (event_18463 != NULL)
-        event_18463->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_task_18450->free_n_blocks_16808;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_task_18450->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_task_18450->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_task_18450->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_task_18450->free_cond_f_res_16868;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18450->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18450->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_task_18450->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_task_18450->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_task_18450->free_mem_17837, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_task_18450->free_mem_17840, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_task_18450->free_mem_17843, .size =0, .references =NULL};
-    struct memblock mem_17846 = {.desc ="mem_17846", .mem =futhark_mc_task_18450->free_mem_17846, .size =0, .references =NULL};
-    int32_t nsubtasks_18039;
-    
-    nsubtasks_18039 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18452 futhark_mc_segmap_parloop_struct_18452_;
-    
-    futhark_mc_segmap_parloop_struct_18452_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18452_.free_n_blocks_16808 = n_blocks_16808;
-    futhark_mc_segmap_parloop_struct_18452_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-    futhark_mc_segmap_parloop_struct_18452_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-    futhark_mc_segmap_parloop_struct_18452_.free_cond_f_res_16867 = cond_f_res_16867;
-    futhark_mc_segmap_parloop_struct_18452_.free_cond_f_res_16868 = cond_f_res_16868;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17765 = mem_17765.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17768 = mem_17768.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17837 = mem_17837.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17840 = mem_17840.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17843 = mem_17843.mem;
-    futhark_mc_segmap_parloop_struct_18452_.free_mem_17846 = mem_17846.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18453_task;
-    
-    futhark_mc_segmap_parloop_18453_task.name = "futhark_mc_segmap_parloop_18453";
-    futhark_mc_segmap_parloop_18453_task.fn = futhark_mc_segmap_parloop_18453;
-    futhark_mc_segmap_parloop_18453_task.args = &futhark_mc_segmap_parloop_struct_18452_;
-    futhark_mc_segmap_parloop_18453_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18453_task.info = info;
-    
-    struct mc_event *event_18462 = mc_event_new(ctx);
-    
-    if (event_18462 != NULL)
-        event_18462->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18453_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18453_task);
-    
-    if (futhark_mc_segmap_parloop_18453_err != 0) {
-        err = futhark_mc_segmap_parloop_18453_err;
-        goto cleanup;
-    }
-    if (event_18462 != NULL) {
-        event_18462->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18453_total", strdup("nothing further"), event_18462, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18463 != NULL) {
-        event_18463->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18451", strdup("nothing further"), event_18463, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_segmap_parloop_struct_18465 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17837;
-    unsigned char *free_mem_17840;
-    unsigned char *free_mem_17843;
-    unsigned char *free_mem_17846;
-};
-struct futhark_mc_task_18473 {
-    struct futhark_context *ctx;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    int64_t free_binop_x_17682;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17769;
-    unsigned char *free_mem_17770;
-    unsigned char *free_mem_17771;
-    unsigned char *free_mem_17772;
-    unsigned char *free_mem_17773;
-};
-struct futhark_mc_scan_stage_1_parloop_struct_18479 {
-    struct futhark_context *ctx;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    int32_t free_get_bit_arg0_16866;
-    bool free_cond_f_res_16867;
-    bool free_cond_f_res_16868;
-    int64_t free_binop_x_17682;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17769;
-    unsigned char *free_mem_17770;
-    unsigned char *free_mem_17771;
-    unsigned char *free_mem_17772;
-    unsigned char *free_mem_17773;
-};
-static int futhark_mc_scan_stage_1_parloop_18480(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_scan_stage_1_parloop_struct_18479 *futhark_mc_scan_stage_1_parloop_struct_18479 = (struct futhark_mc_scan_stage_1_parloop_struct_18479 *) args;
-    struct futhark_context *ctx = futhark_mc_scan_stage_1_parloop_struct_18479->ctx;
-    struct mc_event *event_18481 = mc_event_new(ctx);
-    
-    if (event_18481 != NULL)
-        event_18481->bef = get_wall_time();
-    
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_scan_stage_1_parloop_struct_18479->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_scan_stage_1_parloop_struct_18479->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_scan_stage_1_parloop_struct_18479->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_scan_stage_1_parloop_struct_18479->free_cond_f_res_16868;
-    int64_t binop_x_17682 = futhark_mc_scan_stage_1_parloop_struct_18479->free_binop_x_17682;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_scan_stage_1_parloop_struct_18479->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17769 = {.desc ="mem_17769", .mem =futhark_mc_scan_stage_1_parloop_struct_18479->free_mem_17769, .size =0, .references =NULL};
-    struct memblock mem_17770 = {.desc ="mem_17770", .mem =futhark_mc_scan_stage_1_parloop_struct_18479->free_mem_17770, .size =0, .references =NULL};
-    struct memblock mem_17771 = {.desc ="mem_17771", .mem =futhark_mc_scan_stage_1_parloop_struct_18479->free_mem_17771, .size =0, .references =NULL};
-    struct memblock mem_17772 = {.desc ="mem_17772", .mem =futhark_mc_scan_stage_1_parloop_struct_18479->free_mem_17772, .size =0, .references =NULL};
-    struct memblock mem_17773 = {.desc ="mem_17773", .mem =futhark_mc_scan_stage_1_parloop_struct_18479->free_mem_17773, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_18123;
-    
-    flat_tid_18123 = subtask_id;
-    
-    int16_t eta_p_18151;
-    int16_t eta_p_18152;
-    int16_t eta_p_18153;
-    int16_t eta_p_18154;
-    int16_t eta_p_18155;
-    int16_t eta_p_18156;
-    int16_t eta_p_18157;
-    int16_t eta_p_18158;
-    
-    eta_p_18151 = (int16_t) 0;
-    eta_p_18152 = (int16_t) 0;
-    eta_p_18153 = (int16_t) 0;
-    eta_p_18154 = (int16_t) 0;
-    {
-        int64_t start_18185;
-        int64_t end_18186;
-        
-        start_18185 = start;
-        end_18186 = end;
-        
-        int64_t n_18187 = end_18186 - start_18185;
-        
-        for (int64_t SegScan_i_18188 = start_18185; SegScan_i_18188 < start_18185 + n_18187; SegScan_i_18188++) {
-            int64_t gtid_18124 = SegScan_i_18188;
-            int64_t new_index_18125 = gtid_18124 + binop_x_17682;
-            float eta_p_18126 = ((float *) mem_17737.mem)[new_index_18125];
-            int32_t i32_arg0_18127 = futrts_to_bits32(eta_p_18126);
-            int32_t unsign_arg0_18128 = ashr32(i32_arg0_18127, get_bit_arg0_16866);
-            int32_t unsign_arg0_18129 = 1 & unsign_arg0_18128;
-            int32_t unsign_arg0_18130 = ashr32(i32_arg0_18127, 31);
-            int32_t unsign_arg0_18131 = 1 & unsign_arg0_18130;
-            bool cond_18132 = unsign_arg0_18131 == 1;
-            bool x_18133 = !cond_18132;
-            bool y_18134 = cond_f_res_16867 && x_18133;
-            bool cond_18135 = cond_18132 || y_18134;
-            int32_t defunc_0_get_bit_res_18136;
-            
-            if (cond_18135) {
-                int32_t defunc_0_get_bit_res_t_res_18137 = 1 ^ unsign_arg0_18129;
-                
-                defunc_0_get_bit_res_18136 = defunc_0_get_bit_res_t_res_18137;
-            } else {
-                defunc_0_get_bit_res_18136 = unsign_arg0_18129;
-            }
-            
-            int32_t zp_lhs_18138 = mul32(2, defunc_0_get_bit_res_18136);
-            int32_t unsign_arg0_18139 = ashr32(i32_arg0_18127, blocked_radix_sort_step_arg1_16861);
-            int32_t unsign_arg0_18140 = 1 & unsign_arg0_18139;
-            bool y_18141 = cond_f_res_16868 && x_18133;
-            bool cond_18142 = cond_18132 || y_18141;
-            int32_t defunc_0_get_bit_res_18143;
-            
-            if (cond_18142) {
-                int32_t defunc_0_get_bit_res_t_res_18144 = 1 ^ unsign_arg0_18140;
-                
-                defunc_0_get_bit_res_18143 = defunc_0_get_bit_res_t_res_18144;
-            } else {
-                defunc_0_get_bit_res_18143 = unsign_arg0_18140;
-            }
-            
-            int32_t i32_arg0_18145 = add32(zp_lhs_18138, defunc_0_get_bit_res_18143);
-            int16_t i32_res_18146 = sext_i32_i16(i32_arg0_18145);
-            int16_t defunc_0_f_res_18147;
-            int16_t defunc_0_f_res_18148;
-            int16_t defunc_0_f_res_18149;
-            int16_t defunc_0_f_res_18150;
-            
-            if (futrts_lifted_lambda_6329(ctx, &defunc_0_f_res_18147, &defunc_0_f_res_18148, &defunc_0_f_res_18149, &defunc_0_f_res_18150, i32_res_18146) != 0) {
-                err = 1;
-                goto cleanup;
-            }
-            // write mapped values results to memory
-            {
-                ((int16_t *) mem_17773.mem)[gtid_18124] = i32_res_18146;
-            }
-            // Apply scan op
-            {
-                int64_t uni_i_18189 = 0;
-                
-                {
-                    // Read accumulator
-                    {
-                        eta_p_18151 = eta_p_18151;
-                        eta_p_18152 = eta_p_18152;
-                        eta_p_18153 = eta_p_18153;
-                        eta_p_18154 = eta_p_18154;
-                    }
-                    // Read next values
-                    {
-                        eta_p_18155 = defunc_0_f_res_18147;
-                        eta_p_18156 = defunc_0_f_res_18148;
-                        eta_p_18157 = defunc_0_f_res_18149;
-                        eta_p_18158 = defunc_0_f_res_18150;
-                    }
-                    // Scan op body
-                    {
-                        int16_t defunc_0_op_res_18159 = add16(eta_p_18151, eta_p_18155);
-                        int16_t defunc_0_op_res_18160 = add16(eta_p_18152, eta_p_18156);
-                        int16_t defunc_0_op_res_18161 = add16(eta_p_18153, eta_p_18157);
-                        int16_t defunc_0_op_res_18162 = add16(eta_p_18154, eta_p_18158);
-                        
-                        ((int16_t *) mem_17769.mem)[gtid_18124] = defunc_0_op_res_18159;
-                        eta_p_18151 = defunc_0_op_res_18159;
-                        ((int16_t *) mem_17770.mem)[gtid_18124] = defunc_0_op_res_18160;
-                        eta_p_18152 = defunc_0_op_res_18160;
-                        ((int16_t *) mem_17771.mem)[gtid_18124] = defunc_0_op_res_18161;
-                        eta_p_18153 = defunc_0_op_res_18161;
-                        ((int16_t *) mem_17772.mem)[gtid_18124] = defunc_0_op_res_18162;
-                        eta_p_18154 = defunc_0_op_res_18162;
-                    }
-                }
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18481 != NULL) {
-        event_18481->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_1_parloop_18480", strdup("nothing further"), event_18481, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-struct futhark_mc_scan_stage_3_parloop_struct_18483 {
-    struct futhark_context *ctx;
-    unsigned char *free_mem_17769;
-    unsigned char *free_mem_17770;
-    unsigned char *free_mem_17771;
-    unsigned char *free_mem_17772;
-    unsigned char *free_scan_stage_2_carry_mem_18204;
-    unsigned char *free_scan_stage_2_carry_mem_18206;
-    unsigned char *free_scan_stage_2_carry_mem_18208;
-    unsigned char *free_scan_stage_2_carry_mem_18210;
-};
-static int futhark_mc_scan_stage_3_parloop_18484(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_scan_stage_3_parloop_struct_18483 *futhark_mc_scan_stage_3_parloop_struct_18483 = (struct futhark_mc_scan_stage_3_parloop_struct_18483 *) args;
-    struct futhark_context *ctx = futhark_mc_scan_stage_3_parloop_struct_18483->ctx;
-    struct mc_event *event_18485 = mc_event_new(ctx);
-    
-    if (event_18485 != NULL)
-        event_18485->bef = get_wall_time();
-    
-    struct memblock mem_17769 = {.desc ="mem_17769", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_mem_17769, .size =0, .references =NULL};
-    struct memblock mem_17770 = {.desc ="mem_17770", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_mem_17770, .size =0, .references =NULL};
-    struct memblock mem_17771 = {.desc ="mem_17771", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_mem_17771, .size =0, .references =NULL};
-    struct memblock mem_17772 = {.desc ="mem_17772", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_mem_17772, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_18204 = {.desc ="scan_stage_2_carry_mem_18204", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_scan_stage_2_carry_mem_18204, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_18206 = {.desc ="scan_stage_2_carry_mem_18206", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_scan_stage_2_carry_mem_18206, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_18208 = {.desc ="scan_stage_2_carry_mem_18208", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_scan_stage_2_carry_mem_18208, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_18210 = {.desc ="scan_stage_2_carry_mem_18210", .mem =futhark_mc_scan_stage_3_parloop_struct_18483->free_scan_stage_2_carry_mem_18210, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_18123;
-    
-    flat_tid_18123 = subtask_id;
-    {
-        int16_t eta_p_18213;
-        int16_t eta_p_18214;
-        int16_t eta_p_18215;
-        int16_t eta_p_18216;
-        int16_t eta_p_18217;
-        int16_t eta_p_18218;
-        int16_t eta_p_18219;
-        int16_t eta_p_18220;
-        
-        // load carry-in
-        {
-            eta_p_18213 = ((int16_t *) scan_stage_2_carry_mem_18204.mem)[flat_tid_18123];
-            eta_p_18214 = ((int16_t *) scan_stage_2_carry_mem_18206.mem)[flat_tid_18123];
-            eta_p_18215 = ((int16_t *) scan_stage_2_carry_mem_18208.mem)[flat_tid_18123];
-            eta_p_18216 = ((int16_t *) scan_stage_2_carry_mem_18210.mem)[flat_tid_18123];
-        }
-        
-        int64_t start_18225;
-        int64_t end_18226;
-        
-        start_18225 = start;
-        end_18226 = end;
-        
-        int64_t n_18227 = end_18226 - start_18225;
-        
-        for (int64_t SegScan_i_18228 = start_18225; SegScan_i_18228 < start_18225 + n_18227; SegScan_i_18228++) {
-            int64_t gtid_18124 = SegScan_i_18228;
-            
-            // load partial result
-            {
-                eta_p_18217 = ((int16_t *) mem_17769.mem)[gtid_18124];
-                eta_p_18218 = ((int16_t *) mem_17770.mem)[gtid_18124];
-                eta_p_18219 = ((int16_t *) mem_17771.mem)[gtid_18124];
-                eta_p_18220 = ((int16_t *) mem_17772.mem)[gtid_18124];
-            }
-            // combine carry with partial result
-            {
-                int16_t defunc_0_op_res_18221 = add16(eta_p_18213, eta_p_18217);
-                int16_t defunc_0_op_res_18222 = add16(eta_p_18214, eta_p_18218);
-                int16_t defunc_0_op_res_18223 = add16(eta_p_18215, eta_p_18219);
-                int16_t defunc_0_op_res_18224 = add16(eta_p_18216, eta_p_18220);
-                
-                ((int16_t *) mem_17769.mem)[gtid_18124] = defunc_0_op_res_18221;
-                ((int16_t *) mem_17770.mem)[gtid_18124] = defunc_0_op_res_18222;
-                ((int16_t *) mem_17771.mem)[gtid_18124] = defunc_0_op_res_18223;
-                ((int16_t *) mem_17772.mem)[gtid_18124] = defunc_0_op_res_18224;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18485 != NULL) {
-        event_18485->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_3_parloop_18484", strdup("nothing further"), event_18485, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segscan_task_18474(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18473 *futhark_mc_task_18473 = (struct futhark_mc_task_18473 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18473->ctx;
-    struct mc_event *event_18487 = mc_event_new(ctx);
-    
-    if (event_18487 != NULL)
-        event_18487->bef = get_wall_time();
-    
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_task_18473->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_task_18473->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_task_18473->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_task_18473->free_cond_f_res_16868;
-    int64_t binop_x_17682 = futhark_mc_task_18473->free_binop_x_17682;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18473->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17769 = {.desc ="mem_17769", .mem =futhark_mc_task_18473->free_mem_17769, .size =0, .references =NULL};
-    struct memblock mem_17770 = {.desc ="mem_17770", .mem =futhark_mc_task_18473->free_mem_17770, .size =0, .references =NULL};
-    struct memblock mem_17771 = {.desc ="mem_17771", .mem =futhark_mc_task_18473->free_mem_17771, .size =0, .references =NULL};
-    struct memblock mem_17772 = {.desc ="mem_17772", .mem =futhark_mc_task_18473->free_mem_17772, .size =0, .references =NULL};
-    struct memblock mem_17773 = {.desc ="mem_17773", .mem =futhark_mc_task_18473->free_mem_17773, .size =0, .references =NULL};
-    int64_t scan_stage_2_carry_mem_18204_cached_sizze_18475 = 0;
-    unsigned char *scan_stage_2_carry_mem_18204 = NULL;
-    int64_t scan_stage_2_carry_mem_18206_cached_sizze_18476 = 0;
-    unsigned char *scan_stage_2_carry_mem_18206 = NULL;
-    int64_t scan_stage_2_carry_mem_18208_cached_sizze_18477 = 0;
-    unsigned char *scan_stage_2_carry_mem_18208 = NULL;
-    int64_t scan_stage_2_carry_mem_18210_cached_sizze_18478 = 0;
-    unsigned char *scan_stage_2_carry_mem_18210 = NULL;
-    int32_t nsubtasks_18184;
-    
-    nsubtasks_18184 = info.nsubtasks;
-    if (ctx->debugging)
-        fprintf(ctx->log, "%s\n", "nonsegmented segScan");
-    if (ctx->debugging)
-        fprintf(ctx->log, "%s\n", "Scan stage 1");
-    
-    struct futhark_mc_scan_stage_1_parloop_struct_18479 futhark_mc_scan_stage_1_parloop_struct_18479_;
-    
-    futhark_mc_scan_stage_1_parloop_struct_18479_.ctx = ctx;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_cond_f_res_16867 = cond_f_res_16867;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_cond_f_res_16868 = cond_f_res_16868;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_binop_x_17682 = binop_x_17682;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_mem_17769 = mem_17769.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_mem_17770 = mem_17770.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_mem_17771 = mem_17771.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_mem_17772 = mem_17772.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18479_.free_mem_17773 = mem_17773.mem;
-    
-    struct scheduler_parloop futhark_mc_scan_stage_1_parloop_18480_task;
-    
-    futhark_mc_scan_stage_1_parloop_18480_task.name = "futhark_mc_scan_stage_1_parloop_18480";
-    futhark_mc_scan_stage_1_parloop_18480_task.fn = futhark_mc_scan_stage_1_parloop_18480;
-    futhark_mc_scan_stage_1_parloop_18480_task.args = &futhark_mc_scan_stage_1_parloop_struct_18479_;
-    futhark_mc_scan_stage_1_parloop_18480_task.iterations = iterations;
-    futhark_mc_scan_stage_1_parloop_18480_task.info = info;
-    
-    struct mc_event *event_18482 = mc_event_new(ctx);
-    
-    if (event_18482 != NULL)
-        event_18482->bef = get_wall_time();
-    
-    int futhark_mc_scan_stage_1_parloop_18480_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_scan_stage_1_parloop_18480_task);
-    
-    if (futhark_mc_scan_stage_1_parloop_18480_err != 0) {
-        err = futhark_mc_scan_stage_1_parloop_18480_err;
-        goto cleanup;
-    }
-    if (event_18482 != NULL) {
-        event_18482->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_1_parloop_18480_total", strdup("nothing further"), event_18482, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (slt32(1, nsubtasks_18184)) {
-        if (ctx->debugging)
-            fprintf(ctx->log, "%s\n", "Scan stage 2");
-        
-        int16_t eta_p_18190;
-        int16_t eta_p_18191;
-        int16_t eta_p_18192;
-        int16_t eta_p_18193;
-        int16_t eta_p_18194;
-        int16_t eta_p_18195;
-        int16_t eta_p_18196;
-        int16_t eta_p_18197;
-        int64_t offset_18202 = (int64_t) 0;
-        int64_t offset_index_18203 = (int64_t) 0;
-        
-        if (scan_stage_2_carry_mem_18204_cached_sizze_18475 < (int64_t) 2 * nsubtasks_18184) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_18204, &scan_stage_2_carry_mem_18204_cached_sizze_18475, (int64_t) 2 * nsubtasks_18184);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (scan_stage_2_carry_mem_18206_cached_sizze_18476 < (int64_t) 2 * nsubtasks_18184) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_18206, &scan_stage_2_carry_mem_18206_cached_sizze_18476, (int64_t) 2 * nsubtasks_18184);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (scan_stage_2_carry_mem_18208_cached_sizze_18477 < (int64_t) 2 * nsubtasks_18184) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_18208, &scan_stage_2_carry_mem_18208_cached_sizze_18477, (int64_t) 2 * nsubtasks_18184);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (scan_stage_2_carry_mem_18210_cached_sizze_18478 < (int64_t) 2 * nsubtasks_18184) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_18210, &scan_stage_2_carry_mem_18210_cached_sizze_18478, (int64_t) 2 * nsubtasks_18184);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        // carry-in for first chunk is neutral
-        {
-            ((int16_t *) scan_stage_2_carry_mem_18204)[(int64_t) 0] = (int16_t) 0;
-            ((int16_t *) scan_stage_2_carry_mem_18206)[(int64_t) 0] = (int16_t) 0;
-            ((int16_t *) scan_stage_2_carry_mem_18208)[(int64_t) 0] = (int16_t) 0;
-            ((int16_t *) scan_stage_2_carry_mem_18210)[(int64_t) 0] = (int16_t) 0;
-        }
-        // scan carries
-        {
-            for (int64_t i_18212 = 0; i_18212 < sext_i32_i64(nsubtasks_18184) - (int64_t) 1; i_18212++) {
-                offset_18202 = squot64((int64_t) 256, sext_i32_i64(nsubtasks_18184));
-                if (slt64(i_18212, srem64((int64_t) 256, sext_i32_i64(nsubtasks_18184)))) {
-                    offset_18202 += (int64_t) 1;
-                }
-                offset_index_18203 += offset_18202;
-                
-                int64_t gtid_18124 = offset_index_18203;
-                
-                // Read carry
-                {
-                    eta_p_18190 = ((int16_t *) scan_stage_2_carry_mem_18204)[i_18212];
-                    eta_p_18191 = ((int16_t *) scan_stage_2_carry_mem_18206)[i_18212];
-                    eta_p_18192 = ((int16_t *) scan_stage_2_carry_mem_18208)[i_18212];
-                    eta_p_18193 = ((int16_t *) scan_stage_2_carry_mem_18210)[i_18212];
-                }
-                // Read next values
-                {
-                    eta_p_18194 = ((int16_t *) mem_17769.mem)[offset_index_18203 - (int64_t) 1];
-                    eta_p_18195 = ((int16_t *) mem_17770.mem)[offset_index_18203 - (int64_t) 1];
-                    eta_p_18196 = ((int16_t *) mem_17771.mem)[offset_index_18203 - (int64_t) 1];
-                    eta_p_18197 = ((int16_t *) mem_17772.mem)[offset_index_18203 - (int64_t) 1];
-                }
-                
-                int16_t defunc_0_op_res_18198 = add16(eta_p_18190, eta_p_18194);
-                int16_t defunc_0_op_res_18199 = add16(eta_p_18191, eta_p_18195);
-                int16_t defunc_0_op_res_18200 = add16(eta_p_18192, eta_p_18196);
-                int16_t defunc_0_op_res_18201 = add16(eta_p_18193, eta_p_18197);
-                
-                ((int16_t *) scan_stage_2_carry_mem_18204)[i_18212 + (int64_t) 1] = defunc_0_op_res_18198;
-                ((int16_t *) scan_stage_2_carry_mem_18206)[i_18212 + (int64_t) 1] = defunc_0_op_res_18199;
-                ((int16_t *) scan_stage_2_carry_mem_18208)[i_18212 + (int64_t) 1] = defunc_0_op_res_18200;
-                ((int16_t *) scan_stage_2_carry_mem_18210)[i_18212 + (int64_t) 1] = defunc_0_op_res_18201;
-            }
-        }
-        if (ctx->debugging)
-            fprintf(ctx->log, "%s\n", "Scan stage 3");
-        
-        struct futhark_mc_scan_stage_3_parloop_struct_18483 futhark_mc_scan_stage_3_parloop_struct_18483_;
-        
-        futhark_mc_scan_stage_3_parloop_struct_18483_.ctx = ctx;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_mem_17769 = mem_17769.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_mem_17770 = mem_17770.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_mem_17771 = mem_17771.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_mem_17772 = mem_17772.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_scan_stage_2_carry_mem_18204 = scan_stage_2_carry_mem_18204;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_scan_stage_2_carry_mem_18206 = scan_stage_2_carry_mem_18206;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_scan_stage_2_carry_mem_18208 = scan_stage_2_carry_mem_18208;
-        futhark_mc_scan_stage_3_parloop_struct_18483_.free_scan_stage_2_carry_mem_18210 = scan_stage_2_carry_mem_18210;
-        
-        struct scheduler_parloop futhark_mc_scan_stage_3_parloop_18484_task;
-        
-        futhark_mc_scan_stage_3_parloop_18484_task.name = "futhark_mc_scan_stage_3_parloop_18484";
-        futhark_mc_scan_stage_3_parloop_18484_task.fn = futhark_mc_scan_stage_3_parloop_18484;
-        futhark_mc_scan_stage_3_parloop_18484_task.args = &futhark_mc_scan_stage_3_parloop_struct_18483_;
-        futhark_mc_scan_stage_3_parloop_18484_task.iterations = iterations;
-        futhark_mc_scan_stage_3_parloop_18484_task.info = info;
-        
-        struct mc_event *event_18486 = mc_event_new(ctx);
-        
-        if (event_18486 != NULL)
-            event_18486->bef = get_wall_time();
-        
-        int futhark_mc_scan_stage_3_parloop_18484_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_scan_stage_3_parloop_18484_task);
-        
-        if (futhark_mc_scan_stage_3_parloop_18484_err != 0) {
-            err = futhark_mc_scan_stage_3_parloop_18484_err;
-            goto cleanup;
-        }
-        if (event_18486 != NULL) {
-            event_18486->aft = get_wall_time();
-            lock_lock(&ctx->event_list_lock);
-            add_event(ctx, "futhark_mc_scan_stage_3_parloop_18484_total", strdup("nothing further"), event_18486, (event_report_fn) mc_event_report);
-            lock_unlock(&ctx->event_list_lock);
-        }
-    }
-    
-  cleanup:
-    {
-        free(scan_stage_2_carry_mem_18204);
-        free(scan_stage_2_carry_mem_18206);
-        free(scan_stage_2_carry_mem_18208);
-        free(scan_stage_2_carry_mem_18210);
-    }
-    if (event_18487 != NULL) {
-        event_18487->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segscan_task_18474", strdup("nothing further"), event_18487, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18488 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    int16_t free_last_res_17606;
-    int16_t free_last_res_17607;
-    int16_t free_last_res_17608;
-    int64_t free_binop_x_17682;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17769;
-    unsigned char *free_mem_17770;
-    unsigned char *free_mem_17771;
-    unsigned char *free_mem_17772;
-    unsigned char *free_mem_17773;
-};
-struct futhark_mc_segmap_parloop_struct_18490 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    int16_t free_last_res_17606;
-    int16_t free_last_res_17607;
-    int16_t free_last_res_17608;
-    int64_t free_binop_x_17682;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17769;
-    unsigned char *free_mem_17770;
-    unsigned char *free_mem_17771;
-    unsigned char *free_mem_17772;
-    unsigned char *free_mem_17773;
-};
-static int futhark_mc_segmap_parloop_18491(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18490 *futhark_mc_segmap_parloop_struct_18490 = (struct futhark_mc_segmap_parloop_struct_18490 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18490->ctx;
-    struct mc_event *event_18492 = mc_event_new(ctx);
-    
-    if (event_18492 != NULL)
-        event_18492->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_segmap_parloop_struct_18490->free_gtid_17557;
-    int16_t last_res_17606 = futhark_mc_segmap_parloop_struct_18490->free_last_res_17606;
-    int16_t last_res_17607 = futhark_mc_segmap_parloop_struct_18490->free_last_res_17607;
-    int16_t last_res_17608 = futhark_mc_segmap_parloop_struct_18490->free_last_res_17608;
-    int64_t binop_x_17682 = futhark_mc_segmap_parloop_struct_18490->free_binop_x_17682;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17769 = {.desc ="mem_17769", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17769, .size =0, .references =NULL};
-    struct memblock mem_17770 = {.desc ="mem_17770", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17770, .size =0, .references =NULL};
-    struct memblock mem_17771 = {.desc ="mem_17771", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17771, .size =0, .references =NULL};
-    struct memblock mem_17772 = {.desc ="mem_17772", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17772, .size =0, .references =NULL};
-    struct memblock mem_17773 = {.desc ="mem_17773", .mem =futhark_mc_segmap_parloop_struct_18490->free_mem_17773, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_18163;
-    
-    flat_tid_18163 = subtask_id;
-    {
-        int64_t start_18230;
-        int64_t end_18231;
-        
-        start_18230 = start;
-        end_18231 = end;
-        
-        int64_t n_18232 = end_18231 - start_18230;
-        
-        for (int64_t SegMap_i_18233 = start_18230; SegMap_i_18233 < start_18230 + n_18232; SegMap_i_18233++) {
-            int64_t slice_18234 = (int64_t) 256;
-            int64_t gtid_18164 = SegMap_i_18233;
-            int64_t remnant_18235 = SegMap_i_18233 - gtid_18164;
-            int16_t eta_p_18165 = ((int16_t *) mem_17773.mem)[gtid_18164];
-            int16_t eta_p_18166 = ((int16_t *) mem_17769.mem)[gtid_18164];
-            int16_t eta_p_18167 = ((int16_t *) mem_17770.mem)[gtid_18164];
-            int16_t eta_p_18168 = ((int16_t *) mem_17771.mem)[gtid_18164];
-            int16_t eta_p_18169 = ((int16_t *) mem_17772.mem)[gtid_18164];
-            int64_t new_index_18170 = gtid_18164 + binop_x_17682;
-            float write_value_18171 = ((float *) mem_17737.mem)[new_index_18170];
-            int64_t write_value_18172 = ((int64_t *) mem_17739.mem)[new_index_18170];
-            int64_t defunc_0_f_res_18173;
-            
-            if (futrts_lifted_f_6330(ctx, &defunc_0_f_res_18173, last_res_17606, last_res_17607, last_res_17608, eta_p_18165, eta_p_18166, eta_p_18167, eta_p_18168, eta_p_18169) != 0) {
-                err = 1;
-                goto cleanup;
-            }
-            if (sle64((int64_t) 0, defunc_0_f_res_18173) && slt64(defunc_0_f_res_18173, (int64_t) 256)) {
-                ((float *) mem_17765.mem)[gtid_17557 * (int64_t) 256 + defunc_0_f_res_18173] = write_value_18171;
-            }
-            if (sle64((int64_t) 0, defunc_0_f_res_18173) && slt64(defunc_0_f_res_18173, (int64_t) 256)) {
-                ((int64_t *) mem_17768.mem)[gtid_17557 * (int64_t) 256 + defunc_0_f_res_18173] = write_value_18172;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18492 != NULL) {
-        event_18492->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18491", strdup("nothing further"), event_18492, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18489(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18488 *futhark_mc_task_18488 = (struct futhark_mc_task_18488 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18488->ctx;
-    struct mc_event *event_18494 = mc_event_new(ctx);
-    
-    if (event_18494 != NULL)
-        event_18494->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_task_18488->free_gtid_17557;
-    int16_t last_res_17606 = futhark_mc_task_18488->free_last_res_17606;
-    int16_t last_res_17607 = futhark_mc_task_18488->free_last_res_17607;
-    int16_t last_res_17608 = futhark_mc_task_18488->free_last_res_17608;
-    int64_t binop_x_17682 = futhark_mc_task_18488->free_binop_x_17682;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18488->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18488->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_task_18488->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_task_18488->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17769 = {.desc ="mem_17769", .mem =futhark_mc_task_18488->free_mem_17769, .size =0, .references =NULL};
-    struct memblock mem_17770 = {.desc ="mem_17770", .mem =futhark_mc_task_18488->free_mem_17770, .size =0, .references =NULL};
-    struct memblock mem_17771 = {.desc ="mem_17771", .mem =futhark_mc_task_18488->free_mem_17771, .size =0, .references =NULL};
-    struct memblock mem_17772 = {.desc ="mem_17772", .mem =futhark_mc_task_18488->free_mem_17772, .size =0, .references =NULL};
-    struct memblock mem_17773 = {.desc ="mem_17773", .mem =futhark_mc_task_18488->free_mem_17773, .size =0, .references =NULL};
-    int32_t nsubtasks_18229;
-    
-    nsubtasks_18229 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18490 futhark_mc_segmap_parloop_struct_18490_;
-    
-    futhark_mc_segmap_parloop_struct_18490_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18490_.free_gtid_17557 = gtid_17557;
-    futhark_mc_segmap_parloop_struct_18490_.free_last_res_17606 = last_res_17606;
-    futhark_mc_segmap_parloop_struct_18490_.free_last_res_17607 = last_res_17607;
-    futhark_mc_segmap_parloop_struct_18490_.free_last_res_17608 = last_res_17608;
-    futhark_mc_segmap_parloop_struct_18490_.free_binop_x_17682 = binop_x_17682;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17765 = mem_17765.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17768 = mem_17768.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17769 = mem_17769.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17770 = mem_17770.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17771 = mem_17771.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17772 = mem_17772.mem;
-    futhark_mc_segmap_parloop_struct_18490_.free_mem_17773 = mem_17773.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18491_task;
-    
-    futhark_mc_segmap_parloop_18491_task.name = "futhark_mc_segmap_parloop_18491";
-    futhark_mc_segmap_parloop_18491_task.fn = futhark_mc_segmap_parloop_18491;
-    futhark_mc_segmap_parloop_18491_task.args = &futhark_mc_segmap_parloop_struct_18490_;
-    futhark_mc_segmap_parloop_18491_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18491_task.info = info;
-    
-    struct mc_event *event_18493 = mc_event_new(ctx);
-    
-    if (event_18493 != NULL)
-        event_18493->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18491_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18491_task);
-    
-    if (futhark_mc_segmap_parloop_18491_err != 0) {
-        err = futhark_mc_segmap_parloop_18491_err;
-        goto cleanup;
-    }
-    if (event_18493 != NULL) {
-        event_18493->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18491_total", strdup("nothing further"), event_18493, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18494 != NULL) {
-        event_18494->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18489", strdup("nothing further"), event_18494, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18495 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    unsigned char *free_mem_17774;
-    unsigned char *free_mem_17843;
-};
-struct futhark_mc_segmap_parloop_struct_18497 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    unsigned char *free_mem_17774;
-    unsigned char *free_mem_17843;
-};
-static int futhark_mc_segmap_parloop_18498(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18497 *futhark_mc_segmap_parloop_struct_18497 = (struct futhark_mc_segmap_parloop_struct_18497 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18497->ctx;
-    struct mc_event *event_18499 = mc_event_new(ctx);
-    
-    if (event_18499 != NULL)
-        event_18499->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_segmap_parloop_struct_18497->free_gtid_17557;
-    struct memblock mem_17774 = {.desc ="mem_17774", .mem =futhark_mc_segmap_parloop_struct_18497->free_mem_17774, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_segmap_parloop_struct_18497->free_mem_17843, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_18174;
-    
-    flat_tid_18174 = subtask_id;
-    {
-        int64_t start_18237;
-        int64_t end_18238;
-        
-        start_18237 = start;
-        end_18238 = end;
-        
-        int64_t n_18239 = end_18238 - start_18237;
-        
-        for (int64_t SegMap_i_18240 = start_18237; SegMap_i_18240 < start_18237 + n_18239; SegMap_i_18240++) {
-            int64_t slice_18241 = (int64_t) 4;
-            int64_t gtid_18175 = SegMap_i_18240;
-            int64_t remnant_18242 = SegMap_i_18240 - gtid_18175;
-            int16_t eta_p_18176 = ((int16_t *) mem_17774.mem)[gtid_18175];
-            int64_t i16_res_18177 = sext_i16_i64(eta_p_18176);
-            
-            ((int64_t *) mem_17843.mem)[gtid_17557 * (int64_t) 4 + gtid_18175] = i16_res_18177;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18499 != NULL) {
-        event_18499->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18498", strdup("nothing further"), event_18499, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18496(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18495 *futhark_mc_task_18495 = (struct futhark_mc_task_18495 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18495->ctx;
-    struct mc_event *event_18501 = mc_event_new(ctx);
-    
-    if (event_18501 != NULL)
-        event_18501->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_task_18495->free_gtid_17557;
-    struct memblock mem_17774 = {.desc ="mem_17774", .mem =futhark_mc_task_18495->free_mem_17774, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_task_18495->free_mem_17843, .size =0, .references =NULL};
-    int32_t nsubtasks_18236;
-    
-    nsubtasks_18236 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18497 futhark_mc_segmap_parloop_struct_18497_;
-    
-    futhark_mc_segmap_parloop_struct_18497_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18497_.free_gtid_17557 = gtid_17557;
-    futhark_mc_segmap_parloop_struct_18497_.free_mem_17774 = mem_17774.mem;
-    futhark_mc_segmap_parloop_struct_18497_.free_mem_17843 = mem_17843.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18498_task;
-    
-    futhark_mc_segmap_parloop_18498_task.name = "futhark_mc_segmap_parloop_18498";
-    futhark_mc_segmap_parloop_18498_task.fn = futhark_mc_segmap_parloop_18498;
-    futhark_mc_segmap_parloop_18498_task.args = &futhark_mc_segmap_parloop_struct_18497_;
-    futhark_mc_segmap_parloop_18498_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18498_task.info = info;
-    
-    struct mc_event *event_18500 = mc_event_new(ctx);
-    
-    if (event_18500 != NULL)
-        event_18500->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18498_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18498_task);
-    
-    if (futhark_mc_segmap_parloop_18498_err != 0) {
-        err = futhark_mc_segmap_parloop_18498_err;
-        goto cleanup;
-    }
-    if (event_18500 != NULL) {
-        event_18500->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18498_total", strdup("nothing further"), event_18500, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18501 != NULL) {
-        event_18501->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18496", strdup("nothing further"), event_18501, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18502 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17837;
-};
-struct futhark_mc_copy_parloop_struct_18504 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    unsigned char *free_mem_17765;
-    unsigned char *free_mem_17837;
-};
-static int futhark_mc_copy_parloop_18505(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18504 *futhark_mc_copy_parloop_struct_18504 = (struct futhark_mc_copy_parloop_struct_18504 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18504->ctx;
-    struct mc_event *event_18506 = mc_event_new(ctx);
-    
-    if (event_18506 != NULL)
-        event_18506->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_copy_parloop_struct_18504->free_gtid_17557;
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_copy_parloop_struct_18504->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_copy_parloop_struct_18504->free_mem_17837, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_18243;
-        int64_t end_18244;
-        
-        start_18243 = start;
-        end_18244 = end;
-        
-        int64_t n_18245 = end_18244 - start_18243;
-        
-        for (int64_t copy_i_18246 = start_18243; copy_i_18246 < start_18243 + n_18245; copy_i_18246++) {
-            int64_t slice_18248 = (int64_t) 256;
-            int64_t i_18247 = copy_i_18246;
-            int64_t remnant_18249 = copy_i_18246 - i_18247;
-            float tmp_18250 = ((float *) mem_17765.mem)[gtid_17557 * (int64_t) 256 + i_18247];
-            
-            ((float *) mem_17837.mem)[gtid_17557 * (int64_t) 256 + i_18247] = tmp_18250;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18506 != NULL) {
-        event_18506->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18505", strdup("nothing further"), event_18506, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_18251_task_18503(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18502 *futhark_mc_task_18502 = (struct futhark_mc_task_18502 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18502->ctx;
-    struct mc_event *event_18508 = mc_event_new(ctx);
-    
-    if (event_18508 != NULL)
-        event_18508->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_task_18502->free_gtid_17557;
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_task_18502->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_task_18502->free_mem_17837, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18504 futhark_mc_copy_parloop_struct_18504_;
-    
-    futhark_mc_copy_parloop_struct_18504_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18504_.free_gtid_17557 = gtid_17557;
-    futhark_mc_copy_parloop_struct_18504_.free_mem_17765 = mem_17765.mem;
-    futhark_mc_copy_parloop_struct_18504_.free_mem_17837 = mem_17837.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18505_task;
-    
-    futhark_mc_copy_parloop_18505_task.name = "futhark_mc_copy_parloop_18505";
-    futhark_mc_copy_parloop_18505_task.fn = futhark_mc_copy_parloop_18505;
-    futhark_mc_copy_parloop_18505_task.args = &futhark_mc_copy_parloop_struct_18504_;
-    futhark_mc_copy_parloop_18505_task.iterations = iterations;
-    futhark_mc_copy_parloop_18505_task.info = info;
-    
-    struct mc_event *event_18507 = mc_event_new(ctx);
-    
-    if (event_18507 != NULL)
-        event_18507->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18505_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18505_task);
-    
-    if (futhark_mc_copy_parloop_18505_err != 0) {
-        err = futhark_mc_copy_parloop_18505_err;
-        goto cleanup;
-    }
-    if (event_18507 != NULL) {
-        event_18507->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18505_total", strdup("nothing further"), event_18507, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18508 != NULL) {
-        event_18508->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_18251_task_18503", strdup("nothing further"), event_18508, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18509 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17840;
-};
-struct futhark_mc_copy_parloop_struct_18511 {
-    struct futhark_context *ctx;
-    int64_t free_gtid_17557;
-    unsigned char *free_mem_17768;
-    unsigned char *free_mem_17840;
-};
-static int futhark_mc_copy_parloop_18512(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_copy_parloop_struct_18511 *futhark_mc_copy_parloop_struct_18511 = (struct futhark_mc_copy_parloop_struct_18511 *) args;
-    struct futhark_context *ctx = futhark_mc_copy_parloop_struct_18511->ctx;
-    struct mc_event *event_18513 = mc_event_new(ctx);
-    
-    if (event_18513 != NULL)
-        event_18513->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_copy_parloop_struct_18511->free_gtid_17557;
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_copy_parloop_struct_18511->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_copy_parloop_struct_18511->free_mem_17840, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    
-    {
-        int64_t start_18253;
-        int64_t end_18254;
-        
-        start_18253 = start;
-        end_18254 = end;
-        
-        int64_t n_18255 = end_18254 - start_18253;
-        
-        for (int64_t copy_i_18256 = start_18253; copy_i_18256 < start_18253 + n_18255; copy_i_18256++) {
-            int64_t slice_18258 = (int64_t) 256;
-            int64_t i_18257 = copy_i_18256;
-            int64_t remnant_18259 = copy_i_18256 - i_18257;
-            int64_t tmp_18260 = ((int64_t *) mem_17768.mem)[gtid_17557 * (int64_t) 256 + i_18257];
-            
-            ((int64_t *) mem_17840.mem)[gtid_17557 * (int64_t) 256 + i_18257] = tmp_18260;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18513 != NULL) {
-        event_18513->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18512", strdup("nothing further"), event_18513, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_copy_18261_task_18510(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18509 *futhark_mc_task_18509 = (struct futhark_mc_task_18509 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18509->ctx;
-    struct mc_event *event_18515 = mc_event_new(ctx);
-    
-    if (event_18515 != NULL)
-        event_18515->bef = get_wall_time();
-    
-    int64_t gtid_17557 = futhark_mc_task_18509->free_gtid_17557;
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_task_18509->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_task_18509->free_mem_17840, .size =0, .references =NULL};
-    struct futhark_mc_copy_parloop_struct_18511 futhark_mc_copy_parloop_struct_18511_;
-    
-    futhark_mc_copy_parloop_struct_18511_.ctx = ctx;
-    futhark_mc_copy_parloop_struct_18511_.free_gtid_17557 = gtid_17557;
-    futhark_mc_copy_parloop_struct_18511_.free_mem_17768 = mem_17768.mem;
-    futhark_mc_copy_parloop_struct_18511_.free_mem_17840 = mem_17840.mem;
-    
-    struct scheduler_parloop futhark_mc_copy_parloop_18512_task;
-    
-    futhark_mc_copy_parloop_18512_task.name = "futhark_mc_copy_parloop_18512";
-    futhark_mc_copy_parloop_18512_task.fn = futhark_mc_copy_parloop_18512;
-    futhark_mc_copy_parloop_18512_task.args = &futhark_mc_copy_parloop_struct_18511_;
-    futhark_mc_copy_parloop_18512_task.iterations = iterations;
-    futhark_mc_copy_parloop_18512_task.info = info;
-    
-    struct mc_event *event_18514 = mc_event_new(ctx);
-    
-    if (event_18514 != NULL)
-        event_18514->bef = get_wall_time();
-    
-    int futhark_mc_copy_parloop_18512_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_copy_parloop_18512_task);
-    
-    if (futhark_mc_copy_parloop_18512_err != 0) {
-        err = futhark_mc_copy_parloop_18512_err;
-        goto cleanup;
-    }
-    if (event_18514 != NULL) {
-        event_18514->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_parloop_18512_total", strdup("nothing further"), event_18514, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18515 != NULL) {
-        event_18515->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_copy_18261_task_18510", strdup("nothing further"), event_18515, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-static int futhark_mc_segmap_parloop_18466(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18465 *futhark_mc_segmap_parloop_struct_18465 = (struct futhark_mc_segmap_parloop_struct_18465 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18465->ctx;
-    struct mc_event *event_18516 = mc_event_new(ctx);
-    
-    if (event_18516 != NULL)
-        event_18516->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_segmap_parloop_struct_18465->free_n_blocks_16808;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_segmap_parloop_struct_18465->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_segmap_parloop_struct_18465->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_segmap_parloop_struct_18465->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_segmap_parloop_struct_18465->free_cond_f_res_16868;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17837, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17840, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17843, .size =0, .references =NULL};
-    struct memblock mem_17846 = {.desc ="mem_17846", .mem =futhark_mc_segmap_parloop_struct_18465->free_mem_17846, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t mem_17769_cached_sizze_18467 = 0;
-    unsigned char *mem_17769 = NULL;
-    int64_t mem_17770_cached_sizze_18468 = 0;
-    unsigned char *mem_17770 = NULL;
-    int64_t mem_17771_cached_sizze_18469 = 0;
-    unsigned char *mem_17771 = NULL;
-    int64_t mem_17772_cached_sizze_18470 = 0;
-    unsigned char *mem_17772 = NULL;
-    int64_t mem_17773_cached_sizze_18471 = 0;
-    unsigned char *mem_17773 = NULL;
-    int64_t mem_17774_cached_sizze_18472 = 0;
-    unsigned char *mem_17774 = NULL;
-    int64_t flat_tid_17556;
-    
-    flat_tid_17556 = subtask_id;
-    {
-        int64_t start_18178;
-        int64_t end_18179;
-        
-        start_18178 = start;
-        end_18179 = end;
-        
-        int64_t n_18180 = end_18179 - start_18178;
-        
-        if (mem_17769_cached_sizze_18467 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17769, &mem_17769_cached_sizze_18467, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17770_cached_sizze_18468 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17770, &mem_17770_cached_sizze_18468, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17771_cached_sizze_18469 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17771, &mem_17771_cached_sizze_18469, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17772_cached_sizze_18470 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17772, &mem_17772_cached_sizze_18470, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17773_cached_sizze_18471 < (int64_t) 512) {
-            err = lexical_realloc(ctx, &mem_17773, &mem_17773_cached_sizze_18471, (int64_t) 512);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        if (mem_17774_cached_sizze_18472 < (int64_t) 8) {
-            err = lexical_realloc(ctx, &mem_17774, &mem_17774_cached_sizze_18472, (int64_t) 8);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        for (int64_t SegMap_i_18181 = start_18178; SegMap_i_18181 < start_18178 + n_18180; SegMap_i_18181++) {
-            int64_t slice_18182 = n_blocks_16808;
-            int64_t gtid_17557 = SegMap_i_18181;
-            int64_t remnant_18183 = SegMap_i_18181 - gtid_17557;
-            int64_t binop_x_17682 = (int64_t) 256 * gtid_17557;
-            int64_t flat_tid_18123 = (int64_t) 0;
-            struct futhark_mc_task_18473 futhark_mc_task_18473_;
-            
-            futhark_mc_task_18473_.ctx = ctx;
-            futhark_mc_task_18473_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-            futhark_mc_task_18473_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-            futhark_mc_task_18473_.free_cond_f_res_16867 = cond_f_res_16867;
-            futhark_mc_task_18473_.free_cond_f_res_16868 = cond_f_res_16868;
-            futhark_mc_task_18473_.free_binop_x_17682 = binop_x_17682;
-            futhark_mc_task_18473_.free_mem_17737 = mem_17737.mem;
-            futhark_mc_task_18473_.free_mem_17769 = mem_17769;
-            futhark_mc_task_18473_.free_mem_17770 = mem_17770;
-            futhark_mc_task_18473_.free_mem_17771 = mem_17771;
-            futhark_mc_task_18473_.free_mem_17772 = mem_17772;
-            futhark_mc_task_18473_.free_mem_17773 = mem_17773;
-            
-            struct scheduler_segop futhark_mc_task_18473_task;
-            
-            futhark_mc_task_18473_task.args = &futhark_mc_task_18473_;
-            futhark_mc_task_18473_task.top_level_fn = futhark_mc_segscan_task_18474;
-            futhark_mc_task_18473_task.name = "futhark_mc_segscan_task_18474";
-            futhark_mc_task_18473_task.iterations = (int64_t) 256;
-            futhark_mc_task_18473_task.task_time = &ctx->program->futhark_mc_segscan_task_18474_total_time;
-            futhark_mc_task_18473_task.task_iter = &ctx->program->futhark_mc_segscan_task_18474_total_iter;
-            futhark_mc_task_18473_task.sched = STATIC;
-            futhark_mc_task_18473_task.nested_fn = NULL;
-            
-            int futhark_mc_segscan_task_18474_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18473_task);
-            
-            if (futhark_mc_segscan_task_18474_err != 0) {
-                err = futhark_mc_segscan_task_18474_err;
-                goto cleanup;
-            }
-            
-            int16_t last_res_17606 = ((int16_t *) mem_17769)[(int64_t) 255];
-            int16_t last_res_17607 = ((int16_t *) mem_17770)[(int64_t) 255];
-            int16_t last_res_17608 = ((int16_t *) mem_17771)[(int64_t) 255];
-            int16_t last_res_17609 = ((int16_t *) mem_17772)[(int64_t) 255];
-            int64_t flat_tid_18163 = (int64_t) 0;
-            struct futhark_mc_task_18488 futhark_mc_task_18488_;
-            
-            futhark_mc_task_18488_.ctx = ctx;
-            futhark_mc_task_18488_.free_gtid_17557 = gtid_17557;
-            futhark_mc_task_18488_.free_last_res_17606 = last_res_17606;
-            futhark_mc_task_18488_.free_last_res_17607 = last_res_17607;
-            futhark_mc_task_18488_.free_last_res_17608 = last_res_17608;
-            futhark_mc_task_18488_.free_binop_x_17682 = binop_x_17682;
-            futhark_mc_task_18488_.free_mem_17737 = mem_17737.mem;
-            futhark_mc_task_18488_.free_mem_17739 = mem_17739.mem;
-            futhark_mc_task_18488_.free_mem_17765 = mem_17765.mem;
-            futhark_mc_task_18488_.free_mem_17768 = mem_17768.mem;
-            futhark_mc_task_18488_.free_mem_17769 = mem_17769;
-            futhark_mc_task_18488_.free_mem_17770 = mem_17770;
-            futhark_mc_task_18488_.free_mem_17771 = mem_17771;
-            futhark_mc_task_18488_.free_mem_17772 = mem_17772;
-            futhark_mc_task_18488_.free_mem_17773 = mem_17773;
-            
-            struct scheduler_segop futhark_mc_task_18488_task;
-            
-            futhark_mc_task_18488_task.args = &futhark_mc_task_18488_;
-            futhark_mc_task_18488_task.top_level_fn = futhark_mc_segmap_task_18489;
-            futhark_mc_task_18488_task.name = "futhark_mc_segmap_task_18489";
-            futhark_mc_task_18488_task.iterations = (int64_t) 256;
-            futhark_mc_task_18488_task.task_time = &ctx->program->futhark_mc_segmap_task_18489_total_time;
-            futhark_mc_task_18488_task.task_iter = &ctx->program->futhark_mc_segmap_task_18489_total_iter;
-            futhark_mc_task_18488_task.sched = STATIC;
-            futhark_mc_task_18488_task.nested_fn = NULL;
-            
-            int futhark_mc_segmap_task_18489_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18488_task);
-            
-            if (futhark_mc_segmap_task_18489_err != 0) {
-                err = futhark_mc_segmap_task_18489_err;
-                goto cleanup;
-            }
-            ((int16_t *) mem_17774)[(int64_t) 0] = last_res_17606;
-            ((int16_t *) mem_17774)[(int64_t) 1] = last_res_17607;
-            ((int16_t *) mem_17774)[(int64_t) 2] = last_res_17608;
-            ((int16_t *) mem_17774)[(int64_t) 3] = last_res_17609;
-            
-            int64_t flat_tid_18174 = (int64_t) 0;
-            struct futhark_mc_task_18495 futhark_mc_task_18495_;
-            
-            futhark_mc_task_18495_.ctx = ctx;
-            futhark_mc_task_18495_.free_gtid_17557 = gtid_17557;
-            futhark_mc_task_18495_.free_mem_17774 = mem_17774;
-            futhark_mc_task_18495_.free_mem_17843 = mem_17843.mem;
-            
-            struct scheduler_segop futhark_mc_task_18495_task;
-            
-            futhark_mc_task_18495_task.args = &futhark_mc_task_18495_;
-            futhark_mc_task_18495_task.top_level_fn = futhark_mc_segmap_task_18496;
-            futhark_mc_task_18495_task.name = "futhark_mc_segmap_task_18496";
-            futhark_mc_task_18495_task.iterations = (int64_t) 4;
-            futhark_mc_task_18495_task.task_time = &ctx->program->futhark_mc_segmap_task_18496_total_time;
-            futhark_mc_task_18495_task.task_iter = &ctx->program->futhark_mc_segmap_task_18496_total_iter;
-            futhark_mc_task_18495_task.sched = STATIC;
-            futhark_mc_task_18495_task.nested_fn = NULL;
-            
-            int futhark_mc_segmap_task_18496_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18495_task);
-            
-            if (futhark_mc_segmap_task_18496_err != 0) {
-                err = futhark_mc_segmap_task_18496_err;
-                goto cleanup;
-            }
-            
-            int16_t tmp_17628 = add16(last_res_17606, last_res_17607);
-            int16_t tmp_17629 = add16(last_res_17608, tmp_17628);
-            
-            ((int16_t *) mem_17846.mem)[gtid_17557 * (int64_t) 4] = (int16_t) 0;
-            ((int16_t *) mem_17846.mem)[gtid_17557 * (int64_t) 4 + (int64_t) 1] = last_res_17606;
-            ((int16_t *) mem_17846.mem)[gtid_17557 * (int64_t) 4 + (int64_t) 2] = tmp_17628;
-            ((int16_t *) mem_17846.mem)[gtid_17557 * (int64_t) 4 + (int64_t) 3] = tmp_17629;
-            
-            int64_t iterations_18252 = (int64_t) 256;
-            struct futhark_mc_task_18502 futhark_mc_task_18502_;
-            
-            futhark_mc_task_18502_.ctx = ctx;
-            futhark_mc_task_18502_.free_gtid_17557 = gtid_17557;
-            futhark_mc_task_18502_.free_mem_17765 = mem_17765.mem;
-            futhark_mc_task_18502_.free_mem_17837 = mem_17837.mem;
-            
-            struct scheduler_segop futhark_mc_task_18502_task;
-            
-            futhark_mc_task_18502_task.args = &futhark_mc_task_18502_;
-            futhark_mc_task_18502_task.top_level_fn = futhark_mc_copy_18251_task_18503;
-            futhark_mc_task_18502_task.name = "futhark_mc_copy_18251_task_18503";
-            futhark_mc_task_18502_task.iterations = iterations_18252;
-            futhark_mc_task_18502_task.task_time = &ctx->program->futhark_mc_copy_18251_task_18503_total_time;
-            futhark_mc_task_18502_task.task_iter = &ctx->program->futhark_mc_copy_18251_task_18503_total_iter;
-            futhark_mc_task_18502_task.sched = STATIC;
-            futhark_mc_task_18502_task.nested_fn = NULL;
-            
-            int futhark_mc_copy_18251_task_18503_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18502_task);
-            
-            if (futhark_mc_copy_18251_task_18503_err != 0) {
-                err = futhark_mc_copy_18251_task_18503_err;
-                goto cleanup;
-            }
-            
-            int64_t iterations_18262 = (int64_t) 256;
-            struct futhark_mc_task_18509 futhark_mc_task_18509_;
-            
-            futhark_mc_task_18509_.ctx = ctx;
-            futhark_mc_task_18509_.free_gtid_17557 = gtid_17557;
-            futhark_mc_task_18509_.free_mem_17768 = mem_17768.mem;
-            futhark_mc_task_18509_.free_mem_17840 = mem_17840.mem;
-            
-            struct scheduler_segop futhark_mc_task_18509_task;
-            
-            futhark_mc_task_18509_task.args = &futhark_mc_task_18509_;
-            futhark_mc_task_18509_task.top_level_fn = futhark_mc_copy_18261_task_18510;
-            futhark_mc_task_18509_task.name = "futhark_mc_copy_18261_task_18510";
-            futhark_mc_task_18509_task.iterations = iterations_18262;
-            futhark_mc_task_18509_task.task_time = &ctx->program->futhark_mc_copy_18261_task_18510_total_time;
-            futhark_mc_task_18509_task.task_iter = &ctx->program->futhark_mc_copy_18261_task_18510_total_iter;
-            futhark_mc_task_18509_task.sched = STATIC;
-            futhark_mc_task_18509_task.nested_fn = NULL;
-            
-            int futhark_mc_copy_18261_task_18510_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18509_task);
-            
-            if (futhark_mc_copy_18261_task_18510_err != 0) {
-                err = futhark_mc_copy_18261_task_18510_err;
-                goto cleanup;
-            }
-        }
-    }
-    
-  cleanup:
-    {
-        free(mem_17769);
-        free(mem_17770);
-        free(mem_17771);
-        free(mem_17772);
-        free(mem_17773);
-        free(mem_17774);
-    }
-    if (event_18516 != NULL) {
-        event_18516->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18466", strdup("nothing further"), event_18516, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_nested_task_18464(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18450 *futhark_mc_task_18450 = (struct futhark_mc_task_18450 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18450->ctx;
-    struct mc_event *event_18518 = mc_event_new(ctx);
-    
-    if (event_18518 != NULL)
-        event_18518->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_task_18450->free_n_blocks_16808;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_task_18450->free_blocked_radix_sort_step_arg1_16861;
-    int32_t get_bit_arg0_16866 = futhark_mc_task_18450->free_get_bit_arg0_16866;
-    bool cond_f_res_16867 = futhark_mc_task_18450->free_cond_f_res_16867;
-    bool cond_f_res_16868 = futhark_mc_task_18450->free_cond_f_res_16868;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18450->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18450->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17765 = {.desc ="mem_17765", .mem =futhark_mc_task_18450->free_mem_17765, .size =0, .references =NULL};
-    struct memblock mem_17768 = {.desc ="mem_17768", .mem =futhark_mc_task_18450->free_mem_17768, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_task_18450->free_mem_17837, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_task_18450->free_mem_17840, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_task_18450->free_mem_17843, .size =0, .references =NULL};
-    struct memblock mem_17846 = {.desc ="mem_17846", .mem =futhark_mc_task_18450->free_mem_17846, .size =0, .references =NULL};
-    int32_t nsubtasks_18122;
-    
-    nsubtasks_18122 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18465 futhark_mc_segmap_parloop_struct_18465_;
-    
-    futhark_mc_segmap_parloop_struct_18465_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18465_.free_n_blocks_16808 = n_blocks_16808;
-    futhark_mc_segmap_parloop_struct_18465_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-    futhark_mc_segmap_parloop_struct_18465_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-    futhark_mc_segmap_parloop_struct_18465_.free_cond_f_res_16867 = cond_f_res_16867;
-    futhark_mc_segmap_parloop_struct_18465_.free_cond_f_res_16868 = cond_f_res_16868;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17765 = mem_17765.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17768 = mem_17768.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17837 = mem_17837.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17840 = mem_17840.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17843 = mem_17843.mem;
-    futhark_mc_segmap_parloop_struct_18465_.free_mem_17846 = mem_17846.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18466_task;
-    
-    futhark_mc_segmap_parloop_18466_task.name = "futhark_mc_segmap_parloop_18466";
-    futhark_mc_segmap_parloop_18466_task.fn = futhark_mc_segmap_parloop_18466;
-    futhark_mc_segmap_parloop_18466_task.args = &futhark_mc_segmap_parloop_struct_18465_;
-    futhark_mc_segmap_parloop_18466_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18466_task.info = info;
-    
-    struct mc_event *event_18517 = mc_event_new(ctx);
-    
-    if (event_18517 != NULL)
-        event_18517->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18466_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18466_task);
-    
-    if (futhark_mc_segmap_parloop_18466_err != 0) {
-        err = futhark_mc_segmap_parloop_18466_err;
-        goto cleanup;
-    }
-    if (event_18517 != NULL) {
-        event_18517->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18466_total", strdup("nothing further"), event_18517, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18518 != NULL) {
-        event_18518->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_nested_task_18464", strdup("nothing further"), event_18518, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18519 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int64_t free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    int64_t free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    unsigned char *free_mem_17761;
-    unsigned char *free_mem_17843;
-    unsigned char *free_mem_17848;
-};
-struct futhark_mc_scan_stage_1_parloop_struct_18522 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int64_t free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    unsigned char *free_mem_17761;
-    unsigned char *free_mem_17843;
-    unsigned char *free_mem_17848;
-};
-static int futhark_mc_scan_stage_1_parloop_18523(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_scan_stage_1_parloop_struct_18522 *futhark_mc_scan_stage_1_parloop_struct_18522 = (struct futhark_mc_scan_stage_1_parloop_struct_18522 *) args;
-    struct futhark_context *ctx = futhark_mc_scan_stage_1_parloop_struct_18522->ctx;
-    struct mc_event *event_18524 = mc_event_new(ctx);
-    
-    if (event_18524 != NULL)
-        event_18524->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_scan_stage_1_parloop_struct_18522->free_n_blocks_16808;
-    int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = futhark_mc_scan_stage_1_parloop_struct_18522->free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    struct memblock mem_17761 = {.desc ="mem_17761", .mem =futhark_mc_scan_stage_1_parloop_struct_18522->free_mem_17761, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_scan_stage_1_parloop_struct_18522->free_mem_17843, .size =0, .references =NULL};
-    struct memblock mem_17848 = {.desc ="mem_17848", .mem =futhark_mc_scan_stage_1_parloop_struct_18522->free_mem_17848, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17631;
-    
-    flat_tid_17631 = subtask_id;
-    
-    int64_t eta_p_17045;
-    int64_t eta_p_17046;
-    
-    eta_p_17045 = (int64_t) 0;
-    {
-        int64_t start_18264;
-        int64_t end_18265;
-        
-        start_18264 = start;
-        end_18265 = end;
-        
-        int64_t n_18266 = end_18265 - start_18264;
-        
-        for (int64_t SegScan_i_18267 = start_18264; SegScan_i_18267 < start_18264 + n_18266; SegScan_i_18267++) {
-            int64_t gtid_17632 = SegScan_i_18267;
-            int64_t new_index_17655 = squot64(gtid_17632, dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818);
-            int64_t binop_y_17657 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 * new_index_17655;
-            int64_t new_index_17658 = gtid_17632 - binop_y_17657;
-            bool index_concat_cmp_17660 = sle64(n_blocks_16808, new_index_17658);
-            int64_t index_concat_branch_17664;
-            
-            if (index_concat_cmp_17660) {
-                int64_t index_concat_17662 = ((int64_t *) mem_17761.mem)[new_index_17655];
-                
-                index_concat_branch_17664 = index_concat_17662;
-            } else {
-                int64_t index_concat_17663 = ((int64_t *) mem_17843.mem)[new_index_17658 * (int64_t) 4 + new_index_17655];
-                
-                index_concat_branch_17664 = index_concat_17663;
-            }
-            // write mapped values results to memory
-            { }
-            // Apply scan op
-            {
-                int64_t uni_i_18268 = 0;
-                
-                {
-                    // Read accumulator
-                    {
-                        eta_p_17045 = eta_p_17045;
-                    }
-                    // Read next values
-                    {
-                        eta_p_17046 = index_concat_branch_17664;
-                    }
-                    // Scan op body
-                    {
-                        int64_t defunc_0_op_res_17047 = add64(eta_p_17045, eta_p_17046);
-                        
-                        ((int64_t *) mem_17848.mem)[gtid_17632] = defunc_0_op_res_17047;
-                        eta_p_17045 = defunc_0_op_res_17047;
-                    }
-                }
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18524 != NULL) {
-        event_18524->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_1_parloop_18523", strdup("nothing further"), event_18524, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-struct futhark_mc_scan_stage_3_parloop_struct_18526 {
-    struct futhark_context *ctx;
-    unsigned char *free_mem_17848;
-    unsigned char *free_scan_stage_2_carry_mem_18274;
-};
-static int futhark_mc_scan_stage_3_parloop_18527(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_scan_stage_3_parloop_struct_18526 *futhark_mc_scan_stage_3_parloop_struct_18526 = (struct futhark_mc_scan_stage_3_parloop_struct_18526 *) args;
-    struct futhark_context *ctx = futhark_mc_scan_stage_3_parloop_struct_18526->ctx;
-    struct mc_event *event_18528 = mc_event_new(ctx);
-    
-    if (event_18528 != NULL)
-        event_18528->bef = get_wall_time();
-    
-    struct memblock mem_17848 = {.desc ="mem_17848", .mem =futhark_mc_scan_stage_3_parloop_struct_18526->free_mem_17848, .size =0, .references =NULL};
-    struct memblock scan_stage_2_carry_mem_18274 = {.desc ="scan_stage_2_carry_mem_18274", .mem =futhark_mc_scan_stage_3_parloop_struct_18526->free_scan_stage_2_carry_mem_18274, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17631;
-    
-    flat_tid_17631 = subtask_id;
-    {
-        int64_t eta_p_18277;
-        int64_t eta_p_18278;
-        
-        // load carry-in
-        {
-            eta_p_18277 = ((int64_t *) scan_stage_2_carry_mem_18274.mem)[flat_tid_17631];
-        }
-        
-        int64_t start_18280;
-        int64_t end_18281;
-        
-        start_18280 = start;
-        end_18281 = end;
-        
-        int64_t n_18282 = end_18281 - start_18280;
-        
-        for (int64_t SegScan_i_18283 = start_18280; SegScan_i_18283 < start_18280 + n_18282; SegScan_i_18283++) {
-            int64_t gtid_17632 = SegScan_i_18283;
-            
-            // load partial result
-            {
-                eta_p_18278 = ((int64_t *) mem_17848.mem)[gtid_17632];
-            }
-            // combine carry with partial result
-            {
-                int64_t defunc_0_op_res_18279 = add64(eta_p_18277, eta_p_18278);
-                
-                ((int64_t *) mem_17848.mem)[gtid_17632] = defunc_0_op_res_18279;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18528 != NULL) {
-        event_18528->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_3_parloop_18527", strdup("nothing further"), event_18528, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segscan_task_18520(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18519 *futhark_mc_task_18519 = (struct futhark_mc_task_18519 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18519->ctx;
-    struct mc_event *event_18530 = mc_event_new(ctx);
-    
-    if (event_18530 != NULL)
-        event_18530->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_task_18519->free_n_blocks_16808;
-    int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = futhark_mc_task_18519->free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    int64_t dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = futhark_mc_task_18519->free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    struct memblock mem_17761 = {.desc ="mem_17761", .mem =futhark_mc_task_18519->free_mem_17761, .size =0, .references =NULL};
-    struct memblock mem_17843 = {.desc ="mem_17843", .mem =futhark_mc_task_18519->free_mem_17843, .size =0, .references =NULL};
-    struct memblock mem_17848 = {.desc ="mem_17848", .mem =futhark_mc_task_18519->free_mem_17848, .size =0, .references =NULL};
-    int64_t scan_stage_2_carry_mem_18274_cached_sizze_18521 = 0;
-    unsigned char *scan_stage_2_carry_mem_18274 = NULL;
-    int32_t nsubtasks_18263;
-    
-    nsubtasks_18263 = info.nsubtasks;
-    if (ctx->debugging)
-        fprintf(ctx->log, "%s\n", "nonsegmented segScan");
-    if (ctx->debugging)
-        fprintf(ctx->log, "%s\n", "Scan stage 1");
-    
-    struct futhark_mc_scan_stage_1_parloop_struct_18522 futhark_mc_scan_stage_1_parloop_struct_18522_;
-    
-    futhark_mc_scan_stage_1_parloop_struct_18522_.ctx = ctx;
-    futhark_mc_scan_stage_1_parloop_struct_18522_.free_n_blocks_16808 = n_blocks_16808;
-    futhark_mc_scan_stage_1_parloop_struct_18522_.free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    futhark_mc_scan_stage_1_parloop_struct_18522_.free_mem_17761 = mem_17761.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18522_.free_mem_17843 = mem_17843.mem;
-    futhark_mc_scan_stage_1_parloop_struct_18522_.free_mem_17848 = mem_17848.mem;
-    
-    struct scheduler_parloop futhark_mc_scan_stage_1_parloop_18523_task;
-    
-    futhark_mc_scan_stage_1_parloop_18523_task.name = "futhark_mc_scan_stage_1_parloop_18523";
-    futhark_mc_scan_stage_1_parloop_18523_task.fn = futhark_mc_scan_stage_1_parloop_18523;
-    futhark_mc_scan_stage_1_parloop_18523_task.args = &futhark_mc_scan_stage_1_parloop_struct_18522_;
-    futhark_mc_scan_stage_1_parloop_18523_task.iterations = iterations;
-    futhark_mc_scan_stage_1_parloop_18523_task.info = info;
-    
-    struct mc_event *event_18525 = mc_event_new(ctx);
-    
-    if (event_18525 != NULL)
-        event_18525->bef = get_wall_time();
-    
-    int futhark_mc_scan_stage_1_parloop_18523_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_scan_stage_1_parloop_18523_task);
-    
-    if (futhark_mc_scan_stage_1_parloop_18523_err != 0) {
-        err = futhark_mc_scan_stage_1_parloop_18523_err;
-        goto cleanup;
-    }
-    if (event_18525 != NULL) {
-        event_18525->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_scan_stage_1_parloop_18523_total", strdup("nothing further"), event_18525, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (slt32(1, nsubtasks_18263)) {
-        if (ctx->debugging)
-            fprintf(ctx->log, "%s\n", "Scan stage 2");
-        
-        int64_t eta_p_18269;
-        int64_t eta_p_18270;
-        int64_t offset_18272 = (int64_t) 0;
-        int64_t offset_index_18273 = (int64_t) 0;
-        
-        if (scan_stage_2_carry_mem_18274_cached_sizze_18521 < (int64_t) 8 * nsubtasks_18263) {
-            err = lexical_realloc(ctx, &scan_stage_2_carry_mem_18274, &scan_stage_2_carry_mem_18274_cached_sizze_18521, (int64_t) 8 * nsubtasks_18263);
-            if (err != FUTHARK_SUCCESS)
-                goto cleanup;
-        }
-        // carry-in for first chunk is neutral
-        {
-            ((int64_t *) scan_stage_2_carry_mem_18274)[(int64_t) 0] = (int64_t) 0;
-        }
-        // scan carries
-        {
-            for (int64_t i_18276 = 0; i_18276 < sext_i32_i64(nsubtasks_18263) - (int64_t) 1; i_18276++) {
-                offset_18272 = squot64(dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819, sext_i32_i64(nsubtasks_18263));
-                if (slt64(i_18276, srem64(dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819, sext_i32_i64(nsubtasks_18263)))) {
-                    offset_18272 += (int64_t) 1;
-                }
-                offset_index_18273 += offset_18272;
-                
-                int64_t gtid_17632 = offset_index_18273;
-                
-                // Read carry
-                {
-                    eta_p_18269 = ((int64_t *) scan_stage_2_carry_mem_18274)[i_18276];
-                }
-                // Read next values
-                {
-                    eta_p_18270 = ((int64_t *) mem_17848.mem)[offset_index_18273 - (int64_t) 1];
-                }
-                
-                int64_t defunc_0_op_res_18271 = add64(eta_p_18269, eta_p_18270);
-                
-                ((int64_t *) scan_stage_2_carry_mem_18274)[i_18276 + (int64_t) 1] = defunc_0_op_res_18271;
-            }
-        }
-        if (ctx->debugging)
-            fprintf(ctx->log, "%s\n", "Scan stage 3");
-        
-        struct futhark_mc_scan_stage_3_parloop_struct_18526 futhark_mc_scan_stage_3_parloop_struct_18526_;
-        
-        futhark_mc_scan_stage_3_parloop_struct_18526_.ctx = ctx;
-        futhark_mc_scan_stage_3_parloop_struct_18526_.free_mem_17848 = mem_17848.mem;
-        futhark_mc_scan_stage_3_parloop_struct_18526_.free_scan_stage_2_carry_mem_18274 = scan_stage_2_carry_mem_18274;
-        
-        struct scheduler_parloop futhark_mc_scan_stage_3_parloop_18527_task;
-        
-        futhark_mc_scan_stage_3_parloop_18527_task.name = "futhark_mc_scan_stage_3_parloop_18527";
-        futhark_mc_scan_stage_3_parloop_18527_task.fn = futhark_mc_scan_stage_3_parloop_18527;
-        futhark_mc_scan_stage_3_parloop_18527_task.args = &futhark_mc_scan_stage_3_parloop_struct_18526_;
-        futhark_mc_scan_stage_3_parloop_18527_task.iterations = iterations;
-        futhark_mc_scan_stage_3_parloop_18527_task.info = info;
-        
-        struct mc_event *event_18529 = mc_event_new(ctx);
-        
-        if (event_18529 != NULL)
-            event_18529->bef = get_wall_time();
-        
-        int futhark_mc_scan_stage_3_parloop_18527_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_scan_stage_3_parloop_18527_task);
-        
-        if (futhark_mc_scan_stage_3_parloop_18527_err != 0) {
-            err = futhark_mc_scan_stage_3_parloop_18527_err;
-            goto cleanup;
-        }
-        if (event_18529 != NULL) {
-            event_18529->aft = get_wall_time();
-            lock_lock(&ctx->event_list_lock);
-            add_event(ctx, "futhark_mc_scan_stage_3_parloop_18527_total", strdup("nothing further"), event_18529, (event_report_fn) mc_event_report);
-            lock_unlock(&ctx->event_list_lock);
-        }
-    }
-    
-  cleanup:
-    {
-        free(scan_stage_2_carry_mem_18274);
-    }
-    if (event_18530 != NULL) {
-        event_18530->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segscan_task_18520", strdup("nothing further"), event_18530, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18531 {
-    struct futhark_context *ctx;
-    int64_t free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    unsigned char *free_mem_17848;
-    unsigned char *free_mem_17850;
-};
-struct futhark_mc_segmap_parloop_struct_18533 {
-    struct futhark_context *ctx;
-    int64_t free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    unsigned char *free_mem_17848;
-    unsigned char *free_mem_17850;
-};
-static int futhark_mc_segmap_parloop_18534(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18533 *futhark_mc_segmap_parloop_struct_18533 = (struct futhark_mc_segmap_parloop_struct_18533 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18533->ctx;
-    struct mc_event *event_18535 = mc_event_new(ctx);
-    
-    if (event_18535 != NULL)
-        event_18535->bef = get_wall_time();
-    
-    int64_t dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = futhark_mc_segmap_parloop_struct_18533->free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    struct memblock mem_17848 = {.desc ="mem_17848", .mem =futhark_mc_segmap_parloop_struct_18533->free_mem_17848, .size =0, .references =NULL};
-    struct memblock mem_17850 = {.desc ="mem_17850", .mem =futhark_mc_segmap_parloop_struct_18533->free_mem_17850, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17633;
-    
-    flat_tid_17633 = subtask_id;
-    {
-        int64_t start_18285;
-        int64_t end_18286;
-        
-        start_18285 = start;
-        end_18286 = end;
-        
-        int64_t n_18287 = end_18286 - start_18285;
-        
-        for (int64_t SegMap_i_18288 = start_18285; SegMap_i_18288 < start_18285 + n_18287; SegMap_i_18288++) {
-            int64_t slice_18289 = dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-            int64_t gtid_17634 = SegMap_i_18288;
-            int64_t remnant_18290 = SegMap_i_18288 - gtid_17634;
-            int64_t zv_lhs_17050 = add64((int64_t) -1, gtid_17634);
-            int64_t tmp_17051 = smod64(zv_lhs_17050, dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819);
-            int64_t lifted_lambda_res_17052 = ((int64_t *) mem_17848.mem)[tmp_17051];
-            
-            ((int64_t *) mem_17850.mem)[gtid_17634] = lifted_lambda_res_17052;
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18535 != NULL) {
-        event_18535->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18534", strdup("nothing further"), event_18535, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18532(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18531 *futhark_mc_task_18531 = (struct futhark_mc_task_18531 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18531->ctx;
-    struct mc_event *event_18537 = mc_event_new(ctx);
-    
-    if (event_18537 != NULL)
-        event_18537->bef = get_wall_time();
-    
-    int64_t dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = futhark_mc_task_18531->free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    struct memblock mem_17848 = {.desc ="mem_17848", .mem =futhark_mc_task_18531->free_mem_17848, .size =0, .references =NULL};
-    struct memblock mem_17850 = {.desc ="mem_17850", .mem =futhark_mc_task_18531->free_mem_17850, .size =0, .references =NULL};
-    int32_t nsubtasks_18284;
-    
-    nsubtasks_18284 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18533 futhark_mc_segmap_parloop_struct_18533_;
-    
-    futhark_mc_segmap_parloop_struct_18533_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18533_.free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-    futhark_mc_segmap_parloop_struct_18533_.free_mem_17848 = mem_17848.mem;
-    futhark_mc_segmap_parloop_struct_18533_.free_mem_17850 = mem_17850.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18534_task;
-    
-    futhark_mc_segmap_parloop_18534_task.name = "futhark_mc_segmap_parloop_18534";
-    futhark_mc_segmap_parloop_18534_task.fn = futhark_mc_segmap_parloop_18534;
-    futhark_mc_segmap_parloop_18534_task.args = &futhark_mc_segmap_parloop_struct_18533_;
-    futhark_mc_segmap_parloop_18534_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18534_task.info = info;
-    
-    struct mc_event *event_18536 = mc_event_new(ctx);
-    
-    if (event_18536 != NULL)
-        event_18536->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18534_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18534_task);
-    
-    if (futhark_mc_segmap_parloop_18534_err != 0) {
-        err = futhark_mc_segmap_parloop_18534_err;
-        goto cleanup;
-    }
-    if (event_18536 != NULL) {
-        event_18536->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18534_total", strdup("nothing further"), event_18536, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18537 != NULL) {
-        event_18537->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18532", strdup("nothing further"), event_18537, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18538 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int64_t free_arg_16810;
-    int64_t free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    int64_t free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17757;
-    unsigned char *free_mem_17759;
-    unsigned char *free_mem_17762;
-    unsigned char *free_mem_17837;
-    unsigned char *free_mem_17840;
-    unsigned char *free_mem_17846;
-    unsigned char *free_mem_17850;
-};
-struct futhark_mc_segmap_parloop_struct_18540 {
-    struct futhark_context *ctx;
-    int64_t free_n_blocks_16808;
-    int64_t free_arg_16810;
-    int64_t free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    int64_t free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    int32_t free_blocked_radix_sort_step_arg1_16861;
-    unsigned char *free_mem_17737;
-    unsigned char *free_mem_17739;
-    unsigned char *free_mem_17757;
-    unsigned char *free_mem_17759;
-    unsigned char *free_mem_17762;
-    unsigned char *free_mem_17837;
-    unsigned char *free_mem_17840;
-    unsigned char *free_mem_17846;
-    unsigned char *free_mem_17850;
-};
-static int futhark_mc_segmap_parloop_18541(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18540 *futhark_mc_segmap_parloop_struct_18540 = (struct futhark_mc_segmap_parloop_struct_18540 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18540->ctx;
-    struct mc_event *event_18542 = mc_event_new(ctx);
-    
-    if (event_18542 != NULL)
-        event_18542->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_segmap_parloop_struct_18540->free_n_blocks_16808;
-    int64_t arg_16810 = futhark_mc_segmap_parloop_struct_18540->free_arg_16810;
-    int64_t dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = futhark_mc_segmap_parloop_struct_18540->free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = futhark_mc_segmap_parloop_struct_18540->free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_segmap_parloop_struct_18540->free_blocked_radix_sort_step_arg1_16861;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17757 = {.desc ="mem_17757", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17757, .size =0, .references =NULL};
-    struct memblock mem_17759 = {.desc ="mem_17759", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17759, .size =0, .references =NULL};
-    struct memblock mem_17762 = {.desc ="mem_17762", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17762, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17837, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17840, .size =0, .references =NULL};
-    struct memblock mem_17846 = {.desc ="mem_17846", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17846, .size =0, .references =NULL};
-    struct memblock mem_17850 = {.desc ="mem_17850", .mem =futhark_mc_segmap_parloop_struct_18540->free_mem_17850, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17635;
-    
-    flat_tid_17635 = subtask_id;
-    {
-        int64_t start_18324;
-        int64_t end_18325;
-        
-        start_18324 = start;
-        end_18325 = end;
-        
-        int64_t n_18326 = end_18325 - start_18324;
-        
-        for (int64_t SegMap_i_18327 = start_18324; SegMap_i_18327 < start_18324 + n_18326; SegMap_i_18327++) {
-            int64_t slice_18328 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-            int64_t gtid_17636 = SegMap_i_18327;
-            int64_t remnant_18329 = SegMap_i_18327 - gtid_17636;
-            bool index_concat_cmp_17646 = sle64(arg_16810, gtid_17636);
-            float index_concat_branch_17253;
-            
-            if (index_concat_cmp_17646) {
-                int64_t index_concat_i_18292 = sub64(gtid_17636, arg_16810);
-                float index_concat_18293 = ((float *) mem_17759.mem)[index_concat_i_18292];
-                
-                index_concat_branch_17253 = index_concat_18293;
-            } else {
-                int64_t new_index_18294 = squot64(gtid_17636, (int64_t) 256);
-                int64_t binop_y_18295 = (int64_t) 256 * new_index_18294;
-                int64_t new_index_18296 = gtid_17636 - binop_y_18295;
-                float index_concat_18297 = ((float *) mem_17837.mem)[new_index_18294 * (int64_t) 256 + new_index_18296];
-                
-                index_concat_branch_17253 = index_concat_18297;
-            }
-            
-            int32_t i32_arg0_17260 = futrts_to_bits32(index_concat_branch_17253);
-            int32_t unsign_arg0_17261 = ashr32(i32_arg0_17260, 31);
-            int32_t unsign_arg0_17262 = 1 & unsign_arg0_17261;
-            bool cond_17263 = unsign_arg0_17262 == 1;
-            bool x_17264 = !cond_17263;
-            int32_t zlzb_rhs_17265;
-            int32_t acc_18299 = 0;
-            
-            for (int32_t i_18298 = 0; i_18298 < 2; i_18298++) {
-                int32_t get_bit_arg0_18300 = add32(blocked_radix_sort_step_arg1_16861, i_18298);
-                int32_t unsign_arg0_18301 = ashr32(i32_arg0_17260, get_bit_arg0_18300);
-                int32_t unsign_arg0_18302 = 1 & unsign_arg0_18301;
-                bool cond_f_res_18303 = get_bit_arg0_18300 == 31;
-                bool y_18304 = x_17264 && cond_f_res_18303;
-                bool cond_18305 = cond_17263 || y_18304;
-                int32_t defunc_0_get_bit_res_18306;
-                
-                if (cond_18305) {
-                    int32_t defunc_0_get_bit_res_t_res_18307 = 1 ^ unsign_arg0_18302;
-                    
-                    defunc_0_get_bit_res_18306 = defunc_0_get_bit_res_t_res_18307;
-                } else {
-                    defunc_0_get_bit_res_18306 = unsign_arg0_18302;
-                }
-                
-                int32_t zp_rhs_18308 = shl32(defunc_0_get_bit_res_18306, i_18298);
-                int32_t loopres_18309 = add32(acc_18299, zp_rhs_18308);
-                int32_t acc_tmp_18330 = loopres_18309;
-                
-                acc_18299 = acc_tmp_18330;
-            }
-            zlzb_rhs_17265 = acc_18299;
-            
-            int64_t i32_res_17278 = sext_i32_i64(zlzb_rhs_17265);
-            int64_t block_idx_17279 = sdiv64(gtid_17636, (int64_t) 256);
-            bool x_17280 = sle64((int64_t) 0, block_idx_17279);
-            bool y_17281 = slt64(block_idx_17279, dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818);
-            bool bounds_check_17282 = x_17280 && y_17281;
-            bool index_certs_17283;
-            
-            if (!bounds_check_17282) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) block_idx_17279, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48\n   #1  /prelude/soacs.fut:59:9-11\n   #2  /prelude/array.fut:241:11-17\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:227:48-50\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:270:49-51\n   #5  /prelude/functional.fut:9:44-45\n   #6  lib/github.com/diku-dk/sorts/radix_sort.fut:280:49-51\n   #7  /prelude/functional.fut:9:44-45\n   #8  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            bool x_17284 = sle64((int64_t) 0, i32_res_17278);
-            bool y_17285 = slt64(i32_res_17278, (int64_t) 4);
-            bool bounds_check_17286 = x_17284 && y_17285;
-            bool index_certs_17287;
-            
-            if (!bounds_check_17286) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i32_res_17278, "] out of bounds for array of shape [", (long long) (int64_t) 4, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53\n   #1  /prelude/soacs.fut:59:9-11\n   #2  /prelude/array.fut:241:11-17\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:227:48-50\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:270:49-51\n   #5  /prelude/functional.fut:9:44-45\n   #6  lib/github.com/diku-dk/sorts/radix_sort.fut:280:49-51\n   #7  /prelude/functional.fut:9:44-45\n   #8  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            float index_concat_branch_17650;
-            
-            if (index_concat_cmp_17646) {
-                int64_t index_concat_i_18310 = sub64(gtid_17636, arg_16810);
-                float index_concat_18311 = ((float *) mem_17759.mem)[index_concat_i_18310];
-                
-                index_concat_branch_17650 = index_concat_18311;
-            } else {
-                int64_t new_index_18312 = squot64(gtid_17636, (int64_t) 256);
-                int64_t binop_y_18313 = (int64_t) 256 * new_index_18312;
-                int64_t new_index_18314 = gtid_17636 - binop_y_18313;
-                float index_concat_18315 = ((float *) mem_17837.mem)[new_index_18312 * (int64_t) 256 + new_index_18314];
-                
-                index_concat_branch_17650 = index_concat_18315;
-            }
-            
-            int64_t index_concat_branch_17644;
-            
-            if (index_concat_cmp_17646) {
-                int64_t index_concat_i_18316 = sub64(gtid_17636, arg_16810);
-                int64_t index_concat_18317 = ((int64_t *) mem_17757.mem)[index_concat_i_18316];
-                
-                index_concat_branch_17644 = index_concat_18317;
-            } else {
-                int64_t new_index_18318 = squot64(gtid_17636, (int64_t) 256);
-                int64_t binop_y_18319 = (int64_t) 256 * new_index_18318;
-                int64_t new_index_18320 = gtid_17636 - binop_y_18319;
-                int64_t index_concat_18321 = ((int64_t *) mem_17840.mem)[new_index_18318 * (int64_t) 256 + new_index_18320];
-                
-                index_concat_branch_17644 = index_concat_18321;
-            }
-            
-            int64_t binop_x_17288 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 * i32_res_17278;
-            int64_t new_index_17289 = block_idx_17279 + binop_x_17288;
-            int64_t new_offset_17290 = ((int64_t *) mem_17850.mem)[new_index_17289];
-            bool index_concat_cmp_17291 = sle64(n_blocks_16808, block_idx_17279);
-            int16_t index_concat_branch_17292;
-            
-            if (index_concat_cmp_17291) {
-                int16_t index_concat_18322 = ((int16_t *) mem_17762.mem)[i32_res_17278];
-                
-                index_concat_branch_17292 = index_concat_18322;
-            } else {
-                int16_t index_concat_18323 = ((int16_t *) mem_17846.mem)[block_idx_17279 * (int64_t) 4 + i32_res_17278];
-                
-                index_concat_branch_17292 = index_concat_18323;
-            }
-            
-            int64_t i16_res_17295 = sext_i16_i64(index_concat_branch_17292);
-            int64_t zp_lhs_17296 = mul64((int64_t) 256, block_idx_17279);
-            int64_t old_offset_17297 = add64(i16_res_17295, zp_lhs_17296);
-            int64_t zp_lhs_17298 = sub64(gtid_17636, old_offset_17297);
-            int64_t idx_17299 = add64(new_offset_17290, zp_lhs_17298);
-            
-            if (sle64((int64_t) 0, idx_17299) && slt64(idx_17299, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811)) {
-                ((float *) mem_17737.mem)[idx_17299] = index_concat_branch_17650;
-            }
-            if (sle64((int64_t) 0, idx_17299) && slt64(idx_17299, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811)) {
-                ((int64_t *) mem_17739.mem)[idx_17299] = index_concat_branch_17644;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18542 != NULL) {
-        event_18542->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18541", strdup("nothing further"), event_18542, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18539(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18538 *futhark_mc_task_18538 = (struct futhark_mc_task_18538 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18538->ctx;
-    struct mc_event *event_18544 = mc_event_new(ctx);
-    
-    if (event_18544 != NULL)
-        event_18544->bef = get_wall_time();
-    
-    int64_t n_blocks_16808 = futhark_mc_task_18538->free_n_blocks_16808;
-    int64_t arg_16810 = futhark_mc_task_18538->free_arg_16810;
-    int64_t dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = futhark_mc_task_18538->free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = futhark_mc_task_18538->free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    int32_t blocked_radix_sort_step_arg1_16861 = futhark_mc_task_18538->free_blocked_radix_sort_step_arg1_16861;
-    struct memblock mem_17737 = {.desc ="mem_17737", .mem =futhark_mc_task_18538->free_mem_17737, .size =0, .references =NULL};
-    struct memblock mem_17739 = {.desc ="mem_17739", .mem =futhark_mc_task_18538->free_mem_17739, .size =0, .references =NULL};
-    struct memblock mem_17757 = {.desc ="mem_17757", .mem =futhark_mc_task_18538->free_mem_17757, .size =0, .references =NULL};
-    struct memblock mem_17759 = {.desc ="mem_17759", .mem =futhark_mc_task_18538->free_mem_17759, .size =0, .references =NULL};
-    struct memblock mem_17762 = {.desc ="mem_17762", .mem =futhark_mc_task_18538->free_mem_17762, .size =0, .references =NULL};
-    struct memblock mem_17837 = {.desc ="mem_17837", .mem =futhark_mc_task_18538->free_mem_17837, .size =0, .references =NULL};
-    struct memblock mem_17840 = {.desc ="mem_17840", .mem =futhark_mc_task_18538->free_mem_17840, .size =0, .references =NULL};
-    struct memblock mem_17846 = {.desc ="mem_17846", .mem =futhark_mc_task_18538->free_mem_17846, .size =0, .references =NULL};
-    struct memblock mem_17850 = {.desc ="mem_17850", .mem =futhark_mc_task_18538->free_mem_17850, .size =0, .references =NULL};
-    int32_t nsubtasks_18291;
-    
-    nsubtasks_18291 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18540 futhark_mc_segmap_parloop_struct_18540_;
-    
-    futhark_mc_segmap_parloop_struct_18540_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18540_.free_n_blocks_16808 = n_blocks_16808;
-    futhark_mc_segmap_parloop_struct_18540_.free_arg_16810 = arg_16810;
-    futhark_mc_segmap_parloop_struct_18540_.free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    futhark_mc_segmap_parloop_struct_18540_.free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-    futhark_mc_segmap_parloop_struct_18540_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17737 = mem_17737.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17739 = mem_17739.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17757 = mem_17757.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17759 = mem_17759.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17762 = mem_17762.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17837 = mem_17837.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17840 = mem_17840.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17846 = mem_17846.mem;
-    futhark_mc_segmap_parloop_struct_18540_.free_mem_17850 = mem_17850.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18541_task;
-    
-    futhark_mc_segmap_parloop_18541_task.name = "futhark_mc_segmap_parloop_18541";
-    futhark_mc_segmap_parloop_18541_task.fn = futhark_mc_segmap_parloop_18541;
-    futhark_mc_segmap_parloop_18541_task.args = &futhark_mc_segmap_parloop_struct_18540_;
-    futhark_mc_segmap_parloop_18541_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18541_task.info = info;
-    
-    struct mc_event *event_18543 = mc_event_new(ctx);
-    
-    if (event_18543 != NULL)
-        event_18543->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18541_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18541_task);
-    
-    if (futhark_mc_segmap_parloop_18541_err != 0) {
-        err = futhark_mc_segmap_parloop_18541_err;
-        goto cleanup;
-    }
-    if (event_18543 != NULL) {
-        event_18543->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18541_total", strdup("nothing further"), event_18543, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18544 != NULL) {
-        event_18544->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18539", strdup("nothing further"), event_18544, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
-struct futhark_mc_task_18545 {
-    struct futhark_context *ctx;
-    int64_t free_dz2080U_12740;
-    int64_t free_dz2081U_12741;
-    int64_t free_dz2082U_12742;
-    unsigned char *free_grid_xs_mem_17730;
-    unsigned char *free_grid_ys_mem_17731;
-    unsigned char *free_mem_17858;
-    unsigned char *free_mem_17860;
-    unsigned char *free_mem_17888;
-    unsigned char *free_mem_17890;
-};
-struct futhark_mc_segmap_parloop_struct_18547 {
-    struct futhark_context *ctx;
-    int64_t free_dz2080U_12740;
-    int64_t free_dz2081U_12741;
-    int64_t free_dz2082U_12742;
-    unsigned char *free_grid_xs_mem_17730;
-    unsigned char *free_grid_ys_mem_17731;
-    unsigned char *free_mem_17858;
-    unsigned char *free_mem_17860;
-    unsigned char *free_mem_17888;
-    unsigned char *free_mem_17890;
-};
-static int futhark_mc_segmap_parloop_18548(void *args, int64_t start, int64_t end, int subtask_id, int tid)
-{
-    (void) subtask_id;
-    (void) tid;
-    
-    int err = 0;
-    struct futhark_mc_segmap_parloop_struct_18547 *futhark_mc_segmap_parloop_struct_18547 = (struct futhark_mc_segmap_parloop_struct_18547 *) args;
-    struct futhark_context *ctx = futhark_mc_segmap_parloop_struct_18547->ctx;
-    struct mc_event *event_18549 = mc_event_new(ctx);
-    
-    if (event_18549 != NULL)
-        event_18549->bef = get_wall_time();
-    
-    int64_t dz2080U_12740 = futhark_mc_segmap_parloop_struct_18547->free_dz2080U_12740;
-    int64_t dz2081U_12741 = futhark_mc_segmap_parloop_struct_18547->free_dz2081U_12741;
-    int64_t dz2082U_12742 = futhark_mc_segmap_parloop_struct_18547->free_dz2082U_12742;
-    struct memblock grid_xs_mem_17730 = {.desc ="grid_xs_mem_17730", .mem =futhark_mc_segmap_parloop_struct_18547->free_grid_xs_mem_17730, .size =0, .references =NULL};
-    struct memblock grid_ys_mem_17731 = {.desc ="grid_ys_mem_17731", .mem =futhark_mc_segmap_parloop_struct_18547->free_grid_ys_mem_17731, .size =0, .references =NULL};
-    struct memblock mem_17858 = {.desc ="mem_17858", .mem =futhark_mc_segmap_parloop_struct_18547->free_mem_17858, .size =0, .references =NULL};
-    struct memblock mem_17860 = {.desc ="mem_17860", .mem =futhark_mc_segmap_parloop_struct_18547->free_mem_17860, .size =0, .references =NULL};
-    struct memblock mem_17888 = {.desc ="mem_17888", .mem =futhark_mc_segmap_parloop_struct_18547->free_mem_17888, .size =0, .references =NULL};
-    struct memblock mem_17890 = {.desc ="mem_17890", .mem =futhark_mc_segmap_parloop_struct_18547->free_mem_17890, .size =0, .references =NULL};
-    int64_t iterations = end - start;
-    int64_t flat_tid_17637;
-    
-    flat_tid_17637 = subtask_id;
-    {
-        int64_t start_18345;
-        int64_t end_18346;
-        
-        start_18345 = start;
-        end_18346 = end;
-        
-        int64_t n_18347 = end_18346 - start_18345;
-        
-        for (int64_t SegMap_i_18348 = start_18345; SegMap_i_18348 < start_18345 + n_18347; SegMap_i_18348++) {
-            int64_t slice_18349 = dz2082U_12742;
-            int64_t gtid_17638 = SegMap_i_18348;
-            int64_t remnant_18350 = SegMap_i_18348 - gtid_17638;
-            int64_t eta_p_17228 = ((int64_t *) mem_17858.mem)[gtid_17638];
-            bool x_17232 = sle64((int64_t) 0, eta_p_17228);
-            bool y_17233 = slt64(eta_p_17228, dz2080U_12740);
-            bool bounds_check_17234 = x_17232 && y_17233;
-            bool index_certs_17235;
-            
-            if (!bounds_check_17234) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_17228, "] out of bounds for array of shape [", (long long) dz2080U_12740, "].", "-> #0  arrange.fut:60:30-40\n   #1  arrange.fut:60:42-44\n   #2  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            bool y_17239 = slt64(eta_p_17228, dz2081U_12741);
-            bool bounds_check_17240 = x_17232 && y_17239;
-            bool index_certs_17241;
-            
-            if (!bounds_check_17240) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_17228, "] out of bounds for array of shape [", (long long) dz2081U_12741, "].", "-> #0  arrange.fut:61:30-40\n   #1  arrange.fut:61:42-44\n   #2  arrange.fut:51:1-64:20\n"));
-                err = FUTHARK_PROGRAM_ERROR;
-                goto cleanup;
-            }
-            
-            int64_t write_index_17229 = ((int64_t *) mem_17860.mem)[gtid_17638];
-            double lifted_lambda_res_17236 = ((double *) grid_xs_mem_17730.mem)[eta_p_17228];
-            double lifted_lambda_res_17242 = ((double *) grid_ys_mem_17731.mem)[eta_p_17228];
-            
-            if (sle64((int64_t) 0, write_index_17229) && slt64(write_index_17229, dz2082U_12742)) {
-                ((double *) mem_17888.mem)[write_index_17229] = lifted_lambda_res_17242;
-            }
-            if (sle64((int64_t) 0, write_index_17229) && slt64(write_index_17229, dz2082U_12742)) {
-                ((double *) mem_17890.mem)[write_index_17229] = lifted_lambda_res_17236;
-            }
-        }
-    }
-    
-  cleanup:
-    { }
-    if (event_18549 != NULL) {
-        event_18549->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18548", strdup("nothing further"), event_18549, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    return err;
-}
-int futhark_mc_segmap_task_18546(void *args, int64_t iterations, int tid, struct scheduler_info info)
-{
-    int err = 0;
-    int subtask_id = tid;
-    struct futhark_mc_task_18545 *futhark_mc_task_18545 = (struct futhark_mc_task_18545 *) args;
-    struct futhark_context *ctx = futhark_mc_task_18545->ctx;
-    struct mc_event *event_18551 = mc_event_new(ctx);
-    
-    if (event_18551 != NULL)
-        event_18551->bef = get_wall_time();
-    
-    int64_t dz2080U_12740 = futhark_mc_task_18545->free_dz2080U_12740;
-    int64_t dz2081U_12741 = futhark_mc_task_18545->free_dz2081U_12741;
-    int64_t dz2082U_12742 = futhark_mc_task_18545->free_dz2082U_12742;
-    struct memblock grid_xs_mem_17730 = {.desc ="grid_xs_mem_17730", .mem =futhark_mc_task_18545->free_grid_xs_mem_17730, .size =0, .references =NULL};
-    struct memblock grid_ys_mem_17731 = {.desc ="grid_ys_mem_17731", .mem =futhark_mc_task_18545->free_grid_ys_mem_17731, .size =0, .references =NULL};
-    struct memblock mem_17858 = {.desc ="mem_17858", .mem =futhark_mc_task_18545->free_mem_17858, .size =0, .references =NULL};
-    struct memblock mem_17860 = {.desc ="mem_17860", .mem =futhark_mc_task_18545->free_mem_17860, .size =0, .references =NULL};
-    struct memblock mem_17888 = {.desc ="mem_17888", .mem =futhark_mc_task_18545->free_mem_17888, .size =0, .references =NULL};
-    struct memblock mem_17890 = {.desc ="mem_17890", .mem =futhark_mc_task_18545->free_mem_17890, .size =0, .references =NULL};
-    int32_t nsubtasks_18344;
-    
-    nsubtasks_18344 = info.nsubtasks;
-    
-    struct futhark_mc_segmap_parloop_struct_18547 futhark_mc_segmap_parloop_struct_18547_;
-    
-    futhark_mc_segmap_parloop_struct_18547_.ctx = ctx;
-    futhark_mc_segmap_parloop_struct_18547_.free_dz2080U_12740 = dz2080U_12740;
-    futhark_mc_segmap_parloop_struct_18547_.free_dz2081U_12741 = dz2081U_12741;
-    futhark_mc_segmap_parloop_struct_18547_.free_dz2082U_12742 = dz2082U_12742;
-    futhark_mc_segmap_parloop_struct_18547_.free_grid_xs_mem_17730 = grid_xs_mem_17730.mem;
-    futhark_mc_segmap_parloop_struct_18547_.free_grid_ys_mem_17731 = grid_ys_mem_17731.mem;
-    futhark_mc_segmap_parloop_struct_18547_.free_mem_17858 = mem_17858.mem;
-    futhark_mc_segmap_parloop_struct_18547_.free_mem_17860 = mem_17860.mem;
-    futhark_mc_segmap_parloop_struct_18547_.free_mem_17888 = mem_17888.mem;
-    futhark_mc_segmap_parloop_struct_18547_.free_mem_17890 = mem_17890.mem;
-    
-    struct scheduler_parloop futhark_mc_segmap_parloop_18548_task;
-    
-    futhark_mc_segmap_parloop_18548_task.name = "futhark_mc_segmap_parloop_18548";
-    futhark_mc_segmap_parloop_18548_task.fn = futhark_mc_segmap_parloop_18548;
-    futhark_mc_segmap_parloop_18548_task.args = &futhark_mc_segmap_parloop_struct_18547_;
-    futhark_mc_segmap_parloop_18548_task.iterations = iterations;
-    futhark_mc_segmap_parloop_18548_task.info = info;
-    
-    struct mc_event *event_18550 = mc_event_new(ctx);
-    
-    if (event_18550 != NULL)
-        event_18550->bef = get_wall_time();
-    
-    int futhark_mc_segmap_parloop_18548_err = scheduler_execute_task(&ctx->scheduler, &futhark_mc_segmap_parloop_18548_task);
-    
-    if (futhark_mc_segmap_parloop_18548_err != 0) {
-        err = futhark_mc_segmap_parloop_18548_err;
-        goto cleanup;
-    }
-    if (event_18550 != NULL) {
-        event_18550->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_parloop_18548_total", strdup("nothing further"), event_18550, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    
-  cleanup:
-    { }
-    if (event_18551 != NULL) {
-        event_18551->aft = get_wall_time();
-        lock_lock(&ctx->event_list_lock);
-        add_event(ctx, "futhark_mc_segmap_task_18546", strdup("nothing further"), event_18551, (event_report_fn) mc_event_report);
-        lock_unlock(&ctx->event_list_lock);
-    }
-    if (err == 0) { }
-    return err;
-}
 struct futhark_f64_1d {
     struct memblock mem;
     int64_t shape[1];
@@ -11482,7 +5843,6 @@ struct futhark_f64_1d *futhark_new_f64_1d(struct futhark_context *ctx, const dou
     if (arr == NULL)
         return bad;
     lock_lock(&ctx->lock);
-    worker_local = &ctx->scheduler.workers[0];
     arr->mem.references = NULL;
     if (memblock_alloc(ctx, &arr->mem, dim0 * 8, "arr->mem"))
         err = 1;
@@ -11505,7 +5865,6 @@ struct futhark_f64_1d *futhark_new_raw_f64_1d(struct futhark_context *ctx, unsig
     if (arr == NULL)
         return bad;
     lock_lock(&ctx->lock);
-    worker_local = &ctx->scheduler.workers[0];
     arr->mem.references = NULL;
     arr->mem.mem = data;
     arr->shape[0] = dim0;
@@ -11515,7 +5874,6 @@ struct futhark_f64_1d *futhark_new_raw_f64_1d(struct futhark_context *ctx, unsig
 int futhark_free_f64_1d(struct futhark_context *ctx, struct futhark_f64_1d *arr)
 {
     lock_lock(&ctx->lock);
-    worker_local = &ctx->scheduler.workers[0];
     if (memblock_unref(ctx, &arr->mem, "arr->mem") != 0)
         return 1;
     lock_unlock(&ctx->lock);
@@ -11527,7 +5885,6 @@ int futhark_values_f64_1d(struct futhark_context *ctx, struct futhark_f64_1d *ar
     int err = 0;
     
     lock_lock(&ctx->lock);
-    worker_local = &ctx->scheduler.workers[0];
     if ((size_t) arr->shape[0] * 8 > 0)
         memmove((unsigned char *) data + 0, arr->mem.mem + 0, (size_t) arr->shape[0] * 8);
     lock_unlock(&ctx->lock);
@@ -11539,7 +5896,6 @@ int futhark_index_f64_1d(struct futhark_context *ctx, double *out, struct futhar
     
     if (i0 >= 0 && i0 < arr->shape[0]) {
         lock_lock(&ctx->lock);
-        worker_local = &ctx->scheduler.workers[0];
         if (8 > 0)
             memmove((unsigned char *) out + 0, arr->mem.mem + 8 * (i0 * 1), 8);
         lock_unlock(&ctx->lock);
@@ -11560,78 +5916,92 @@ const int64_t *futhark_shape_f64_1d(struct futhark_context *ctx, struct futhark_
     return arr->shape;
 }
 
-FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_18351, struct memblock *mem_out_p_18352, int64_t *out_prim_out_18353, struct memblock grid_xs_mem_17730, struct memblock grid_ys_mem_17731, struct memblock pts_x_mem_17732, struct memblock pts_y_mem_17733, int64_t dz2080U_12740, int64_t dz2081U_12741, int64_t dz2082U_12742, int64_t dz2083U_12743)
+FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_18068, struct memblock *mem_out_p_18069, int64_t *out_prim_out_18070, struct memblock grid_xs_mem_17709, struct memblock grid_ys_mem_17710, struct memblock pts_x_mem_17711, struct memblock pts_y_mem_17712, int64_t dz2080U_12740, int64_t dz2081U_12741, int64_t dz2082U_12742, int64_t dz2083U_12743)
 {
     (void) ctx;
     
     int err = 0;
-    int64_t mem_17735_cached_sizze_18354 = 0;
-    unsigned char *mem_17735 = NULL;
-    int64_t mem_17737_cached_sizze_18355 = 0;
-    unsigned char *mem_17737 = NULL;
-    int64_t mem_17739_cached_sizze_18356 = 0;
-    unsigned char *mem_17739 = NULL;
-    int64_t mem_17747_cached_sizze_18357 = 0;
-    unsigned char *mem_17747 = NULL;
-    int64_t mem_17749_cached_sizze_18358 = 0;
-    unsigned char *mem_17749 = NULL;
-    int64_t mem_17751_cached_sizze_18359 = 0;
-    unsigned char *mem_17751 = NULL;
-    int64_t mem_17753_cached_sizze_18360 = 0;
-    unsigned char *mem_17753 = NULL;
-    int64_t mem_17755_cached_sizze_18361 = 0;
-    unsigned char *mem_17755 = NULL;
-    int64_t mem_17757_cached_sizze_18362 = 0;
-    unsigned char *mem_17757 = NULL;
-    int64_t mem_17759_cached_sizze_18363 = 0;
-    unsigned char *mem_17759 = NULL;
-    int64_t mem_17760_cached_sizze_18364 = 0;
-    unsigned char *mem_17760 = NULL;
-    int64_t mem_17761_cached_sizze_18365 = 0;
-    unsigned char *mem_17761 = NULL;
-    int64_t mem_17762_cached_sizze_18366 = 0;
-    unsigned char *mem_17762 = NULL;
-    int64_t mem_17765_cached_sizze_18367 = 0;
-    unsigned char *mem_17765 = NULL;
-    int64_t mem_17768_cached_sizze_18368 = 0;
-    unsigned char *mem_17768 = NULL;
-    int64_t mem_17837_cached_sizze_18369 = 0;
-    unsigned char *mem_17837 = NULL;
-    int64_t mem_17840_cached_sizze_18370 = 0;
-    unsigned char *mem_17840 = NULL;
-    int64_t mem_17843_cached_sizze_18371 = 0;
-    unsigned char *mem_17843 = NULL;
-    int64_t mem_17846_cached_sizze_18372 = 0;
-    unsigned char *mem_17846 = NULL;
-    int64_t mem_17848_cached_sizze_18373 = 0;
-    unsigned char *mem_17848 = NULL;
-    int64_t mem_17850_cached_sizze_18374 = 0;
-    unsigned char *mem_17850 = NULL;
-    int64_t mem_17858_cached_sizze_18375 = 0;
-    unsigned char *mem_17858 = NULL;
-    int64_t mem_17860_cached_sizze_18376 = 0;
-    unsigned char *mem_17860 = NULL;
-    int64_t mem_17861_cached_sizze_18377 = 0;
-    unsigned char *mem_17861 = NULL;
-    int64_t mem_17862_cached_sizze_18378 = 0;
-    unsigned char *mem_17862 = NULL;
-    struct memblock mem_17890;
+    int64_t mem_17714_cached_sizze_18071 = 0;
+    unsigned char *mem_17714 = NULL;
+    int64_t mem_17722_cached_sizze_18072 = 0;
+    unsigned char *mem_17722 = NULL;
+    int64_t mem_17724_cached_sizze_18073 = 0;
+    unsigned char *mem_17724 = NULL;
+    int64_t mem_17732_cached_sizze_18074 = 0;
+    unsigned char *mem_17732 = NULL;
+    int64_t mem_17734_cached_sizze_18075 = 0;
+    unsigned char *mem_17734 = NULL;
+    int64_t mem_17736_cached_sizze_18076 = 0;
+    unsigned char *mem_17736 = NULL;
+    int64_t mem_17738_cached_sizze_18077 = 0;
+    unsigned char *mem_17738 = NULL;
+    int64_t mem_17740_cached_sizze_18078 = 0;
+    unsigned char *mem_17740 = NULL;
+    int64_t mem_17772_cached_sizze_18079 = 0;
+    unsigned char *mem_17772 = NULL;
+    int64_t mem_17774_cached_sizze_18080 = 0;
+    unsigned char *mem_17774 = NULL;
+    int64_t mem_17787_cached_sizze_18081 = 0;
+    unsigned char *mem_17787 = NULL;
+    int64_t mem_17788_cached_sizze_18082 = 0;
+    unsigned char *mem_17788 = NULL;
+    int64_t mem_17795_cached_sizze_18083 = 0;
+    unsigned char *mem_17795 = NULL;
+    int64_t mem_17798_cached_sizze_18084 = 0;
+    unsigned char *mem_17798 = NULL;
+    int64_t mem_17801_cached_sizze_18085 = 0;
+    unsigned char *mem_17801 = NULL;
+    int64_t mem_17804_cached_sizze_18086 = 0;
+    unsigned char *mem_17804 = NULL;
+    int64_t mem_17807_cached_sizze_18087 = 0;
+    unsigned char *mem_17807 = NULL;
+    int64_t mem_17824_cached_sizze_18088 = 0;
+    unsigned char *mem_17824 = NULL;
+    int64_t mem_17825_cached_sizze_18089 = 0;
+    unsigned char *mem_17825 = NULL;
+    int64_t mem_17826_cached_sizze_18090 = 0;
+    unsigned char *mem_17826 = NULL;
+    int64_t mem_17827_cached_sizze_18091 = 0;
+    unsigned char *mem_17827 = NULL;
+    int64_t mem_17828_cached_sizze_18092 = 0;
+    unsigned char *mem_17828 = NULL;
+    int64_t mem_17829_cached_sizze_18093 = 0;
+    unsigned char *mem_17829 = NULL;
+    int64_t mem_17830_cached_sizze_18094 = 0;
+    unsigned char *mem_17830 = NULL;
+    int64_t mem_17873_cached_sizze_18095 = 0;
+    unsigned char *mem_17873 = NULL;
+    int64_t mem_17874_cached_sizze_18096 = 0;
+    unsigned char *mem_17874 = NULL;
+    int64_t mem_17899_cached_sizze_18097 = 0;
+    unsigned char *mem_17899 = NULL;
+    int64_t mem_17907_cached_sizze_18098 = 0;
+    unsigned char *mem_17907 = NULL;
+    int64_t mem_17933_cached_sizze_18099 = 0;
+    unsigned char *mem_17933 = NULL;
+    int64_t mem_17935_cached_sizze_18100 = 0;
+    unsigned char *mem_17935 = NULL;
+    int64_t mem_17936_cached_sizze_18101 = 0;
+    unsigned char *mem_17936 = NULL;
+    int64_t mem_17937_cached_sizze_18102 = 0;
+    unsigned char *mem_17937 = NULL;
+    struct memblock mem_17965;
     
-    mem_17890.references = NULL;
+    mem_17965.references = NULL;
     
-    struct memblock mem_17888;
+    struct memblock mem_17963;
     
-    mem_17888.references = NULL;
+    mem_17963.references = NULL;
     
-    struct memblock mem_out_17911;
+    struct memblock mem_out_18012;
     
-    mem_out_17911.references = NULL;
+    mem_out_18012.references = NULL;
     
-    struct memblock mem_out_17910;
+    struct memblock mem_out_18011;
     
-    mem_out_17910.references = NULL;
+    mem_out_18011.references = NULL;
     
-    int64_t prim_out_17912;
+    int64_t prim_out_18013;
     int64_t dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 = mul64(dz2080U_12740, dz2082U_12742);
     bool bounds_invalid_upwards_16771 = slt64(dzlz7bUZLztZRz20Umz20Unz7dUzg_16770, (int64_t) 0);
     bool valid_16772 = !bounds_invalid_upwards_16771;
@@ -11653,7 +6023,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         goto cleanup;
     }
     
-    int64_t bytes_17734 = (int64_t) 4 * dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
+    int64_t bytes_17713 = (int64_t) 4 * dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
     bool cond_16806 = dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 == (int64_t) 0;
     int32_t iters_16807;
     
@@ -11676,8 +6046,8 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         goto cleanup;
     }
     
-    int64_t bytes_17736 = (int64_t) 4 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    int64_t bytes_17738 = (int64_t) 8 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
+    int64_t bytes_17721 = (int64_t) 4 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
+    int64_t bytes_17723 = (int64_t) 8 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
     bool loop_nonempty_16817 = slt32(0, iters_16807);
     int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = add64((int64_t) 1, n_blocks_16808);
     int64_t dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = mul64((int64_t) 4, dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818);
@@ -11750,14 +6120,14 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         goto cleanup;
     }
     
-    int64_t bytes_17746 = (int64_t) 2 * rest_16809;
-    int64_t bytes_17756 = (int64_t) 8 * rest_16809;
-    int64_t bytes_17758 = (int64_t) 4 * rest_16809;
-    int64_t bytes_17764 = (int64_t) 1024 * n_blocks_16808;
-    int64_t bytes_17767 = (int64_t) 2048 * n_blocks_16808;
-    int64_t bytes_17842 = (int64_t) 32 * n_blocks_16808;
-    int64_t bytes_17845 = (int64_t) 8 * n_blocks_16808;
-    int64_t bytes_17847 = (int64_t) 32 * dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
+    int64_t bytes_17731 = (int64_t) 2 * rest_16809;
+    int64_t bytes_17771 = (int64_t) 8 * rest_16809;
+    int64_t bytes_17773 = (int64_t) 4 * rest_16809;
+    int64_t bytes_17797 = (int64_t) 1024 * n_blocks_16808;
+    int64_t bytes_17800 = (int64_t) 2048 * n_blocks_16808;
+    int64_t bytes_17803 = (int64_t) 32 * n_blocks_16808;
+    int64_t bytes_17806 = (int64_t) 8 * n_blocks_16808;
+    int64_t bytes_17898 = (int64_t) 32 * dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
     bool dim_match_17113 = dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 == dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
     bool empty_or_match_cert_17114;
     
@@ -11767,7 +6137,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         goto cleanup;
     }
     
-    int64_t bytes_17857 = (int64_t) 8 * dz2082U_12742;
+    int64_t bytes_17932 = (int64_t) 8 * dz2082U_12742;
     bool cond_17121 = slt64((int64_t) 0, dzlz7bUZLztZRz20Umz20Unz7dUzg_16770);
     bool loop_cond_t_res_17122 = slt64((int64_t) 0, dz2082U_12742);
     bool x_17123 = cond_17121 && loop_cond_t_res_17122;
@@ -11780,172 +6150,207 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
-    if (mem_17735_cached_sizze_18354 < bytes_17734) {
-        err = lexical_realloc(ctx, &mem_17735, &mem_17735_cached_sizze_18354, bytes_17734);
+    if (mem_17714_cached_sizze_18071 < bytes_17713) {
+        err = lexical_realloc(ctx, &mem_17714, &mem_17714_cached_sizze_18071, bytes_17713);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    
-    int64_t flat_tid_17538 = (int64_t) 0;
-    struct futhark_mc_task_18379 futhark_mc_task_18379_;
-    
-    futhark_mc_task_18379_.ctx = ctx;
-    futhark_mc_task_18379_.free_dz2080U_12740 = dz2080U_12740;
-    futhark_mc_task_18379_.free_dz2081U_12741 = dz2081U_12741;
-    futhark_mc_task_18379_.free_dz2082U_12742 = dz2082U_12742;
-    futhark_mc_task_18379_.free_dz2083U_12743 = dz2083U_12743;
-    futhark_mc_task_18379_.free_dzlz7bUZLztZRz20Umz20Unz7dUzg_16770 = dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    futhark_mc_task_18379_.free_grid_xs_mem_17730 = grid_xs_mem_17730.mem;
-    futhark_mc_task_18379_.free_grid_ys_mem_17731 = grid_ys_mem_17731.mem;
-    futhark_mc_task_18379_.free_pts_x_mem_17732 = pts_x_mem_17732.mem;
-    futhark_mc_task_18379_.free_pts_y_mem_17733 = pts_y_mem_17733.mem;
-    futhark_mc_task_18379_.free_mem_17735 = mem_17735;
-    
-    struct scheduler_segop futhark_mc_task_18379_task;
-    
-    futhark_mc_task_18379_task.args = &futhark_mc_task_18379_;
-    futhark_mc_task_18379_task.top_level_fn = futhark_mc_segmap_task_18380;
-    futhark_mc_task_18379_task.name = "futhark_mc_segmap_task_18380";
-    futhark_mc_task_18379_task.iterations = dzlz7bUZLztZRz20Umz20Unz7dUzg_16770;
-    futhark_mc_task_18379_task.task_time = &ctx->program->futhark_mc_segmap_task_18380_total_time;
-    futhark_mc_task_18379_task.task_iter = &ctx->program->futhark_mc_segmap_task_18380_total_iter;
-    futhark_mc_task_18379_task.sched = STATIC;
-    futhark_mc_task_18379_task.nested_fn = NULL;
-    
-    int futhark_mc_segmap_task_18380_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18379_task);
-    
-    if (futhark_mc_segmap_task_18380_err != 0) {
-        err = futhark_mc_segmap_task_18380_err;
-        goto cleanup;
-    }
-    if (mem_17737_cached_sizze_18355 < bytes_17736) {
-        err = lexical_realloc(ctx, &mem_17737, &mem_17737_cached_sizze_18355, bytes_17736);
-        if (err != FUTHARK_SUCCESS)
-            goto cleanup;
-    }
-    
-    int64_t iterations_17929 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    struct futhark_mc_task_18386 futhark_mc_task_18386_;
-    
-    futhark_mc_task_18386_.ctx = ctx;
-    futhark_mc_task_18386_.free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-    futhark_mc_task_18386_.free_mem_17735 = mem_17735;
-    futhark_mc_task_18386_.free_mem_17737 = mem_17737;
-    
-    struct scheduler_segop futhark_mc_task_18386_task;
-    
-    futhark_mc_task_18386_task.args = &futhark_mc_task_18386_;
-    futhark_mc_task_18386_task.top_level_fn = futhark_mc_copy_17928_task_18387;
-    futhark_mc_task_18386_task.name = "futhark_mc_copy_17928_task_18387";
-    futhark_mc_task_18386_task.iterations = iterations_17929;
-    futhark_mc_task_18386_task.task_time = &ctx->program->futhark_mc_copy_17928_task_18387_total_time;
-    futhark_mc_task_18386_task.task_iter = &ctx->program->futhark_mc_copy_17928_task_18387_total_iter;
-    futhark_mc_task_18386_task.sched = STATIC;
-    futhark_mc_task_18386_task.nested_fn = NULL;
-    
-    int futhark_mc_copy_17928_task_18387_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18386_task);
-    
-    if (futhark_mc_copy_17928_task_18387_err != 0) {
-        err = futhark_mc_copy_17928_task_18387_err;
-        goto cleanup;
-    }
-    if (mem_17739_cached_sizze_18356 < bytes_17738) {
-        err = lexical_realloc(ctx, &mem_17739, &mem_17739_cached_sizze_18356, bytes_17738);
-        if (err != FUTHARK_SUCCESS)
-            goto cleanup;
-    }
-    for (int64_t i_17930 = 0; i_17930 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811; i_17930++) {
-        int64_t x_17931 = (int64_t) 0 + i_17930 * (int64_t) 1;
+    for (int64_t i_17540 = 0; i_17540 < dzlz7bUZLztZRz20Umz20Unz7dUzg_16770; i_17540++) {
+        int64_t g_16780 = sdiv64(i_17540, dz2082U_12742);
+        int64_t p_16781 = smod64(i_17540, dz2082U_12742);
+        bool x_16782 = sle64((int64_t) 0, g_16780);
+        bool y_16783 = slt64(g_16780, dz2080U_12740);
+        bool bounds_check_16784 = x_16782 && y_16783;
+        bool index_certs_16785;
         
-        ((int64_t *) mem_17739)[i_17930] = x_17931;
+        if (!bounds_check_16784) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_16780, "] out of bounds for array of shape [", (long long) dz2080U_12740, "].", "-> #0  arrange.fut:19:14-24\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
+            err = FUTHARK_PROGRAM_ERROR;
+            goto cleanup;
+        }
+        
+        bool x_16787 = sle64((int64_t) 0, p_16781);
+        bool y_16788 = slt64(p_16781, dz2082U_12742);
+        bool bounds_check_16789 = x_16787 && y_16788;
+        bool index_certs_16790;
+        
+        if (!bounds_check_16789) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_16781, "] out of bounds for array of shape [", (long long) dz2082U_12742, "].", "-> #0  arrange.fut:19:27-35\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
+            err = FUTHARK_PROGRAM_ERROR;
+            goto cleanup;
+        }
+        
+        bool y_16793 = slt64(g_16780, dz2081U_12741);
+        bool bounds_check_16794 = x_16782 && y_16793;
+        bool index_certs_16795;
+        
+        if (!bounds_check_16794) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_16780, "] out of bounds for array of shape [", (long long) dz2081U_12741, "].", "-> #0  arrange.fut:20:14-24\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
+            err = FUTHARK_PROGRAM_ERROR;
+            goto cleanup;
+        }
+        
+        bool y_16797 = slt64(p_16781, dz2083U_12743);
+        bool bounds_check_16798 = x_16787 && y_16797;
+        bool index_certs_16799;
+        
+        if (!bounds_check_16798) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_16781, "] out of bounds for array of shape [", (long long) dz2083U_12743, "].", "-> #0  arrange.fut:20:27-35\n   #1  arrange.fut:22:6-16\n   #2  arrange.fut:51:1-64:20\n"));
+            err = FUTHARK_PROGRAM_ERROR;
+            goto cleanup;
+        }
+        
+        double zm_lhs_16786 = ((double *) grid_xs_mem_17709.mem)[g_16780];
+        double zm_rhs_16791 = ((double *) pts_x_mem_17711.mem)[p_16781];
+        double dx_16792 = zm_lhs_16786 - zm_rhs_16791;
+        double zm_lhs_16796 = ((double *) grid_ys_mem_17710.mem)[g_16780];
+        double zm_rhs_16800 = ((double *) pts_y_mem_17712.mem)[p_16781];
+        double dy_16801 = zm_lhs_16796 - zm_rhs_16800;
+        double zp_lhs_16802 = dx_16792 * dx_16792;
+        double zp_rhs_16803 = dy_16801 * dy_16801;
+        double f64_arg0_16804 = zp_lhs_16802 + zp_rhs_16803;
+        float f64_res_16805 = fpconv_f64_f32(f64_arg0_16804);
+        
+        ((float *) mem_17714)[i_17540] = f64_res_16805;
     }
-    if (mem_17747_cached_sizze_18357 < bytes_17746) {
-        err = lexical_realloc(ctx, &mem_17747, &mem_17747_cached_sizze_18357, bytes_17746);
+    if (mem_17722_cached_sizze_18072 < bytes_17721) {
+        err = lexical_realloc(ctx, &mem_17722, &mem_17722_cached_sizze_18072, bytes_17721);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17749_cached_sizze_18358 < bytes_17746) {
-        err = lexical_realloc(ctx, &mem_17749, &mem_17749_cached_sizze_18358, bytes_17746);
+    lmad_copy_4b(ctx, 1, (uint32_t *) mem_17722, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_17714, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811});
+    if (mem_17724_cached_sizze_18073 < bytes_17723) {
+        err = lexical_realloc(ctx, &mem_17724, &mem_17724_cached_sizze_18073, bytes_17723);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17751_cached_sizze_18359 < bytes_17746) {
-        err = lexical_realloc(ctx, &mem_17751, &mem_17751_cached_sizze_18359, bytes_17746);
+    for (int64_t i_18015 = 0; i_18015 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811; i_18015++) {
+        int64_t x_18016 = (int64_t) 0 + i_18015 * (int64_t) 1;
+        
+        ((int64_t *) mem_17724)[i_18015] = x_18016;
+    }
+    if (mem_17732_cached_sizze_18074 < bytes_17731) {
+        err = lexical_realloc(ctx, &mem_17732, &mem_17732_cached_sizze_18074, bytes_17731);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17753_cached_sizze_18360 < bytes_17746) {
-        err = lexical_realloc(ctx, &mem_17753, &mem_17753_cached_sizze_18360, bytes_17746);
+    if (mem_17734_cached_sizze_18075 < bytes_17731) {
+        err = lexical_realloc(ctx, &mem_17734, &mem_17734_cached_sizze_18075, bytes_17731);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17755_cached_sizze_18361 < bytes_17746) {
-        err = lexical_realloc(ctx, &mem_17755, &mem_17755_cached_sizze_18361, bytes_17746);
+    if (mem_17736_cached_sizze_18076 < bytes_17731) {
+        err = lexical_realloc(ctx, &mem_17736, &mem_17736_cached_sizze_18076, bytes_17731);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17757_cached_sizze_18362 < bytes_17756) {
-        err = lexical_realloc(ctx, &mem_17757, &mem_17757_cached_sizze_18362, bytes_17756);
+    if (mem_17738_cached_sizze_18077 < bytes_17731) {
+        err = lexical_realloc(ctx, &mem_17738, &mem_17738_cached_sizze_18077, bytes_17731);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17759_cached_sizze_18363 < bytes_17758) {
-        err = lexical_realloc(ctx, &mem_17759, &mem_17759_cached_sizze_18363, bytes_17758);
+    if (mem_17740_cached_sizze_18078 < bytes_17731) {
+        err = lexical_realloc(ctx, &mem_17740, &mem_17740_cached_sizze_18078, bytes_17731);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17760_cached_sizze_18364 < (int64_t) 8) {
-        err = lexical_realloc(ctx, &mem_17760, &mem_17760_cached_sizze_18364, (int64_t) 8);
+    if (mem_17772_cached_sizze_18079 < bytes_17771) {
+        err = lexical_realloc(ctx, &mem_17772, &mem_17772_cached_sizze_18079, bytes_17771);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17761_cached_sizze_18365 < (int64_t) 32) {
-        err = lexical_realloc(ctx, &mem_17761, &mem_17761_cached_sizze_18365, (int64_t) 32);
+    if (mem_17774_cached_sizze_18080 < bytes_17773) {
+        err = lexical_realloc(ctx, &mem_17774, &mem_17774_cached_sizze_18080, bytes_17773);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17762_cached_sizze_18366 < (int64_t) 8) {
-        err = lexical_realloc(ctx, &mem_17762, &mem_17762_cached_sizze_18366, (int64_t) 8);
+    if (mem_17787_cached_sizze_18081 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_17787, &mem_17787_cached_sizze_18081, (int64_t) 8);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17765_cached_sizze_18367 < bytes_17764) {
-        err = lexical_realloc(ctx, &mem_17765, &mem_17765_cached_sizze_18367, bytes_17764);
+    if (mem_17788_cached_sizze_18082 < (int64_t) 32) {
+        err = lexical_realloc(ctx, &mem_17788, &mem_17788_cached_sizze_18082, (int64_t) 32);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17768_cached_sizze_18368 < bytes_17767) {
-        err = lexical_realloc(ctx, &mem_17768, &mem_17768_cached_sizze_18368, bytes_17767);
+    if (mem_17795_cached_sizze_18083 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_17795, &mem_17795_cached_sizze_18083, (int64_t) 8);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17837_cached_sizze_18369 < bytes_17764) {
-        err = lexical_realloc(ctx, &mem_17837, &mem_17837_cached_sizze_18369, bytes_17764);
+    if (mem_17798_cached_sizze_18084 < bytes_17797) {
+        err = lexical_realloc(ctx, &mem_17798, &mem_17798_cached_sizze_18084, bytes_17797);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17840_cached_sizze_18370 < bytes_17767) {
-        err = lexical_realloc(ctx, &mem_17840, &mem_17840_cached_sizze_18370, bytes_17767);
+    if (mem_17801_cached_sizze_18085 < bytes_17800) {
+        err = lexical_realloc(ctx, &mem_17801, &mem_17801_cached_sizze_18085, bytes_17800);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17843_cached_sizze_18371 < bytes_17842) {
-        err = lexical_realloc(ctx, &mem_17843, &mem_17843_cached_sizze_18371, bytes_17842);
+    if (mem_17804_cached_sizze_18086 < bytes_17803) {
+        err = lexical_realloc(ctx, &mem_17804, &mem_17804_cached_sizze_18086, bytes_17803);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17846_cached_sizze_18372 < bytes_17845) {
-        err = lexical_realloc(ctx, &mem_17846, &mem_17846_cached_sizze_18372, bytes_17845);
+    if (mem_17807_cached_sizze_18087 < bytes_17806) {
+        err = lexical_realloc(ctx, &mem_17807, &mem_17807_cached_sizze_18087, bytes_17806);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17848_cached_sizze_18373 < bytes_17847) {
-        err = lexical_realloc(ctx, &mem_17848, &mem_17848_cached_sizze_18373, bytes_17847);
+    if (mem_17824_cached_sizze_18088 < (int64_t) 1024) {
+        err = lexical_realloc(ctx, &mem_17824, &mem_17824_cached_sizze_18088, (int64_t) 1024);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_17850_cached_sizze_18374 < bytes_17847) {
-        err = lexical_realloc(ctx, &mem_17850, &mem_17850_cached_sizze_18374, bytes_17847);
+    if (mem_17825_cached_sizze_18089 < (int64_t) 2048) {
+        err = lexical_realloc(ctx, &mem_17825, &mem_17825_cached_sizze_18089, (int64_t) 2048);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17826_cached_sizze_18090 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_17826, &mem_17826_cached_sizze_18090, (int64_t) 512);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17827_cached_sizze_18091 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_17827, &mem_17827_cached_sizze_18091, (int64_t) 512);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17828_cached_sizze_18092 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_17828, &mem_17828_cached_sizze_18092, (int64_t) 512);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17829_cached_sizze_18093 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_17829, &mem_17829_cached_sizze_18093, (int64_t) 512);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17830_cached_sizze_18094 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_17830, &mem_17830_cached_sizze_18094, (int64_t) 512);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17873_cached_sizze_18095 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_17873, &mem_17873_cached_sizze_18095, (int64_t) 8);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17874_cached_sizze_18096 < (int64_t) 32) {
+        err = lexical_realloc(ctx, &mem_17874, &mem_17874_cached_sizze_18096, (int64_t) 32);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17899_cached_sizze_18097 < bytes_17898) {
+        err = lexical_realloc(ctx, &mem_17899, &mem_17899_cached_sizze_18097, bytes_17898);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    if (mem_17907_cached_sizze_18098 < bytes_17898) {
+        err = lexical_realloc(ctx, &mem_17907, &mem_17907_cached_sizze_18098, bytes_17898);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
@@ -11954,40 +6359,93 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         int32_t get_bit_arg0_16866 = add32(1, blocked_radix_sort_step_arg1_16861);
         bool cond_f_res_16867 = get_bit_arg0_16866 == 31;
         bool cond_f_res_16868 = blocked_radix_sort_step_arg1_16861 == 31;
-        int64_t flat_tid_17540 = (int64_t) 0;
-        struct futhark_mc_task_18393 futhark_mc_task_18393_;
+        int16_t discard_17562;
+        int16_t discard_17563;
+        int16_t discard_17564;
+        int16_t discard_17565;
+        int16_t scanacc_17547;
+        int16_t scanacc_17548;
+        int16_t scanacc_17549;
+        int16_t scanacc_17550;
         
-        futhark_mc_task_18393_.ctx = ctx;
-        futhark_mc_task_18393_.free_rest_16809 = rest_16809;
-        futhark_mc_task_18393_.free_arg_16810 = arg_16810;
-        futhark_mc_task_18393_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-        futhark_mc_task_18393_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-        futhark_mc_task_18393_.free_cond_f_res_16867 = cond_f_res_16867;
-        futhark_mc_task_18393_.free_cond_f_res_16868 = cond_f_res_16868;
-        futhark_mc_task_18393_.free_mem_17737 = mem_17737;
-        futhark_mc_task_18393_.free_mem_17747 = mem_17747;
-        futhark_mc_task_18393_.free_mem_17749 = mem_17749;
-        futhark_mc_task_18393_.free_mem_17751 = mem_17751;
-        futhark_mc_task_18393_.free_mem_17753 = mem_17753;
-        futhark_mc_task_18393_.free_mem_17755 = mem_17755;
-        
-        struct scheduler_segop futhark_mc_task_18393_task;
-        
-        futhark_mc_task_18393_task.args = &futhark_mc_task_18393_;
-        futhark_mc_task_18393_task.top_level_fn = futhark_mc_segscan_task_18394;
-        futhark_mc_task_18393_task.name = "futhark_mc_segscan_task_18394";
-        futhark_mc_task_18393_task.iterations = rest_16809;
-        futhark_mc_task_18393_task.task_time = &ctx->program->futhark_mc_segscan_task_18394_total_time;
-        futhark_mc_task_18393_task.task_iter = &ctx->program->futhark_mc_segscan_task_18394_total_iter;
-        futhark_mc_task_18393_task.sched = STATIC;
-        futhark_mc_task_18393_task.nested_fn = NULL;
-        
-        int futhark_mc_segscan_task_18394_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18393_task);
-        
-        if (futhark_mc_segscan_task_18394_err != 0) {
-            err = futhark_mc_segscan_task_18394_err;
-            goto cleanup;
+        scanacc_17547 = (int16_t) 0;
+        scanacc_17548 = (int16_t) 0;
+        scanacc_17549 = (int16_t) 0;
+        scanacc_17550 = (int16_t) 0;
+        for (int64_t i_17556 = 0; i_17556 < rest_16809; i_17556++) {
+            int64_t slice_17692 = arg_16810 + i_17556;
+            float eta_p_17325 = ((float *) mem_17722)[slice_17692];
+            int32_t i32_arg0_17326 = futrts_to_bits32(eta_p_17325);
+            int32_t unsign_arg0_17327 = ashr32(i32_arg0_17326, get_bit_arg0_16866);
+            int32_t unsign_arg0_17328 = 1 & unsign_arg0_17327;
+            int32_t unsign_arg0_17329 = ashr32(i32_arg0_17326, 31);
+            int32_t unsign_arg0_17330 = 1 & unsign_arg0_17329;
+            bool cond_17331 = unsign_arg0_17330 == 1;
+            bool x_17332 = !cond_17331;
+            bool y_17333 = cond_f_res_16867 && x_17332;
+            bool cond_17334 = cond_17331 || y_17333;
+            int32_t defunc_0_get_bit_res_17335;
+            
+            if (cond_17334) {
+                int32_t defunc_0_get_bit_res_t_res_17481 = 1 ^ unsign_arg0_17328;
+                
+                defunc_0_get_bit_res_17335 = defunc_0_get_bit_res_t_res_17481;
+            } else {
+                defunc_0_get_bit_res_17335 = unsign_arg0_17328;
+            }
+            
+            int32_t zp_lhs_17337 = mul32(2, defunc_0_get_bit_res_17335);
+            int32_t unsign_arg0_17338 = ashr32(i32_arg0_17326, blocked_radix_sort_step_arg1_16861);
+            int32_t unsign_arg0_17339 = 1 & unsign_arg0_17338;
+            bool y_17340 = cond_f_res_16868 && x_17332;
+            bool cond_17341 = cond_17331 || y_17340;
+            int32_t defunc_0_get_bit_res_17342;
+            
+            if (cond_17341) {
+                int32_t defunc_0_get_bit_res_t_res_17482 = 1 ^ unsign_arg0_17339;
+                
+                defunc_0_get_bit_res_17342 = defunc_0_get_bit_res_t_res_17482;
+            } else {
+                defunc_0_get_bit_res_17342 = unsign_arg0_17339;
+            }
+            
+            int32_t i32_arg0_17344 = add32(zp_lhs_17337, defunc_0_get_bit_res_17342);
+            int16_t i32_res_17345 = sext_i32_i16(i32_arg0_17344);
+            int16_t defunc_0_f_res_17347;
+            int16_t defunc_0_f_res_17348;
+            int16_t defunc_0_f_res_17349;
+            int16_t defunc_0_f_res_17350;
+            
+            if (futrts_lifted_lambda_6329(ctx, &defunc_0_f_res_17347, &defunc_0_f_res_17348, &defunc_0_f_res_17349, &defunc_0_f_res_17350, i32_res_17345) != 0) {
+                err = 1;
+                goto cleanup;
+            }
+            
+            int16_t defunc_0_op_res_16916 = add16(defunc_0_f_res_17347, scanacc_17547);
+            int16_t defunc_0_op_res_16917 = add16(defunc_0_f_res_17348, scanacc_17548);
+            int16_t defunc_0_op_res_16918 = add16(defunc_0_f_res_17349, scanacc_17549);
+            int16_t defunc_0_op_res_16919 = add16(defunc_0_f_res_17350, scanacc_17550);
+            
+            ((int16_t *) mem_17732)[i_17556] = defunc_0_op_res_16916;
+            ((int16_t *) mem_17734)[i_17556] = defunc_0_op_res_16917;
+            ((int16_t *) mem_17736)[i_17556] = defunc_0_op_res_16918;
+            ((int16_t *) mem_17738)[i_17556] = defunc_0_op_res_16919;
+            ((int16_t *) mem_17740)[i_17556] = i32_res_17345;
+            
+            int16_t scanacc_tmp_18019 = defunc_0_op_res_16916;
+            int16_t scanacc_tmp_18020 = defunc_0_op_res_16917;
+            int16_t scanacc_tmp_18021 = defunc_0_op_res_16918;
+            int16_t scanacc_tmp_18022 = defunc_0_op_res_16919;
+            
+            scanacc_17547 = scanacc_tmp_18019;
+            scanacc_17548 = scanacc_tmp_18020;
+            scanacc_17549 = scanacc_tmp_18021;
+            scanacc_17550 = scanacc_tmp_18022;
         }
+        discard_17562 = scanacc_17547;
+        discard_17563 = scanacc_17548;
+        discard_17564 = scanacc_17549;
+        discard_17565 = scanacc_17550;
         
         int16_t defunc_0_radix_sort_step_i16_res_16920;
         int16_t defunc_0_radix_sort_step_i16_res_16921;
@@ -12000,358 +6458,406 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
             defunc_0_radix_sort_step_i16_res_16922 = (int16_t) 0;
             defunc_0_radix_sort_step_i16_res_16923 = (int16_t) 0;
         } else {
-            int16_t last_res_16924 = ((int16_t *) mem_17747)[m_16832];
-            int16_t last_res_16925 = ((int16_t *) mem_17749)[m_16832];
-            int16_t last_res_16926 = ((int16_t *) mem_17751)[m_16832];
-            int16_t last_res_16927 = ((int16_t *) mem_17753)[m_16832];
+            int16_t last_res_16924 = ((int16_t *) mem_17732)[m_16832];
+            int16_t last_res_16925 = ((int16_t *) mem_17734)[m_16832];
+            int16_t last_res_16926 = ((int16_t *) mem_17736)[m_16832];
+            int16_t last_res_16927 = ((int16_t *) mem_17738)[m_16832];
             
             defunc_0_radix_sort_step_i16_res_16920 = last_res_16924;
             defunc_0_radix_sort_step_i16_res_16921 = last_res_16925;
             defunc_0_radix_sort_step_i16_res_16922 = last_res_16926;
             defunc_0_radix_sort_step_i16_res_16923 = last_res_16927;
         }
-        
-        int64_t iterations_17988 = rest_16809;
-        struct futhark_mc_task_18408 futhark_mc_task_18408_;
-        
-        futhark_mc_task_18408_.ctx = ctx;
-        futhark_mc_task_18408_.free_rest_16809 = rest_16809;
-        futhark_mc_task_18408_.free_arg_16810 = arg_16810;
-        futhark_mc_task_18408_.free_mem_17739 = mem_17739;
-        futhark_mc_task_18408_.free_mem_17757 = mem_17757;
-        
-        struct scheduler_segop futhark_mc_task_18408_task;
-        
-        futhark_mc_task_18408_task.args = &futhark_mc_task_18408_;
-        futhark_mc_task_18408_task.top_level_fn = futhark_mc_copy_17987_task_18409;
-        futhark_mc_task_18408_task.name = "futhark_mc_copy_17987_task_18409";
-        futhark_mc_task_18408_task.iterations = iterations_17988;
-        futhark_mc_task_18408_task.task_time = &ctx->program->futhark_mc_copy_17987_task_18409_total_time;
-        futhark_mc_task_18408_task.task_iter = &ctx->program->futhark_mc_copy_17987_task_18409_total_iter;
-        futhark_mc_task_18408_task.sched = STATIC;
-        futhark_mc_task_18408_task.nested_fn = NULL;
-        
-        int futhark_mc_copy_17987_task_18409_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18408_task);
-        
-        if (futhark_mc_copy_17987_task_18409_err != 0) {
-            err = futhark_mc_copy_17987_task_18409_err;
-            goto cleanup;
+        lmad_copy_8b(ctx, 1, (uint64_t *) mem_17772, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_17724, (int64_t) 0 + (int64_t) 1 * arg_16810, (int64_t []) {(int64_t) 1}, (int64_t []) {rest_16809});
+        lmad_copy_4b(ctx, 1, (uint32_t *) mem_17774, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_17722, (int64_t) 0 + (int64_t) 1 * arg_16810, (int64_t []) {(int64_t) 1}, (int64_t []) {rest_16809});
+        for (int64_t write_iter_17566 = 0; write_iter_17566 < rest_16809; write_iter_17566++) {
+            int16_t write_iv_17569 = ((int16_t *) mem_17740)[write_iter_17566];
+            int16_t write_iv_17570 = ((int16_t *) mem_17732)[write_iter_17566];
+            int16_t write_iv_17571 = ((int16_t *) mem_17734)[write_iter_17566];
+            int16_t write_iv_17572 = ((int16_t *) mem_17736)[write_iter_17566];
+            int16_t write_iv_17573 = ((int16_t *) mem_17738)[write_iter_17566];
+            int64_t slice_17691 = arg_16810 + write_iter_17566;
+            float write_iv_17574 = ((float *) mem_17722)[slice_17691];
+            int64_t write_iv_17575 = ((int64_t *) mem_17724)[slice_17691];
+            int64_t defunc_0_f_res_17309;
+            
+            if (futrts_lifted_f_6330(ctx, &defunc_0_f_res_17309, defunc_0_radix_sort_step_i16_res_16920, defunc_0_radix_sort_step_i16_res_16921, defunc_0_radix_sort_step_i16_res_16922, write_iv_17569, write_iv_17570, write_iv_17571, write_iv_17572, write_iv_17573) != 0) {
+                err = 1;
+                goto cleanup;
+            }
+            if (sle64((int64_t) 0, defunc_0_f_res_17309) && slt64(defunc_0_f_res_17309, rest_16809)) {
+                ((float *) mem_17774)[defunc_0_f_res_17309] = write_iv_17574;
+            }
+            if (sle64((int64_t) 0, defunc_0_f_res_17309) && slt64(defunc_0_f_res_17309, rest_16809)) {
+                ((int64_t *) mem_17772)[defunc_0_f_res_17309] = write_iv_17575;
+            }
         }
-        
-        int64_t iterations_17998 = rest_16809;
-        struct futhark_mc_task_18415 futhark_mc_task_18415_;
-        
-        futhark_mc_task_18415_.ctx = ctx;
-        futhark_mc_task_18415_.free_rest_16809 = rest_16809;
-        futhark_mc_task_18415_.free_arg_16810 = arg_16810;
-        futhark_mc_task_18415_.free_mem_17737 = mem_17737;
-        futhark_mc_task_18415_.free_mem_17759 = mem_17759;
-        
-        struct scheduler_segop futhark_mc_task_18415_task;
-        
-        futhark_mc_task_18415_task.args = &futhark_mc_task_18415_;
-        futhark_mc_task_18415_task.top_level_fn = futhark_mc_copy_17997_task_18416;
-        futhark_mc_task_18415_task.name = "futhark_mc_copy_17997_task_18416";
-        futhark_mc_task_18415_task.iterations = iterations_17998;
-        futhark_mc_task_18415_task.task_time = &ctx->program->futhark_mc_copy_17997_task_18416_total_time;
-        futhark_mc_task_18415_task.task_iter = &ctx->program->futhark_mc_copy_17997_task_18416_total_iter;
-        futhark_mc_task_18415_task.sched = STATIC;
-        futhark_mc_task_18415_task.nested_fn = NULL;
-        
-        int futhark_mc_copy_17997_task_18416_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18415_task);
-        
-        if (futhark_mc_copy_17997_task_18416_err != 0) {
-            err = futhark_mc_copy_17997_task_18416_err;
-            goto cleanup;
-        }
-        
-        int64_t flat_tid_17542 = (int64_t) 0;
-        struct futhark_mc_task_18422 futhark_mc_task_18422_;
-        
-        futhark_mc_task_18422_.ctx = ctx;
-        futhark_mc_task_18422_.free_rest_16809 = rest_16809;
-        futhark_mc_task_18422_.free_arg_16810 = arg_16810;
-        futhark_mc_task_18422_.free_defunc_0_radix_sort_step_i16_res_16920 = defunc_0_radix_sort_step_i16_res_16920;
-        futhark_mc_task_18422_.free_defunc_0_radix_sort_step_i16_res_16921 = defunc_0_radix_sort_step_i16_res_16921;
-        futhark_mc_task_18422_.free_defunc_0_radix_sort_step_i16_res_16922 = defunc_0_radix_sort_step_i16_res_16922;
-        futhark_mc_task_18422_.free_mem_17737 = mem_17737;
-        futhark_mc_task_18422_.free_mem_17739 = mem_17739;
-        futhark_mc_task_18422_.free_mem_17747 = mem_17747;
-        futhark_mc_task_18422_.free_mem_17749 = mem_17749;
-        futhark_mc_task_18422_.free_mem_17751 = mem_17751;
-        futhark_mc_task_18422_.free_mem_17753 = mem_17753;
-        futhark_mc_task_18422_.free_mem_17755 = mem_17755;
-        futhark_mc_task_18422_.free_mem_17757 = mem_17757;
-        futhark_mc_task_18422_.free_mem_17759 = mem_17759;
-        
-        struct scheduler_segop futhark_mc_task_18422_task;
-        
-        futhark_mc_task_18422_task.args = &futhark_mc_task_18422_;
-        futhark_mc_task_18422_task.top_level_fn = futhark_mc_segmap_task_18423;
-        futhark_mc_task_18422_task.name = "futhark_mc_segmap_task_18423";
-        futhark_mc_task_18422_task.iterations = rest_16809;
-        futhark_mc_task_18422_task.task_time = &ctx->program->futhark_mc_segmap_task_18423_total_time;
-        futhark_mc_task_18422_task.task_iter = &ctx->program->futhark_mc_segmap_task_18423_total_iter;
-        futhark_mc_task_18422_task.sched = STATIC;
-        futhark_mc_task_18422_task.nested_fn = NULL;
-        
-        int futhark_mc_segmap_task_18423_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18422_task);
-        
-        if (futhark_mc_segmap_task_18423_err != 0) {
-            err = futhark_mc_segmap_task_18423_err;
-            goto cleanup;
-        }
-        ((int16_t *) mem_17760)[(int64_t) 0] = defunc_0_radix_sort_step_i16_res_16920;
-        ((int16_t *) mem_17760)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_16921;
-        ((int16_t *) mem_17760)[(int64_t) 2] = defunc_0_radix_sort_step_i16_res_16922;
-        ((int16_t *) mem_17760)[(int64_t) 3] = defunc_0_radix_sort_step_i16_res_16923;
-        
-        int64_t flat_tid_17544 = (int64_t) 0;
-        struct futhark_mc_task_18429 futhark_mc_task_18429_;
-        
-        futhark_mc_task_18429_.ctx = ctx;
-        futhark_mc_task_18429_.free_mem_17760 = mem_17760;
-        futhark_mc_task_18429_.free_mem_17761 = mem_17761;
-        
-        struct scheduler_segop futhark_mc_task_18429_task;
-        
-        futhark_mc_task_18429_task.args = &futhark_mc_task_18429_;
-        futhark_mc_task_18429_task.top_level_fn = futhark_mc_segmap_task_18430;
-        futhark_mc_task_18429_task.name = "futhark_mc_segmap_task_18430";
-        futhark_mc_task_18429_task.iterations = (int64_t) 4;
-        futhark_mc_task_18429_task.task_time = &ctx->program->futhark_mc_segmap_task_18430_total_time;
-        futhark_mc_task_18429_task.task_iter = &ctx->program->futhark_mc_segmap_task_18430_total_iter;
-        futhark_mc_task_18429_task.sched = STATIC;
-        futhark_mc_task_18429_task.nested_fn = NULL;
-        
-        int futhark_mc_segmap_task_18430_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18429_task);
-        
-        if (futhark_mc_segmap_task_18430_err != 0) {
-            err = futhark_mc_segmap_task_18430_err;
-            goto cleanup;
+        ((int16_t *) mem_17787)[(int64_t) 0] = defunc_0_radix_sort_step_i16_res_16920;
+        ((int16_t *) mem_17787)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_16921;
+        ((int16_t *) mem_17787)[(int64_t) 2] = defunc_0_radix_sort_step_i16_res_16922;
+        ((int16_t *) mem_17787)[(int64_t) 3] = defunc_0_radix_sort_step_i16_res_16923;
+        for (int64_t i_17580 = 0; i_17580 < (int64_t) 4; i_17580++) {
+            int16_t eta_p_16944 = ((int16_t *) mem_17787)[i_17580];
+            int64_t i16_res_16945 = sext_i16_i64(eta_p_16944);
+            
+            ((int64_t *) mem_17788)[i_17580] = i16_res_16945;
         }
         
         int16_t tmp_16946 = add16(defunc_0_radix_sort_step_i16_res_16920, defunc_0_radix_sort_step_i16_res_16921);
         int16_t tmp_16947 = add16(defunc_0_radix_sort_step_i16_res_16922, tmp_16946);
         
-        ((int16_t *) mem_17762)[(int64_t) 0] = (int16_t) 0;
-        ((int16_t *) mem_17762)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_16920;
-        ((int16_t *) mem_17762)[(int64_t) 2] = tmp_16946;
-        ((int16_t *) mem_17762)[(int64_t) 3] = tmp_16947;
-        
-        int64_t iterations_18025 = n_blocks_16808 * (int64_t) 256;
-        struct futhark_mc_task_18436 futhark_mc_task_18436_;
-        
-        futhark_mc_task_18436_.ctx = ctx;
-        futhark_mc_task_18436_.free_n_blocks_16808 = n_blocks_16808;
-        futhark_mc_task_18436_.free_mem_17737 = mem_17737;
-        futhark_mc_task_18436_.free_mem_17765 = mem_17765;
-        
-        struct scheduler_segop futhark_mc_task_18436_task;
-        
-        futhark_mc_task_18436_task.args = &futhark_mc_task_18436_;
-        futhark_mc_task_18436_task.top_level_fn = futhark_mc_copy_18024_task_18437;
-        futhark_mc_task_18436_task.name = "futhark_mc_copy_18024_task_18437";
-        futhark_mc_task_18436_task.iterations = iterations_18025;
-        futhark_mc_task_18436_task.task_time = &ctx->program->futhark_mc_copy_18024_task_18437_total_time;
-        futhark_mc_task_18436_task.task_iter = &ctx->program->futhark_mc_copy_18024_task_18437_total_iter;
-        futhark_mc_task_18436_task.sched = STATIC;
-        futhark_mc_task_18436_task.nested_fn = NULL;
-        
-        int futhark_mc_copy_18024_task_18437_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18436_task);
-        
-        if (futhark_mc_copy_18024_task_18437_err != 0) {
-            err = futhark_mc_copy_18024_task_18437_err;
-            goto cleanup;
+        ((int16_t *) mem_17795)[(int64_t) 0] = (int16_t) 0;
+        ((int16_t *) mem_17795)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_16920;
+        ((int16_t *) mem_17795)[(int64_t) 2] = tmp_16946;
+        ((int16_t *) mem_17795)[(int64_t) 3] = tmp_16947;
+        for (int64_t i_17630 = 0; i_17630 < n_blocks_16808; i_17630++) {
+            lmad_copy_4b(ctx, 1, (uint32_t *) mem_17824, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_17722, (int64_t) 0 + i_17630 * ((int64_t) 1 * (int64_t) 256), (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            lmad_copy_8b(ctx, 1, (uint64_t *) mem_17825, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_17724, (int64_t) 0 + i_17630 * ((int64_t) 1 * (int64_t) 256), (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            
+            int64_t binop_x_17707 = (int64_t) 256 * i_17630;
+            int16_t discard_17602;
+            int16_t discard_17603;
+            int16_t discard_17604;
+            int16_t discard_17605;
+            int16_t scanacc_17587;
+            int16_t scanacc_17588;
+            int16_t scanacc_17589;
+            int16_t scanacc_17590;
+            
+            scanacc_17587 = (int16_t) 0;
+            scanacc_17588 = (int16_t) 0;
+            scanacc_17589 = (int16_t) 0;
+            scanacc_17590 = (int16_t) 0;
+            for (int64_t i_17596 = 0; i_17596 < (int64_t) 256; i_17596++) {
+                int64_t new_index_17708 = i_17596 + binop_x_17707;
+                float eta_p_17381 = ((float *) mem_17722)[new_index_17708];
+                int32_t i32_arg0_17382 = futrts_to_bits32(eta_p_17381);
+                int32_t unsign_arg0_17383 = ashr32(i32_arg0_17382, get_bit_arg0_16866);
+                int32_t unsign_arg0_17384 = 1 & unsign_arg0_17383;
+                int32_t unsign_arg0_17385 = ashr32(i32_arg0_17382, 31);
+                int32_t unsign_arg0_17386 = 1 & unsign_arg0_17385;
+                bool cond_17387 = unsign_arg0_17386 == 1;
+                bool x_17388 = !cond_17387;
+                bool y_17389 = cond_f_res_16867 && x_17388;
+                bool cond_17390 = cond_17387 || y_17389;
+                int32_t defunc_0_get_bit_res_17391;
+                
+                if (cond_17390) {
+                    int32_t defunc_0_get_bit_res_t_res_17483 = 1 ^ unsign_arg0_17384;
+                    
+                    defunc_0_get_bit_res_17391 = defunc_0_get_bit_res_t_res_17483;
+                } else {
+                    defunc_0_get_bit_res_17391 = unsign_arg0_17384;
+                }
+                
+                int32_t zp_lhs_17393 = mul32(2, defunc_0_get_bit_res_17391);
+                int32_t unsign_arg0_17394 = ashr32(i32_arg0_17382, blocked_radix_sort_step_arg1_16861);
+                int32_t unsign_arg0_17395 = 1 & unsign_arg0_17394;
+                bool y_17396 = cond_f_res_16868 && x_17388;
+                bool cond_17397 = cond_17387 || y_17396;
+                int32_t defunc_0_get_bit_res_17398;
+                
+                if (cond_17397) {
+                    int32_t defunc_0_get_bit_res_t_res_17484 = 1 ^ unsign_arg0_17395;
+                    
+                    defunc_0_get_bit_res_17398 = defunc_0_get_bit_res_t_res_17484;
+                } else {
+                    defunc_0_get_bit_res_17398 = unsign_arg0_17395;
+                }
+                
+                int32_t i32_arg0_17400 = add32(zp_lhs_17393, defunc_0_get_bit_res_17398);
+                int16_t i32_res_17401 = sext_i32_i16(i32_arg0_17400);
+                int16_t defunc_0_f_res_17403;
+                int16_t defunc_0_f_res_17404;
+                int16_t defunc_0_f_res_17405;
+                int16_t defunc_0_f_res_17406;
+                
+                if (futrts_lifted_lambda_6329(ctx, &defunc_0_f_res_17403, &defunc_0_f_res_17404, &defunc_0_f_res_17405, &defunc_0_f_res_17406, i32_res_17401) != 0) {
+                    err = 1;
+                    goto cleanup;
+                }
+                
+                int16_t defunc_0_op_res_17008 = add16(defunc_0_f_res_17403, scanacc_17587);
+                int16_t defunc_0_op_res_17009 = add16(defunc_0_f_res_17404, scanacc_17588);
+                int16_t defunc_0_op_res_17010 = add16(defunc_0_f_res_17405, scanacc_17589);
+                int16_t defunc_0_op_res_17011 = add16(defunc_0_f_res_17406, scanacc_17590);
+                
+                ((int16_t *) mem_17826)[i_17596] = defunc_0_op_res_17008;
+                ((int16_t *) mem_17827)[i_17596] = defunc_0_op_res_17009;
+                ((int16_t *) mem_17828)[i_17596] = defunc_0_op_res_17010;
+                ((int16_t *) mem_17829)[i_17596] = defunc_0_op_res_17011;
+                ((int16_t *) mem_17830)[i_17596] = i32_res_17401;
+                
+                int16_t scanacc_tmp_18035 = defunc_0_op_res_17008;
+                int16_t scanacc_tmp_18036 = defunc_0_op_res_17009;
+                int16_t scanacc_tmp_18037 = defunc_0_op_res_17010;
+                int16_t scanacc_tmp_18038 = defunc_0_op_res_17011;
+                
+                scanacc_17587 = scanacc_tmp_18035;
+                scanacc_17588 = scanacc_tmp_18036;
+                scanacc_17589 = scanacc_tmp_18037;
+                scanacc_17590 = scanacc_tmp_18038;
+            }
+            discard_17602 = scanacc_17587;
+            discard_17603 = scanacc_17588;
+            discard_17604 = scanacc_17589;
+            discard_17605 = scanacc_17590;
+            
+            int16_t last_res_17012 = ((int16_t *) mem_17826)[(int64_t) 255];
+            int16_t last_res_17013 = ((int16_t *) mem_17827)[(int64_t) 255];
+            int16_t last_res_17014 = ((int16_t *) mem_17828)[(int64_t) 255];
+            int16_t last_res_17015 = ((int16_t *) mem_17829)[(int64_t) 255];
+            
+            for (int64_t write_iter_17606 = 0; write_iter_17606 < (int64_t) 256; write_iter_17606++) {
+                int16_t write_iv_17609 = ((int16_t *) mem_17830)[write_iter_17606];
+                int16_t write_iv_17610 = ((int16_t *) mem_17826)[write_iter_17606];
+                int16_t write_iv_17611 = ((int16_t *) mem_17827)[write_iter_17606];
+                int16_t write_iv_17612 = ((int16_t *) mem_17828)[write_iter_17606];
+                int16_t write_iv_17613 = ((int16_t *) mem_17829)[write_iter_17606];
+                int64_t new_index_17704 = write_iter_17606 + binop_x_17707;
+                float write_iv_17614 = ((float *) mem_17722)[new_index_17704];
+                int64_t write_iv_17615 = ((int64_t *) mem_17724)[new_index_17704];
+                int64_t defunc_0_f_res_17365;
+                
+                if (futrts_lifted_f_6330(ctx, &defunc_0_f_res_17365, last_res_17012, last_res_17013, last_res_17014, write_iv_17609, write_iv_17610, write_iv_17611, write_iv_17612, write_iv_17613) != 0) {
+                    err = 1;
+                    goto cleanup;
+                }
+                if (sle64((int64_t) 0, defunc_0_f_res_17365) && slt64(defunc_0_f_res_17365, (int64_t) 256)) {
+                    ((float *) mem_17824)[defunc_0_f_res_17365] = write_iv_17614;
+                }
+                if (sle64((int64_t) 0, defunc_0_f_res_17365) && slt64(defunc_0_f_res_17365, (int64_t) 256)) {
+                    ((int64_t *) mem_17825)[defunc_0_f_res_17365] = write_iv_17615;
+                }
+            }
+            ((int16_t *) mem_17873)[(int64_t) 0] = last_res_17012;
+            ((int16_t *) mem_17873)[(int64_t) 1] = last_res_17013;
+            ((int16_t *) mem_17873)[(int64_t) 2] = last_res_17014;
+            ((int16_t *) mem_17873)[(int64_t) 3] = last_res_17015;
+            for (int64_t i_17620 = 0; i_17620 < (int64_t) 4; i_17620++) {
+                int16_t eta_p_17030 = ((int16_t *) mem_17873)[i_17620];
+                int64_t i16_res_17031 = sext_i16_i64(eta_p_17030);
+                
+                ((int64_t *) mem_17874)[i_17620] = i16_res_17031;
+            }
+            
+            int16_t tmp_17032 = add16(last_res_17012, last_res_17013);
+            int16_t tmp_17033 = add16(last_res_17014, tmp_17032);
+            
+            ((int16_t *) mem_17807)[i_17630 * (int64_t) 4] = (int16_t) 0;
+            ((int16_t *) mem_17807)[i_17630 * (int64_t) 4 + (int64_t) 1] = last_res_17012;
+            ((int16_t *) mem_17807)[i_17630 * (int64_t) 4 + (int64_t) 2] = tmp_17032;
+            ((int16_t *) mem_17807)[i_17630 * (int64_t) 4 + (int64_t) 3] = tmp_17033;
+            lmad_copy_4b(ctx, 1, (uint32_t *) mem_17798, i_17630 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_17824, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            lmad_copy_8b(ctx, 1, (uint64_t *) mem_17801, i_17630 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_17825, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            lmad_copy_8b(ctx, 1, (uint64_t *) mem_17804, i_17630 * (int64_t) 4, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_17874, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 4});
         }
         
-        int64_t iterations_18038 = n_blocks_16808 * (int64_t) 256;
-        struct futhark_mc_task_18443 futhark_mc_task_18443_;
+        int64_t discard_17642;
+        int64_t scanacc_17638 = (int64_t) 0;
         
-        futhark_mc_task_18443_.ctx = ctx;
-        futhark_mc_task_18443_.free_n_blocks_16808 = n_blocks_16808;
-        futhark_mc_task_18443_.free_mem_17739 = mem_17739;
-        futhark_mc_task_18443_.free_mem_17768 = mem_17768;
-        
-        struct scheduler_segop futhark_mc_task_18443_task;
-        
-        futhark_mc_task_18443_task.args = &futhark_mc_task_18443_;
-        futhark_mc_task_18443_task.top_level_fn = futhark_mc_copy_18037_task_18444;
-        futhark_mc_task_18443_task.name = "futhark_mc_copy_18037_task_18444";
-        futhark_mc_task_18443_task.iterations = iterations_18038;
-        futhark_mc_task_18443_task.task_time = &ctx->program->futhark_mc_copy_18037_task_18444_total_time;
-        futhark_mc_task_18443_task.task_iter = &ctx->program->futhark_mc_copy_18037_task_18444_total_iter;
-        futhark_mc_task_18443_task.sched = STATIC;
-        futhark_mc_task_18443_task.nested_fn = NULL;
-        
-        int futhark_mc_copy_18037_task_18444_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18443_task);
-        
-        if (futhark_mc_copy_18037_task_18444_err != 0) {
-            err = futhark_mc_copy_18037_task_18444_err;
-            goto cleanup;
+        for (int64_t i_17640 = 0; i_17640 < dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819; i_17640++) {
+            int64_t new_index_17680 = squot64(i_17640, dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818);
+            int64_t binop_y_17682 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 * new_index_17680;
+            int64_t new_index_17683 = i_17640 - binop_y_17682;
+            bool index_concat_cmp_17685 = sle64(n_blocks_16808, new_index_17683);
+            int64_t index_concat_branch_17689;
+            
+            if (index_concat_cmp_17685) {
+                int64_t index_concat_17687 = ((int64_t *) mem_17788)[new_index_17680];
+                
+                index_concat_branch_17689 = index_concat_17687;
+            } else {
+                int64_t index_concat_17688 = ((int64_t *) mem_17804)[new_index_17683 * (int64_t) 4 + new_index_17680];
+                
+                index_concat_branch_17689 = index_concat_17688;
+            }
+            
+            int64_t defunc_0_op_res_17047 = add64(scanacc_17638, index_concat_branch_17689);
+            
+            ((int64_t *) mem_17899)[i_17640] = defunc_0_op_res_17047;
+            
+            int64_t scanacc_tmp_18047 = defunc_0_op_res_17047;
+            
+            scanacc_17638 = scanacc_tmp_18047;
         }
-        
-        int64_t flat_tid_17546 = (int64_t) 0;
-        int64_t flat_tid_17556 = (int64_t) 0;
-        struct futhark_mc_task_18450 futhark_mc_task_18450_;
-        
-        futhark_mc_task_18450_.ctx = ctx;
-        futhark_mc_task_18450_.free_n_blocks_16808 = n_blocks_16808;
-        futhark_mc_task_18450_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-        futhark_mc_task_18450_.free_get_bit_arg0_16866 = get_bit_arg0_16866;
-        futhark_mc_task_18450_.free_cond_f_res_16867 = cond_f_res_16867;
-        futhark_mc_task_18450_.free_cond_f_res_16868 = cond_f_res_16868;
-        futhark_mc_task_18450_.free_mem_17737 = mem_17737;
-        futhark_mc_task_18450_.free_mem_17739 = mem_17739;
-        futhark_mc_task_18450_.free_mem_17765 = mem_17765;
-        futhark_mc_task_18450_.free_mem_17768 = mem_17768;
-        futhark_mc_task_18450_.free_mem_17837 = mem_17837;
-        futhark_mc_task_18450_.free_mem_17840 = mem_17840;
-        futhark_mc_task_18450_.free_mem_17843 = mem_17843;
-        futhark_mc_task_18450_.free_mem_17846 = mem_17846;
-        
-        struct scheduler_segop futhark_mc_task_18450_task;
-        
-        futhark_mc_task_18450_task.args = &futhark_mc_task_18450_;
-        futhark_mc_task_18450_task.top_level_fn = futhark_mc_segmap_task_18451;
-        futhark_mc_task_18450_task.name = "futhark_mc_segmap_task_18451";
-        futhark_mc_task_18450_task.iterations = n_blocks_16808;
-        futhark_mc_task_18450_task.task_time = &ctx->program->futhark_mc_segmap_task_18451_total_time;
-        futhark_mc_task_18450_task.task_iter = &ctx->program->futhark_mc_segmap_task_18451_total_iter;
-        futhark_mc_task_18450_task.sched = STATIC;
-        futhark_mc_task_18450_task.nested_fn = futhark_mc_segmap_nested_task_18464;
-        
-        int futhark_mc_segmap_task_18451_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18450_task);
-        
-        if (futhark_mc_segmap_task_18451_err != 0) {
-            err = futhark_mc_segmap_task_18451_err;
-            goto cleanup;
+        discard_17642 = scanacc_17638;
+        for (int64_t i_17645 = 0; i_17645 < dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819; i_17645++) {
+            int64_t zv_lhs_17050 = add64((int64_t) -1, i_17645);
+            int64_t tmp_17051 = smod64(zv_lhs_17050, dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819);
+            int64_t lifted_lambda_res_17052 = ((int64_t *) mem_17899)[tmp_17051];
+            
+            ((int64_t *) mem_17907)[i_17645] = lifted_lambda_res_17052;
         }
-        
-        int64_t flat_tid_17631 = (int64_t) 0;
-        struct futhark_mc_task_18519 futhark_mc_task_18519_;
-        
-        futhark_mc_task_18519_.ctx = ctx;
-        futhark_mc_task_18519_.free_n_blocks_16808 = n_blocks_16808;
-        futhark_mc_task_18519_.free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-        futhark_mc_task_18519_.free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-        futhark_mc_task_18519_.free_mem_17761 = mem_17761;
-        futhark_mc_task_18519_.free_mem_17843 = mem_17843;
-        futhark_mc_task_18519_.free_mem_17848 = mem_17848;
-        
-        struct scheduler_segop futhark_mc_task_18519_task;
-        
-        futhark_mc_task_18519_task.args = &futhark_mc_task_18519_;
-        futhark_mc_task_18519_task.top_level_fn = futhark_mc_segscan_task_18520;
-        futhark_mc_task_18519_task.name = "futhark_mc_segscan_task_18520";
-        futhark_mc_task_18519_task.iterations = dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-        futhark_mc_task_18519_task.task_time = &ctx->program->futhark_mc_segscan_task_18520_total_time;
-        futhark_mc_task_18519_task.task_iter = &ctx->program->futhark_mc_segscan_task_18520_total_iter;
-        futhark_mc_task_18519_task.sched = STATIC;
-        futhark_mc_task_18519_task.nested_fn = NULL;
-        
-        int futhark_mc_segscan_task_18520_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18519_task);
-        
-        if (futhark_mc_segscan_task_18520_err != 0) {
-            err = futhark_mc_segscan_task_18520_err;
-            goto cleanup;
-        }
-        
-        int64_t flat_tid_17633 = (int64_t) 0;
-        struct futhark_mc_task_18531 futhark_mc_task_18531_;
-        
-        futhark_mc_task_18531_.ctx = ctx;
-        futhark_mc_task_18531_.free_dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819 = dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-        futhark_mc_task_18531_.free_mem_17848 = mem_17848;
-        futhark_mc_task_18531_.free_mem_17850 = mem_17850;
-        
-        struct scheduler_segop futhark_mc_task_18531_task;
-        
-        futhark_mc_task_18531_task.args = &futhark_mc_task_18531_;
-        futhark_mc_task_18531_task.top_level_fn = futhark_mc_segmap_task_18532;
-        futhark_mc_task_18531_task.name = "futhark_mc_segmap_task_18532";
-        futhark_mc_task_18531_task.iterations = dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_16819;
-        futhark_mc_task_18531_task.task_time = &ctx->program->futhark_mc_segmap_task_18532_total_time;
-        futhark_mc_task_18531_task.task_iter = &ctx->program->futhark_mc_segmap_task_18532_total_iter;
-        futhark_mc_task_18531_task.sched = STATIC;
-        futhark_mc_task_18531_task.nested_fn = NULL;
-        
-        int futhark_mc_segmap_task_18532_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18531_task);
-        
-        if (futhark_mc_segmap_task_18532_err != 0) {
-            err = futhark_mc_segmap_task_18532_err;
-            goto cleanup;
-        }
-        ((int64_t *) mem_17850)[(int64_t) 0] = (int64_t) 0;
-        
-        int64_t flat_tid_17635 = (int64_t) 0;
-        struct futhark_mc_task_18538 futhark_mc_task_18538_;
-        
-        futhark_mc_task_18538_.ctx = ctx;
-        futhark_mc_task_18538_.free_n_blocks_16808 = n_blocks_16808;
-        futhark_mc_task_18538_.free_arg_16810 = arg_16810;
-        futhark_mc_task_18538_.free_dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-        futhark_mc_task_18538_.free_dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818;
-        futhark_mc_task_18538_.free_blocked_radix_sort_step_arg1_16861 = blocked_radix_sort_step_arg1_16861;
-        futhark_mc_task_18538_.free_mem_17737 = mem_17737;
-        futhark_mc_task_18538_.free_mem_17739 = mem_17739;
-        futhark_mc_task_18538_.free_mem_17757 = mem_17757;
-        futhark_mc_task_18538_.free_mem_17759 = mem_17759;
-        futhark_mc_task_18538_.free_mem_17762 = mem_17762;
-        futhark_mc_task_18538_.free_mem_17837 = mem_17837;
-        futhark_mc_task_18538_.free_mem_17840 = mem_17840;
-        futhark_mc_task_18538_.free_mem_17846 = mem_17846;
-        futhark_mc_task_18538_.free_mem_17850 = mem_17850;
-        
-        struct scheduler_segop futhark_mc_task_18538_task;
-        
-        futhark_mc_task_18538_task.args = &futhark_mc_task_18538_;
-        futhark_mc_task_18538_task.top_level_fn = futhark_mc_segmap_task_18539;
-        futhark_mc_task_18538_task.name = "futhark_mc_segmap_task_18539";
-        futhark_mc_task_18538_task.iterations = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811;
-        futhark_mc_task_18538_task.task_time = &ctx->program->futhark_mc_segmap_task_18539_total_time;
-        futhark_mc_task_18538_task.task_iter = &ctx->program->futhark_mc_segmap_task_18539_total_iter;
-        futhark_mc_task_18538_task.sched = STATIC;
-        futhark_mc_task_18538_task.nested_fn = NULL;
-        
-        int futhark_mc_segmap_task_18539_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18538_task);
-        
-        if (futhark_mc_segmap_task_18539_err != 0) {
-            err = futhark_mc_segmap_task_18539_err;
-            goto cleanup;
+        ((int64_t *) mem_17907)[(int64_t) 0] = (int64_t) 0;
+        for (int64_t write_iter_17647 = 0; write_iter_17647 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811; write_iter_17647++) {
+            bool index_concat_cmp_17671 = sle64(arg_16810, write_iter_17647);
+            float index_concat_branch_17253;
+            
+            if (index_concat_cmp_17671) {
+                int64_t index_concat_i_17493 = sub64(write_iter_17647, arg_16810);
+                float index_concat_17494 = ((float *) mem_17774)[index_concat_i_17493];
+                
+                index_concat_branch_17253 = index_concat_17494;
+            } else {
+                int64_t new_index_17256 = squot64(write_iter_17647, (int64_t) 256);
+                int64_t binop_y_17257 = (int64_t) 256 * new_index_17256;
+                int64_t new_index_17258 = write_iter_17647 - binop_y_17257;
+                float index_concat_17259 = ((float *) mem_17798)[new_index_17256 * (int64_t) 256 + new_index_17258];
+                
+                index_concat_branch_17253 = index_concat_17259;
+            }
+            
+            int32_t i32_arg0_17260 = futrts_to_bits32(index_concat_branch_17253);
+            int32_t unsign_arg0_17261 = ashr32(i32_arg0_17260, 31);
+            int32_t unsign_arg0_17262 = 1 & unsign_arg0_17261;
+            bool cond_17263 = unsign_arg0_17262 == 1;
+            bool x_17264 = !cond_17263;
+            int32_t zlzb_rhs_17265;
+            int32_t acc_17267 = 0;
+            
+            for (int32_t i_17266 = 0; i_17266 < 2; i_17266++) {
+                int32_t get_bit_arg0_17268 = add32(blocked_radix_sort_step_arg1_16861, i_17266);
+                int32_t unsign_arg0_17269 = ashr32(i32_arg0_17260, get_bit_arg0_17268);
+                int32_t unsign_arg0_17270 = 1 & unsign_arg0_17269;
+                bool cond_f_res_17271 = get_bit_arg0_17268 == 31;
+                bool y_17272 = x_17264 && cond_f_res_17271;
+                bool cond_17273 = cond_17263 || y_17272;
+                int32_t defunc_0_get_bit_res_17274;
+                
+                if (cond_17273) {
+                    int32_t defunc_0_get_bit_res_t_res_17495 = 1 ^ unsign_arg0_17270;
+                    
+                    defunc_0_get_bit_res_17274 = defunc_0_get_bit_res_t_res_17495;
+                } else {
+                    defunc_0_get_bit_res_17274 = unsign_arg0_17270;
+                }
+                
+                int32_t zp_rhs_17276 = shl32(defunc_0_get_bit_res_17274, i_17266);
+                int32_t loopres_17277 = add32(acc_17267, zp_rhs_17276);
+                int32_t acc_tmp_18052 = loopres_17277;
+                
+                acc_17267 = acc_tmp_18052;
+            }
+            zlzb_rhs_17265 = acc_17267;
+            
+            int64_t i32_res_17278 = sext_i32_i64(zlzb_rhs_17265);
+            int64_t block_idx_17279 = sdiv64(write_iter_17647, (int64_t) 256);
+            bool x_17280 = sle64((int64_t) 0, block_idx_17279);
+            bool y_17281 = slt64(block_idx_17279, dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818);
+            bool bounds_check_17282 = x_17280 && y_17281;
+            bool index_certs_17283;
+            
+            if (!bounds_check_17282) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) block_idx_17279, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48\n   #1  /prelude/soacs.fut:59:9-11\n   #2  /prelude/array.fut:241:11-17\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:227:48-50\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:270:49-51\n   #5  /prelude/functional.fut:9:44-45\n   #6  lib/github.com/diku-dk/sorts/radix_sort.fut:280:49-51\n   #7  /prelude/functional.fut:9:44-45\n   #8  arrange.fut:51:1-64:20\n"));
+                err = FUTHARK_PROGRAM_ERROR;
+                goto cleanup;
+            }
+            
+            bool x_17284 = sle64((int64_t) 0, i32_res_17278);
+            bool y_17285 = slt64(i32_res_17278, (int64_t) 4);
+            bool bounds_check_17286 = x_17284 && y_17285;
+            bool index_certs_17287;
+            
+            if (!bounds_check_17286) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i32_res_17278, "] out of bounds for array of shape [", (long long) (int64_t) 4, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53\n   #1  /prelude/soacs.fut:59:9-11\n   #2  /prelude/array.fut:241:11-17\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:227:48-50\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:270:49-51\n   #5  /prelude/functional.fut:9:44-45\n   #6  lib/github.com/diku-dk/sorts/radix_sort.fut:280:49-51\n   #7  /prelude/functional.fut:9:44-45\n   #8  arrange.fut:51:1-64:20\n"));
+                err = FUTHARK_PROGRAM_ERROR;
+                goto cleanup;
+            }
+            
+            float index_concat_branch_17675;
+            
+            if (index_concat_cmp_17671) {
+                int64_t index_concat_i_17672 = sub64(write_iter_17647, arg_16810);
+                float index_concat_17673 = ((float *) mem_17774)[index_concat_i_17672];
+                
+                index_concat_branch_17675 = index_concat_17673;
+            } else {
+                int64_t new_index_17699 = squot64(write_iter_17647, (int64_t) 256);
+                int64_t binop_y_17701 = (int64_t) 256 * new_index_17699;
+                int64_t new_index_17702 = write_iter_17647 - binop_y_17701;
+                float index_concat_17674 = ((float *) mem_17798)[new_index_17699 * (int64_t) 256 + new_index_17702];
+                
+                index_concat_branch_17675 = index_concat_17674;
+            }
+            
+            int64_t index_concat_branch_17669;
+            
+            if (index_concat_cmp_17671) {
+                int64_t index_concat_i_17666 = sub64(write_iter_17647, arg_16810);
+                int64_t index_concat_17667 = ((int64_t *) mem_17772)[index_concat_i_17666];
+                
+                index_concat_branch_17669 = index_concat_17667;
+            } else {
+                int64_t new_index_17695 = squot64(write_iter_17647, (int64_t) 256);
+                int64_t binop_y_17697 = (int64_t) 256 * new_index_17695;
+                int64_t new_index_17698 = write_iter_17647 - binop_y_17697;
+                int64_t index_concat_17668 = ((int64_t *) mem_17801)[new_index_17695 * (int64_t) 256 + new_index_17698];
+                
+                index_concat_branch_17669 = index_concat_17668;
+            }
+            
+            int64_t binop_x_17288 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_16818 * i32_res_17278;
+            int64_t new_index_17289 = block_idx_17279 + binop_x_17288;
+            int64_t new_offset_17290 = ((int64_t *) mem_17907)[new_index_17289];
+            bool index_concat_cmp_17291 = sle64(n_blocks_16808, block_idx_17279);
+            int16_t index_concat_branch_17292;
+            
+            if (index_concat_cmp_17291) {
+                int16_t index_concat_17496 = ((int16_t *) mem_17795)[i32_res_17278];
+                
+                index_concat_branch_17292 = index_concat_17496;
+            } else {
+                int16_t index_concat_17294 = ((int16_t *) mem_17807)[block_idx_17279 * (int64_t) 4 + i32_res_17278];
+                
+                index_concat_branch_17292 = index_concat_17294;
+            }
+            
+            int64_t i16_res_17295 = sext_i16_i64(index_concat_branch_17292);
+            int64_t zp_lhs_17296 = mul64((int64_t) 256, block_idx_17279);
+            int64_t old_offset_17297 = add64(i16_res_17295, zp_lhs_17296);
+            int64_t zp_lhs_17298 = sub64(write_iter_17647, old_offset_17297);
+            int64_t idx_17299 = add64(new_offset_17290, zp_lhs_17298);
+            
+            if (sle64((int64_t) 0, idx_17299) && slt64(idx_17299, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811)) {
+                ((float *) mem_17722)[idx_17299] = index_concat_branch_17675;
+            }
+            if (sle64((int64_t) 0, idx_17299) && slt64(idx_17299, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_16811)) {
+                ((int64_t *) mem_17724)[idx_17299] = index_concat_branch_17669;
+            }
         }
     }
-    if (mem_17858_cached_sizze_18375 < bytes_17857) {
-        err = lexical_realloc(ctx, &mem_17858, &mem_17858_cached_sizze_18375, bytes_17857);
+    if (mem_17933_cached_sizze_18099 < bytes_17932) {
+        err = lexical_realloc(ctx, &mem_17933, &mem_17933_cached_sizze_18099, bytes_17932);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    for (int64_t nest_i_18331 = 0; nest_i_18331 < dz2082U_12742; nest_i_18331++) {
-        ((int64_t *) mem_17858)[nest_i_18331] = (int64_t) 0;
+    for (int64_t nest_i_18053 = 0; nest_i_18053 < dz2082U_12742; nest_i_18053++) {
+        ((int64_t *) mem_17933)[nest_i_18053] = (int64_t) 0;
     }
-    if (mem_17860_cached_sizze_18376 < bytes_17857) {
-        err = lexical_realloc(ctx, &mem_17860, &mem_17860_cached_sizze_18376, bytes_17857);
+    if (mem_17935_cached_sizze_18100 < bytes_17932) {
+        err = lexical_realloc(ctx, &mem_17935, &mem_17935_cached_sizze_18100, bytes_17932);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    for (int64_t nest_i_18332 = 0; nest_i_18332 < dz2082U_12742; nest_i_18332++) {
-        ((int64_t *) mem_17860)[nest_i_18332] = (int64_t) 0;
+    for (int64_t nest_i_18054 = 0; nest_i_18054 < dz2082U_12742; nest_i_18054++) {
+        ((int64_t *) mem_17935)[nest_i_18054] = (int64_t) 0;
     }
-    if (mem_17861_cached_sizze_18377 < dz2080U_12740) {
-        err = lexical_realloc(ctx, &mem_17861, &mem_17861_cached_sizze_18377, dz2080U_12740);
+    if (mem_17936_cached_sizze_18101 < dz2080U_12740) {
+        err = lexical_realloc(ctx, &mem_17936, &mem_17936_cached_sizze_18101, dz2080U_12740);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    for (int64_t nest_i_18333 = 0; nest_i_18333 < dz2080U_12740; nest_i_18333++) {
-        ((bool *) mem_17861)[nest_i_18333] = 0;
+    for (int64_t nest_i_18055 = 0; nest_i_18055 < dz2080U_12740; nest_i_18055++) {
+        ((bool *) mem_17936)[nest_i_18055] = 0;
     }
-    if (mem_17862_cached_sizze_18378 < dz2082U_12742) {
-        err = lexical_realloc(ctx, &mem_17862, &mem_17862_cached_sizze_18378, dz2082U_12742);
+    if (mem_17937_cached_sizze_18102 < dz2082U_12742) {
+        err = lexical_realloc(ctx, &mem_17937, &mem_17937_cached_sizze_18102, dz2082U_12742);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    for (int64_t nest_i_18334 = 0; nest_i_18334 < dz2082U_12742; nest_i_18334++) {
-        ((bool *) mem_17862)[nest_i_18334] = 0;
+    for (int64_t nest_i_18056 = 0; nest_i_18056 < dz2082U_12742; nest_i_18056++) {
+        ((bool *) mem_17937)[nest_i_18056] = 0;
     }
     
     bool greedy_match_from_sorted_idx_res_17129;
@@ -12376,7 +6882,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
             goto cleanup;
         }
         
-        int64_t j_17147 = ((int64_t *) mem_17739)[i_17137];
+        int64_t j_17147 = ((int64_t *) mem_17724)[i_17137];
         int64_t g_17148 = sdiv64(j_17147, dz2082U_12742);
         bool x_17150 = sle64((int64_t) 0, g_17148);
         bool y_17151 = slt64(g_17148, dz2080U_12740);
@@ -12390,7 +6896,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         }
         
         int64_t p_17149 = smod64(j_17147, dz2082U_12742);
-        bool not_arg0_17154 = ((bool *) mem_17861)[g_17148];
+        bool not_arg0_17154 = ((bool *) mem_17936)[g_17148];
         bool not_res_17155 = !not_arg0_17154;
         bool cond_17156;
         
@@ -12406,7 +6912,7 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
                 goto cleanup;
             }
             
-            bool not_arg0_17519 = ((bool *) mem_17862)[p_17149];
+            bool not_arg0_17519 = ((bool *) mem_17937)[p_17149];
             bool not_res_17520 = !not_arg0_17519;
             
             cond_17156 = not_res_17520;
@@ -12439,10 +6945,10 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
-            ((int64_t *) mem_17858)[cnt_17138] = g_17148;
-            ((int64_t *) mem_17860)[cnt_17138] = p_17149;
-            ((bool *) mem_17861)[g_17148] = 1;
-            ((bool *) mem_17862)[p_17149] = 1;
+            ((int64_t *) mem_17933)[cnt_17138] = g_17148;
+            ((int64_t *) mem_17935)[cnt_17138] = p_17149;
+            ((bool *) mem_17936)[g_17148] = 1;
+            ((bool *) mem_17937)[p_17149] = 1;
             
             int64_t tmp_17533 = add64((int64_t) 1, i_17137);
             int64_t tmp_17534 = add64((int64_t) 1, cnt_17138);
@@ -12459,118 +6965,127 @@ FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_contex
         bool cond_17184 = slt64(loopres_17163, dzlz7bUZLztZRz20Umz20Unz7dUzg_16770);
         bool loop_cond_t_res_17185 = slt64(loopres_17164, dz2082U_12742);
         bool x_17186 = cond_17184 && loop_cond_t_res_17185;
-        bool loop_while_tmp_18335 = x_17186;
-        int64_t i_tmp_18336 = loopres_17163;
-        int64_t cnt_tmp_18337 = loopres_17164;
+        bool loop_while_tmp_18057 = x_17186;
+        int64_t i_tmp_18058 = loopres_17163;
+        int64_t cnt_tmp_18059 = loopres_17164;
         
-        loop_while_17136 = loop_while_tmp_18335;
-        i_17137 = i_tmp_18336;
-        cnt_17138 = cnt_tmp_18337;
+        loop_while_17136 = loop_while_tmp_18057;
+        i_17137 = i_tmp_18058;
+        cnt_17138 = cnt_tmp_18059;
     }
     greedy_match_from_sorted_idx_res_17129 = loop_while_17136;
     greedy_match_from_sorted_idx_res_17130 = i_17137;
     greedy_match_from_sorted_idx_res_17131 = cnt_17138;
-    if (memblock_alloc(ctx, &mem_17888, bytes_17857, "mem_17888")) {
+    if (memblock_alloc(ctx, &mem_17963, bytes_17932, "mem_17963")) {
         err = 1;
         goto cleanup;
     }
-    for (int64_t nest_i_18342 = 0; nest_i_18342 < dz2082U_12742; nest_i_18342++) {
-        ((double *) mem_17888.mem)[nest_i_18342] = 0.0;
+    for (int64_t nest_i_18064 = 0; nest_i_18064 < dz2082U_12742; nest_i_18064++) {
+        ((double *) mem_17963.mem)[nest_i_18064] = 0.0;
     }
-    if (memblock_alloc(ctx, &mem_17890, bytes_17857, "mem_17890")) {
+    if (memblock_alloc(ctx, &mem_17965, bytes_17932, "mem_17965")) {
         err = 1;
         goto cleanup;
     }
-    for (int64_t nest_i_18343 = 0; nest_i_18343 < dz2082U_12742; nest_i_18343++) {
-        ((double *) mem_17890.mem)[nest_i_18343] = 0.0;
+    for (int64_t nest_i_18065 = 0; nest_i_18065 < dz2082U_12742; nest_i_18065++) {
+        ((double *) mem_17965.mem)[nest_i_18065] = 0.0;
     }
-    
-    int64_t flat_tid_17637 = (int64_t) 0;
-    struct futhark_mc_task_18545 futhark_mc_task_18545_;
-    
-    futhark_mc_task_18545_.ctx = ctx;
-    futhark_mc_task_18545_.free_dz2080U_12740 = dz2080U_12740;
-    futhark_mc_task_18545_.free_dz2081U_12741 = dz2081U_12741;
-    futhark_mc_task_18545_.free_dz2082U_12742 = dz2082U_12742;
-    futhark_mc_task_18545_.free_grid_xs_mem_17730 = grid_xs_mem_17730.mem;
-    futhark_mc_task_18545_.free_grid_ys_mem_17731 = grid_ys_mem_17731.mem;
-    futhark_mc_task_18545_.free_mem_17858 = mem_17858;
-    futhark_mc_task_18545_.free_mem_17860 = mem_17860;
-    futhark_mc_task_18545_.free_mem_17888 = mem_17888.mem;
-    futhark_mc_task_18545_.free_mem_17890 = mem_17890.mem;
-    
-    struct scheduler_segop futhark_mc_task_18545_task;
-    
-    futhark_mc_task_18545_task.args = &futhark_mc_task_18545_;
-    futhark_mc_task_18545_task.top_level_fn = futhark_mc_segmap_task_18546;
-    futhark_mc_task_18545_task.name = "futhark_mc_segmap_task_18546";
-    futhark_mc_task_18545_task.iterations = dz2082U_12742;
-    futhark_mc_task_18545_task.task_time = &ctx->program->futhark_mc_segmap_task_18546_total_time;
-    futhark_mc_task_18545_task.task_iter = &ctx->program->futhark_mc_segmap_task_18546_total_iter;
-    futhark_mc_task_18545_task.sched = STATIC;
-    futhark_mc_task_18545_task.nested_fn = NULL;
-    
-    int futhark_mc_segmap_task_18546_err = scheduler_prepare_task(&ctx->scheduler, &futhark_mc_task_18545_task);
-    
-    if (futhark_mc_segmap_task_18546_err != 0) {
-        err = futhark_mc_segmap_task_18546_err;
-        goto cleanup;
+    for (int64_t write_iter_17655 = 0; write_iter_17655 < dz2082U_12742; write_iter_17655++) {
+        int64_t write_iv_17658 = ((int64_t *) mem_17933)[write_iter_17655];
+        bool x_17232 = sle64((int64_t) 0, write_iv_17658);
+        bool y_17233 = slt64(write_iv_17658, dz2080U_12740);
+        bool bounds_check_17234 = x_17232 && y_17233;
+        bool index_certs_17235;
+        
+        if (!bounds_check_17234) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) write_iv_17658, "] out of bounds for array of shape [", (long long) dz2080U_12740, "].", "-> #0  arrange.fut:60:30-40\n   #1  arrange.fut:60:42-44\n   #2  arrange.fut:51:1-64:20\n"));
+            err = FUTHARK_PROGRAM_ERROR;
+            goto cleanup;
+        }
+        
+        bool y_17239 = slt64(write_iv_17658, dz2081U_12741);
+        bool bounds_check_17240 = x_17232 && y_17239;
+        bool index_certs_17241;
+        
+        if (!bounds_check_17240) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) write_iv_17658, "] out of bounds for array of shape [", (long long) dz2081U_12741, "].", "-> #0  arrange.fut:61:30-40\n   #1  arrange.fut:61:42-44\n   #2  arrange.fut:51:1-64:20\n"));
+            err = FUTHARK_PROGRAM_ERROR;
+            goto cleanup;
+        }
+        
+        int64_t write_iv_17659 = ((int64_t *) mem_17935)[write_iter_17655];
+        double lifted_lambda_res_17236 = ((double *) grid_xs_mem_17709.mem)[write_iv_17658];
+        double lifted_lambda_res_17242 = ((double *) grid_ys_mem_17710.mem)[write_iv_17658];
+        
+        if (sle64((int64_t) 0, write_iv_17659) && slt64(write_iv_17659, dz2082U_12742)) {
+            ((double *) mem_17963.mem)[write_iv_17659] = lifted_lambda_res_17242;
+        }
+        if (sle64((int64_t) 0, write_iv_17659) && slt64(write_iv_17659, dz2082U_12742)) {
+            ((double *) mem_17965.mem)[write_iv_17659] = lifted_lambda_res_17236;
+        }
     }
-    if (memblock_set(ctx, &mem_out_17910, &mem_17890, "mem_17890") != 0)
+    if (memblock_set(ctx, &mem_out_18011, &mem_17965, "mem_17965") != 0)
         return 1;
-    if (memblock_set(ctx, &mem_out_17911, &mem_17888, "mem_17888") != 0)
+    if (memblock_set(ctx, &mem_out_18012, &mem_17963, "mem_17963") != 0)
         return 1;
-    prim_out_17912 = dz2082U_12742;
-    if (memblock_set(ctx, &*mem_out_p_18351, &mem_out_17910, "mem_out_17910") != 0)
+    prim_out_18013 = dz2082U_12742;
+    if (memblock_set(ctx, &*mem_out_p_18068, &mem_out_18011, "mem_out_18011") != 0)
         return 1;
-    if (memblock_set(ctx, &*mem_out_p_18352, &mem_out_17911, "mem_out_17911") != 0)
+    if (memblock_set(ctx, &*mem_out_p_18069, &mem_out_18012, "mem_out_18012") != 0)
         return 1;
-    *out_prim_out_18353 = prim_out_17912;
+    *out_prim_out_18070 = prim_out_18013;
     
   cleanup:
     {
-        free(mem_17735);
-        free(mem_17737);
-        free(mem_17739);
-        free(mem_17747);
-        free(mem_17749);
-        free(mem_17751);
-        free(mem_17753);
-        free(mem_17755);
-        free(mem_17757);
-        free(mem_17759);
-        free(mem_17760);
-        free(mem_17761);
-        free(mem_17762);
-        free(mem_17765);
-        free(mem_17768);
-        free(mem_17837);
-        free(mem_17840);
-        free(mem_17843);
-        free(mem_17846);
-        free(mem_17848);
-        free(mem_17850);
-        free(mem_17858);
-        free(mem_17860);
-        free(mem_17861);
-        free(mem_17862);
-        if (memblock_unref(ctx, &mem_17890, "mem_17890") != 0)
+        free(mem_17714);
+        free(mem_17722);
+        free(mem_17724);
+        free(mem_17732);
+        free(mem_17734);
+        free(mem_17736);
+        free(mem_17738);
+        free(mem_17740);
+        free(mem_17772);
+        free(mem_17774);
+        free(mem_17787);
+        free(mem_17788);
+        free(mem_17795);
+        free(mem_17798);
+        free(mem_17801);
+        free(mem_17804);
+        free(mem_17807);
+        free(mem_17824);
+        free(mem_17825);
+        free(mem_17826);
+        free(mem_17827);
+        free(mem_17828);
+        free(mem_17829);
+        free(mem_17830);
+        free(mem_17873);
+        free(mem_17874);
+        free(mem_17899);
+        free(mem_17907);
+        free(mem_17933);
+        free(mem_17935);
+        free(mem_17936);
+        free(mem_17937);
+        if (memblock_unref(ctx, &mem_17965, "mem_17965") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_17888, "mem_17888") != 0)
+        if (memblock_unref(ctx, &mem_17963, "mem_17963") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_out_17911, "mem_out_17911") != 0)
+        if (memblock_unref(ctx, &mem_out_18012, "mem_out_18012") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_out_17910, "mem_out_17910") != 0)
+        if (memblock_unref(ctx, &mem_out_18011, "mem_out_18011") != 0)
             return 1;
     }
     return err;
 }
-FUTHARK_FUN_ATTR int futrts_lifted_f_6330(struct futhark_context *ctx, int64_t *out_prim_out_18552, int16_t na_9704, int16_t nb_9705, int16_t nc_9706, int16_t bin_9707, int16_t a_9708, int16_t b_9709, int16_t c_9710, int16_t d_9711)
+FUTHARK_FUN_ATTR int futrts_lifted_f_6330(struct futhark_context *ctx, int64_t *out_prim_out_18103, int16_t na_9704, int16_t nb_9705, int16_t nc_9706, int16_t bin_9707, int16_t a_9708, int16_t b_9709, int16_t c_9710, int16_t d_9711)
 {
     (void) ctx;
     
     int err = 0;
-    int64_t prim_out_17910;
+    int64_t prim_out_18011;
     bool bool_arg0_9712 = bin_9707 == (int16_t) 0;
     int16_t bool_res_12769 = btoi_bool_i16(bool_arg0_9712);
     int16_t zp_rhs_9716 = mul16(a_9708, bool_res_12769);
@@ -12601,22 +7116,22 @@ FUTHARK_FUN_ATTR int futrts_lifted_f_6330(struct futhark_context *ctx, int64_t *
     int16_t i16_arg0_9767 = add16(zp_lhs_9759, zp_rhs_9765);
     int64_t i16_res_12783 = sext_i16_i64(i16_arg0_9767);
     
-    prim_out_17910 = i16_res_12783;
-    *out_prim_out_18552 = prim_out_17910;
+    prim_out_18011 = i16_res_12783;
+    *out_prim_out_18103 = prim_out_18011;
     
   cleanup:
     { }
     return err;
 }
-FUTHARK_FUN_ATTR int futrts_lifted_lambda_6329(struct futhark_context *ctx, int16_t *out_prim_out_18553, int16_t *out_prim_out_18554, int16_t *out_prim_out_18555, int16_t *out_prim_out_18556, int16_t x_9647)
+FUTHARK_FUN_ATTR int futrts_lifted_lambda_6329(struct futhark_context *ctx, int16_t *out_prim_out_18104, int16_t *out_prim_out_18105, int16_t *out_prim_out_18106, int16_t *out_prim_out_18107, int16_t x_9647)
 {
     (void) ctx;
     
     int err = 0;
-    int16_t prim_out_17910;
-    int16_t prim_out_17911;
-    int16_t prim_out_17912;
-    int16_t prim_out_17913;
+    int16_t prim_out_18011;
+    int16_t prim_out_18012;
+    int16_t prim_out_18013;
+    int16_t prim_out_18014;
     bool bool_arg0_9648 = x_9647 == (int16_t) 0;
     int16_t bool_res_12769 = btoi_bool_i16(bool_arg0_9648);
     bool bool_arg0_9652 = x_9647 == (int16_t) 1;
@@ -12626,14 +7141,14 @@ FUTHARK_FUN_ATTR int futrts_lifted_lambda_6329(struct futhark_context *ctx, int1
     bool bool_arg0_9660 = x_9647 == (int16_t) 3;
     int16_t bool_res_12775 = btoi_bool_i16(bool_arg0_9660);
     
-    prim_out_17910 = bool_res_12769;
-    prim_out_17911 = bool_res_12771;
-    prim_out_17912 = bool_res_12773;
-    prim_out_17913 = bool_res_12775;
-    *out_prim_out_18553 = prim_out_17910;
-    *out_prim_out_18554 = prim_out_17911;
-    *out_prim_out_18555 = prim_out_17912;
-    *out_prim_out_18556 = prim_out_17913;
+    prim_out_18011 = bool_res_12769;
+    prim_out_18012 = bool_res_12771;
+    prim_out_18013 = bool_res_12773;
+    prim_out_18014 = bool_res_12775;
+    *out_prim_out_18104 = prim_out_18011;
+    *out_prim_out_18105 = prim_out_18012;
+    *out_prim_out_18106 = prim_out_18013;
+    *out_prim_out_18107 = prim_out_18014;
     
   cleanup:
     { }
@@ -12646,56 +7161,55 @@ int futhark_entry_arrange_from_coordinates(struct futhark_context *ctx, struct f
     int64_t dz2081U_12741 = (int64_t) 0;
     int64_t dz2082U_12742 = (int64_t) 0;
     int64_t dz2083U_12743 = (int64_t) 0;
-    int64_t prim_out_17912 = (int64_t) 0;
+    int64_t prim_out_18013 = (int64_t) 0;
     int ret = 0;
     
     lock_lock(&ctx->lock);
-    worker_local = &ctx->scheduler.workers[0];
     
-    struct memblock mem_out_17911;
+    struct memblock mem_out_18012;
     
-    mem_out_17911.references = NULL;
+    mem_out_18012.references = NULL;
     
-    struct memblock mem_out_17910;
+    struct memblock mem_out_18011;
     
-    mem_out_17910.references = NULL;
+    mem_out_18011.references = NULL;
     
-    struct memblock pts_y_mem_17733;
+    struct memblock pts_y_mem_17712;
     
-    pts_y_mem_17733.references = NULL;
+    pts_y_mem_17712.references = NULL;
     
-    struct memblock pts_x_mem_17732;
+    struct memblock pts_x_mem_17711;
     
-    pts_x_mem_17732.references = NULL;
+    pts_x_mem_17711.references = NULL;
     
-    struct memblock grid_ys_mem_17731;
+    struct memblock grid_ys_mem_17710;
     
-    grid_ys_mem_17731.references = NULL;
+    grid_ys_mem_17710.references = NULL;
     
-    struct memblock grid_xs_mem_17730;
+    struct memblock grid_xs_mem_17709;
     
-    grid_xs_mem_17730.references = NULL;
-    grid_xs_mem_17730 = in0->mem;
+    grid_xs_mem_17709.references = NULL;
+    grid_xs_mem_17709 = in0->mem;
     dz2080U_12740 = in0->shape[0];
-    grid_ys_mem_17731 = in1->mem;
+    grid_ys_mem_17710 = in1->mem;
     dz2081U_12741 = in1->shape[0];
-    pts_x_mem_17732 = in2->mem;
+    pts_x_mem_17711 = in2->mem;
     dz2082U_12742 = in2->shape[0];
-    pts_y_mem_17733 = in3->mem;
+    pts_y_mem_17712 = in3->mem;
     dz2083U_12743 = in3->shape[0];
     if (!(dz2080U_12740 == in0->shape[0] && (dz2081U_12741 == in1->shape[0] && (dz2082U_12742 == in2->shape[0] && dz2083U_12743 == in3->shape[0])))) {
         ret = 1;
         set_error(ctx, msgprintf("Error: entry point arguments have invalid sizes.\n"));
     }
     if (ret == 0) {
-        ret = futrts_entry_arrange_from_coordinates(ctx, &mem_out_17910, &mem_out_17911, &prim_out_17912, grid_xs_mem_17730, grid_ys_mem_17731, pts_x_mem_17732, pts_y_mem_17733, dz2080U_12740, dz2081U_12741, dz2082U_12742, dz2083U_12743);
+        ret = futrts_entry_arrange_from_coordinates(ctx, &mem_out_18011, &mem_out_18012, &prim_out_18013, grid_xs_mem_17709, grid_ys_mem_17710, pts_x_mem_17711, pts_y_mem_17712, dz2080U_12740, dz2081U_12741, dz2082U_12742, dz2083U_12743);
         if (ret == 0) {
             assert((*out0 = (struct futhark_f64_1d *) malloc(sizeof(struct futhark_f64_1d))) != NULL);
-            (*out0)->mem = mem_out_17910;
-            (*out0)->shape[0] = prim_out_17912;
+            (*out0)->mem = mem_out_18011;
+            (*out0)->shape[0] = prim_out_18013;
             assert((*out1 = (struct futhark_f64_1d *) malloc(sizeof(struct futhark_f64_1d))) != NULL);
-            (*out1)->mem = mem_out_17911;
-            (*out1)->shape[0] = prim_out_17912;
+            (*out1)->mem = mem_out_18012;
+            (*out1)->shape[0] = prim_out_18013;
         }
     }
     lock_unlock(&ctx->lock);
