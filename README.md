@@ -15,12 +15,11 @@ command (in your R console):
     if(!require('remotes')) install.packages('remotes')
     remotes::install_github("nevrome/ggpointgrid")
 
-### Examples
+Windows users will need the
+[Rtools](https://cran.r-project.org/bin/windows/Rtools/) to build the
+package.
 
-``` r
-library(ggplot2)
-set.seed(5)
-```
+### Examples
 
 #### `geom_pointgrid`
 
@@ -35,6 +34,9 @@ The grid properties are controlled with the parameters `grid_x` and
 `grid_y`, which allow to precisely specify the desired graticules.
 
 ``` r
+library(ggplot2)
+set.seed(5)
+
 df <- tibble::tibble(
   x = rep(c(1,1,2,3,3), times = 10),
   y = rep(c(1,3,2,1,3), times = 10),
@@ -66,7 +68,7 @@ p4 <- ggplot(df) +
 cowplot::plot_grid(p1, p2, p3, p4)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
 `geom_textgrid` performs the same arrangement operation on text data. It
 is to `geom_text` what `geom_pointgrid` is to `geom_point`.
@@ -117,4 +119,4 @@ p7 <- ggplot(df) +
 cowplot::plot_grid(p4, p5, p6, p7)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->

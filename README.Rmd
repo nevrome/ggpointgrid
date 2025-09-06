@@ -19,6 +19,8 @@ if(!require('remotes')) install.packages('remotes')
 remotes::install_github("nevrome/ggpointgrid")
 ```
 
+Windows users will need the [Rtools](https://cran.r-project.org/bin/windows/Rtools/) to build the package.
+
 ### Examples
 
 #### `geom_pointgrid`
