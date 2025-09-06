@@ -37,3 +37,12 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# futhark context
+*.o
+*.so
+src/lib/
+src/arrange
+src/result.json
+src/result.prof/
+futhark_test.txt

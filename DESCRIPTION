@@ -1,7 +1,7 @@
 Package: ggpointgrid
 Title: Rearrange scatter plot points on a regular grid
 Description: Some simple geoms derived from geom_point to rearrange scatterplot coordinates on regular grids while strictly avoiding over-plotting.
-Version: 1.3.0
+Version: 1.4.0
 Authors@R: 
   c(person(given = "Clemens",
            family = "Schmid",
@@ -11,17 +11,14 @@ Authors@R:
 URL: https://github.com/nevrome/ggpointgrid
 BugReports: https://github.com/nevrome/ggpointgrid/issues
 Depends: R (>= 3.4.0)
-Language: en_GB
+Language: en
 License: GPL-3 | file LICENSE
 Encoding: UTF-8
 Imports:
   checkmate,
-  dplyr,
-  fields,
   ggplot2,
-  glue,
   grid,
-  reshape2,
-  rlang,
-  stats
-RoxygenNote: 7.2.3
+  Rcpp (>= 1.0.5),
+  rlang
+RoxygenNote: 7.3.2
+LinkingTo: Rcpp

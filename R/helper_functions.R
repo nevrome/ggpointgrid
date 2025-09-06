@@ -52,7 +52,7 @@ translate_shape_string <- function(shape_string) {
       ""
     }
     
-    rlang::abort(glue::glue("Can't find shape name:", collapsed_names, more_problems))
+    rlang::abort(paste0("Can't find shape name:", collapsed_names, more_problems))
   }
   
   if (any(nonunique_strings)) {
@@ -76,7 +76,7 @@ translate_shape_string <- function(shape_string) {
       ""
     }
     
-    rlang::abort(glue::glue("Shape names must be unambiguous:", collapsed_names, more_problems))
+    rlang::abort(paste0("Shape names must be unambiguous:", collapsed_names, more_problems))
   }
   
   unname(pch_table[shape_match])

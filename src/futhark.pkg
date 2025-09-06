@@ -1,0 +1,3 @@
+require {
+  github.com/diku-dk/sorts 0.6.0 #f448cd990c86c566715915a8fc4182c8c2ff5400
+}

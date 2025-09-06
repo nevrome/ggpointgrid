@@ -1,3 +1,9 @@
+### 1.4.0
+
+- switched to a futhark (https://futhark-lang.org) implementation of the arrangement algorithm behind `geom_pointgrid()`
+- added a direct interface for this algorithm: `arrange_points_on_grid()`
+- added the helper function `make_grid_sequence()` for coordinate sequence preparation
+
 ### 1.3.0
 
 - made the core arrangement algorithm for `geom_pointgrid()` faster, by replacing some inefficient base R code

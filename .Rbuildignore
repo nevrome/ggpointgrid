@@ -4,3 +4,8 @@
 ^README\.Rmd$
 ^NEWS\.md$
 ^playground$
+^build\.R$
+^src/arrange$
+^src/arrange\.fut$
+^src/arrange\.json$
+^src/futhark\.pkg$
