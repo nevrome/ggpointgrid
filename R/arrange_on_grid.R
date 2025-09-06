@@ -24,7 +24,7 @@
 #' 
 #' @examples
 #' set.seed(123)
-#' df <- tibble::tibble(
+#' df <- data.frame(
 #'   id = 1:200,
 #'   x = runif(200, -5, 5),
 #'   y = runif(200, -5, 5)
