@@ -2,15 +2,15 @@
 #' 
 #' @description \code{arrange_points_on_grid} is an interface to the grid arrange
 #' algorithm used for \link{geom_pointgrid}. \code{make_grid_sequence} is a little
-#' helper function to prepare regular grids along one dimension.
+#' helper function to prepare regular sequences of coordinates along one dimension.
 #'
-#' @param axes Numeric matrix. Grid coordinates to which the points should be
+#' @param grid_xy Numeric matrix. Grid coordinates to which the points should be
 #' mapped. 2-column matrix with x-axis coordinates in the first, and y-axis
 #' coordinates in the second column.
-#' @param pts Numeric matrix. Point (observation) coordinates that should be
+#' @param pts_xy Numeric matrix. Point (observation) coordinates that should be
 #' mapped to the grid. 2-column matrix with x-axis coordinates in the first, and
 #' y-axis coordinates in the second column.
-#' @param grid_length Integer. Length of the output grid along this axis. Note
+#' @param grid_length Integer. Length of the output grid along one axis. Note
 #' that integers in R are marked with a trailing L, so e.g. grid_length = 40L.
 #' @param data_axis Numeric vector. Coordinates of the input data for plotting
 #' along the respective axis. Is used to inform the sequence range.
@@ -18,7 +18,7 @@
 #' Either "discrete" or "continuous".
 #' 
 #' @return \code{arrange_points_on_grid} returns a 2-column numeric matrix with
-#' the same number and order of rows as \code{pts}. It contains the grid-mapped
+#' the same number and order of rows as \code{pts_xy}. It contains the grid-mapped
 #' x-axis coordinates in the first, and y-axis coordinates in the second column.
 #' \code{make_grid_sequence} returns a numeric vector of grid coordinates.
 #' 
@@ -37,7 +37,7 @@
 #' segments(min(axis_x), axis_y, max(axis_x), axis_y, col = "grey")
 #'
 #' res <- arrange_points_on_grid(
-#'  matrix(c(axis_x, axis_y), ncol = 2),
+#'  as.matrix(expand.grid(axis_x, axis_y)),
 #'  as.matrix(df[c("x", "y")])
 #' )
 #' segments(df$x, df$y, res[,"x"], res[,"y"])
@@ -48,18 +48,17 @@ NULL
 
 #' @rdname grid_arrange_algorithm
 #' @export
-arrange_points_on_grid <- function(axes, pts) {
+arrange_points_on_grid <- function(grid_xy, pts_xy) {
   # input checks
-  checkmate::assert_matrix(axes, any.missing = FALSE, ncols = 2)
-  checkmate::assert_matrix(pts, any.missing = FALSE, ncols = 2)
+  checkmate::assert_matrix(grid_xy, any.missing = FALSE, ncols = 2)
+  checkmate::assert_matrix(pts_xy, any.missing = FALSE, ncols = 2)
   # creating grid
-  xy_grid <- expand.grid(axes[,1], axes[,2])
-  if (nrow(xy_grid) < nrow(pts)) {
+  if (nrow(grid_xy) < nrow(pts_xy)) {
     stop("The grid is not big enough to accommodate all input points.")
   }
   # run arrange algorithm
   res <- futhark_entry_arrange_from_coordinates_cpp(
-    xy_grid[,1], xy_grid[,2], pts[,1], pts[,2]
+    grid_xy[,1], grid_xy[,2], pts_xy[,1], pts_xy[,2]
   )
   # compile output
   m <- matrix(c(res[[1]], res[[2]]), ncol = 2)

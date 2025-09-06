@@ -126,6 +126,8 @@ make_grid_axes_in_geom <- function(tab, grid_x, grid_y) {
   } else {
     axis_y <- grid_y
   }
-  # return axes vectors
-  return(matrix(c(axis_x, axis_y), ncol = 2))
+  # expand
+  axes_df <- expand.grid(axis_x, axis_y)
+  # return axes matrix
+  return(as.matrix(axes_df))
 }

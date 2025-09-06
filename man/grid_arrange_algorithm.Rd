@@ -6,20 +6,20 @@
 \alias{make_grid_sequence}
 \title{Grid arrange algorithm}
 \usage{
-arrange_points_on_grid(axes, pts)
+arrange_points_on_grid(grid_xy, pts_xy)
 
 make_grid_sequence(grid_length, data_axis, mode = "continuous")
 }
 \arguments{
-\item{axes}{Numeric matrix. Grid coordinates to which the points should be
+\item{grid_xy}{Numeric matrix. Grid coordinates to which the points should be
 mapped. 2-column matrix with x-axis coordinates in the first, and y-axis
 coordinates in the second column.}
 
-\item{pts}{Numeric matrix. Point (observation) coordinates that should be
+\item{pts_xy}{Numeric matrix. Point (observation) coordinates that should be
 mapped to the grid. 2-column matrix with x-axis coordinates in the first, and
 y-axis coordinates in the second column.}
 
-\item{grid_length}{Integer. Length of the output grid along this axis. Note
+\item{grid_length}{Integer. Length of the output grid along one axis. Note
 that integers in R are marked with a trailing L, so e.g. grid_length = 40L.}
 
 \item{data_axis}{Numeric vector. Coordinates of the input data for plotting
@@ -30,14 +30,14 @@ Either "discrete" or "continuous".}
 }
 \value{
 \code{arrange_points_on_grid} returns a 2-column numeric matrix with
-the same number and order of rows as \code{pts}. It contains the grid-mapped
+the same number and order of rows as \code{pts_xy}. It contains the grid-mapped
 x-axis coordinates in the first, and y-axis coordinates in the second column.
 \code{make_grid_sequence} returns a numeric vector of grid coordinates.
 }
 \description{
 \code{arrange_points_on_grid} is an interface to the grid arrange
 algorithm used for \link{geom_pointgrid}. \code{make_grid_sequence} is a little
-helper function to prepare regular grids along one dimension.
+helper function to prepare regular sequences of coordinates along one dimension.
 }
 \examples{
 set.seed(123)
@@ -54,7 +54,7 @@ segments(axis_x, min(axis_y), axis_x, max(axis_y), col = "grey")
 segments(min(axis_x), axis_y, max(axis_x), axis_y, col = "grey")
 
 res <- arrange_points_on_grid(
- matrix(c(axis_x, axis_y), ncol = 2),
+ as.matrix(expand.grid(axis_x, axis_y)),
  as.matrix(df[c("x", "y")])
 )
 segments(df$x, df$y, res[,"x"], res[,"y"])
