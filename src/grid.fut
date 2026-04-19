@@ -3,14 +3,6 @@ type point = (f64, f64)
 def min_f64 (a: f64) (b: f64) : f64 = if a < b then a else b
 def max_f64 (a: f64) (b: f64) : f64 = if a > b then a else b
 
--- get outer edges of bounding box to populate initial grid
-def bbox_points [n] (xs: [n]f64) (ys: [n]f64) : (f64, f64, f64, f64) =
-  let xmin = reduce min_f64 xs[0] xs
-  let xmax = reduce max_f64 xs[0] xs
-  let ymin = reduce min_f64 ys[0] ys
-  let ymax = reduce max_f64 ys[0] ys
-  in (xmin, ymin, xmax, ymax)
-
 -- check whether a horizontal ray from (px,py) crosses edge (x1,y1)-(x2,y2)
 def ray_crosses_edge
   (px: f64) (py: f64)
@@ -83,13 +75,6 @@ def point_in_any_polygon [n][k][m]
        (map (\p -> point_in_polygon xs ys ring_offsets polygon_offsets p px py)
             poly_ids)
 
--- expand two 1D axes into a flattened grid (optional helper)
-def expand_grid [nx] [ny] (xs: [nx]f64) (ys: [ny]f64)
-    : ([ny * nx]f64, [ny * nx]f64) =
-  let grid_xs = flatten (map (\_ -> xs) ys)
-  let grid_ys = flatten (map (\y -> replicate nx y) ys)
-  in (grid_xs, grid_ys)
-
 -- create a regular grid inside polygons
 entry grid_in_polygons_
   -- xs + ys: all polygon/ring coordinates in a flat format
@@ -110,17 +95,32 @@ entry grid_in_polygons_
   -- return good grid points as separate x/y arrays
   : ([]f64, []f64) =
   let polygon_offsets = [0] ++ scan (+) 0 polygon_ring_counts
-  let (cand_x, cand_y) = expand_grid gx gy
-  let flat_ids = indices cand_x
+  let flat_ids = indices gx
   let inside =
     map2 (\px py -> point_in_any_polygon xs ys ring_offsets polygon_offsets px py)
-         cand_x cand_y
+         gx gy
   let idx = filter (\i -> inside[i]) flat_ids
-  let out_x = map (\i -> cand_x[i]) idx
-  let out_y = map (\i -> cand_y[i]) idx
+  let out_x = map (\i -> gx[i]) idx
+  let out_y = map (\i -> gy[i]) idx
   in (out_x, out_y)
-  
+
+------ for testing/debugging/profiling ------
+
 -- direct test on the command line
 -- futhark c grid.fut
 -- echo [0,10,10,0, 3,7,7,3] [0,0,10,10, 3,3,7,7] [0,4,8] [2] [0,2,4,6,8,10] [0,2,4,6,8,10] | ./grid -e grid_in_polygons_
-  
+
+-- get outer edges of bounding box to populate initial grid
+-- def bbox_points [n] (xs: [n]f64) (ys: [n]f64) : (f64, f64, f64, f64) =
+--   let xmin = reduce min_f64 xs[0] xs
+--   let xmax = reduce max_f64 xs[0] xs
+--   let ymin = reduce min_f64 ys[0] ys
+--   let ymax = reduce max_f64 ys[0] ys
+--   in (xmin, ymin, xmax, ymax)
+
+-- expand two 1D axes into a flattened grid (optional helper)
+-- def expand_grid [nx] [ny] (xs: [nx]f64) (ys: [ny]f64)
+--     : ([ny * nx]f64, [ny * nx]f64) =
+--   let grid_xs = flatten (map (\_ -> xs) ys)
+--   let grid_ys = flatten (map (\y -> replicate nx y) ys)
+--   in (grid_xs, grid_ys)
