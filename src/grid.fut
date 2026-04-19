@@ -99,7 +99,7 @@ def expand_grid [nx] [ny] (xs: [nx]f64) (ys: [ny]f64)
   in (grid_xs, grid_ys)
 
 -- create a regular grid inside polygons
-entry grid_in_polygons
+entry grid_in_polygons_
   -- xs + ys: all polygon/ring coordinates in a flat format
   (xs: []f64)
   (ys: []f64)
@@ -133,5 +133,5 @@ entry grid_in_polygons
   
 -- direct test on the command line
 -- futhark c makeGridInPolygon.fut
--- echo [0,10,10,0, 3,7,7,3] [0,0,10,10, 3,3,7,7] [0,4,8] [2] 5 5 | ./makeGridInPolygon -e grid_in_polygons
+-- echo [0,10,10,0, 3,7,7,3] [0,0,10,10, 3,3,7,7] [0,4,8] [2] 5 5 | ./makeGridInPolygon -e grid_in_polygons_
   
