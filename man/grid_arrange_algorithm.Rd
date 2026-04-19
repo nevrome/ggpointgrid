@@ -4,11 +4,19 @@
 \alias{grid_arrange_algorithm}
 \alias{arrange_points_on_grid}
 \alias{make_grid_sequence}
+\alias{filter_grid_in_polygons}
 \title{Grid arrange algorithm}
 \usage{
 arrange_points_on_grid(grid_xy, pts_xy)
 
 make_grid_sequence(grid_length, data_axis, mode = "continuous")
+
+filter_grid_in_polygons(
+  grid_xy,
+  polygons_xy,
+  ring_offsets = c(0, nrow(polygons_xy)),
+  polygon_ring_counts = c(1)
+)
 }
 \arguments{
 \item{grid_xy}{Numeric matrix. Grid coordinates to which the points should be
@@ -57,6 +65,28 @@ res <- arrange_points_on_grid(
  as.matrix(expand.grid(axis_x, axis_y)),
  as.matrix(df[c("x", "y")])
 )
+segments(df$x, df$y, res[,"x"], res[,"y"])
+points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
+
+# limit the grid to a certain polygon
+theta <- seq(0, 2*pi, length.out = 100)
+circle_poly <- cbind(
+  x = 3 * cos(theta),
+  y = 3 * sin(theta)
+)
+small_grid <- filter_grid_in_polygons(
+  as.matrix(expand.grid(
+    make_grid_sequence(30L, df$x),
+    make_grid_sequence(30L, df$y)
+  )),
+  circle_poly
+)
+res <- arrange_points_on_grid(
+ small_grid,
+ as.matrix(df[c("x", "y")])
+)
+plot(df$x, df$y, pch = 20, cex = 0.7, asp = 1)
+polygon(circle_poly[,1], circle_poly[,2], border = "blue", lwd = 2)
 segments(df$x, df$y, res[,"x"], res[,"y"])
 points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
 

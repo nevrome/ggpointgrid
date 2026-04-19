@@ -42,7 +42,29 @@
 #' )
 #' segments(df$x, df$y, res[,"x"], res[,"y"])
 #' points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
-#'
+#' 
+#' # limit the grid to a certain polygon
+#' theta <- seq(0, 2*pi, length.out = 100)
+#' circle_poly <- cbind(
+#'   x = 3 * cos(theta),
+#'   y = 3 * sin(theta)
+#' )
+#' small_grid <- filter_grid_in_polygons(
+#'   as.matrix(expand.grid(
+#'     make_grid_sequence(30L, df$x),
+#'     make_grid_sequence(30L, df$y)
+#'   )),
+#'   circle_poly
+#' )
+#' res <- arrange_points_on_grid(
+#'  small_grid,
+#'  as.matrix(df[c("x", "y")])
+#' )
+#' plot(df$x, df$y, pch = 20, cex = 0.7, asp = 1)
+#' polygon(circle_poly[,1], circle_poly[,2], border = "blue", lwd = 2)
+#' segments(df$x, df$y, res[,"x"], res[,"y"])
+#' points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
+#' 
 #' @name grid_arrange_algorithm
 NULL
 
@@ -83,3 +105,29 @@ make_grid_sequence <- function(grid_length, data_axis, mode = "continuous") {
     stop("Unkown mode: ", mode)
   }
 }
+
+#' @rdname grid_arrange_algorithm
+#' @export
+filter_grid_in_polygons <- function(
+  grid_xy,
+  polygons_xy,
+  ring_offsets = c(0,nrow(polygons_xy)), polygon_ring_counts = c(1)
+  ) {
+  # input checks
+  checkmate::assert_matrix(grid_xy, any.missing = FALSE, ncols = 2)
+  checkmate::assert_matrix(polygons_xy, any.missing = FALSE, ncols = 2)
+  # run grid creation algorithm
+  res <- futhark_entry_grid_in_polygons_cpp(
+    xs = polygons_xy[,1],
+    ys = polygons_xy[,2],
+    ring_offsets = ring_offsets,
+    polygon_ring_counts = polygon_ring_counts,
+    gx = grid_xy[,1],
+    gy = grid_xy[,2]
+  )
+  # compile output
+  m <- matrix(c(res[[1]], res[[2]]), ncol = 2)
+  colnames(m) <- c("x", "y")
+  return(m)
+}
+
