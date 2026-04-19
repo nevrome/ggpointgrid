@@ -16,7 +16,7 @@
 #' )
 #' 
 #' ggplot(testdata, aes(x, y, label = l)) +
-#' geom_textgrid(color = "red", grid_x = 40, grid_y = 40)
+#'   geom_textgrid(color = "red", grid_x = 40L, grid_y = 40L)
 #' 
 #' @export
 geom_textgrid <- function(

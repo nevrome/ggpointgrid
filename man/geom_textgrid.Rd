@@ -42,7 +42,8 @@ from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 \item{grid_x}{Single integer or numeric vector. If a single integer is supplied, 
 then the grid's x-axis coordinates are determined as a regular sequence from
 \code{min(x)} to \code{max(x)}. If a numeric vector is supplied, then this 
-vector is directly used for the grid's x-axis coordinates.}
+vector is directly used for the grid's x-axis coordinates.
+Note that integers in R are marked with a trailing L, so e.g. grid_x = 40L.}
 
 \item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for the 
 y-axis.}
@@ -134,6 +135,6 @@ testdata <- data.frame(
 )
 
 ggplot(testdata, aes(x, y, label = l)) +
-geom_textgrid(color = "red", grid_x = 40, grid_y = 40)
+  geom_textgrid(color = "red", grid_x = 40L, grid_y = 40L)
 
 }

@@ -10,6 +10,7 @@
 #' then the grid's x-axis coordinates are determined as a regular sequence from
 #' \code{min(x)} to \code{max(x)}. If a numeric vector is supplied, then this 
 #' vector is directly used for the grid's x-axis coordinates.
+#' Note that integers in R are marked with a trailing L, so e.g. grid_x = 40L.
 #' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for the 
 #' y-axis.
 #' 
@@ -22,14 +23,14 @@
 #' )
 #' 
 #' ggplot(testdata, aes(x, y)) +
-# geom_pointgrid(color = "red", grid_x = 40, grid_y = 40)
+#'   geom_pointgrid(color = "red", grid_x = 40L, grid_y = 40L)
 #' 
 #' @export
 geom_pointgrid <- function(
   mapping = NULL,
   data = NULL,
-  grid_x = 20,
-  grid_y = 20,
+  grid_x = 20L,
+  grid_y = 20L,
   stat = "identity",
   position = "identity",
   ...,
@@ -102,9 +103,9 @@ make_grid_axes_in_geom <- function(tab, grid_x, grid_y) {
   checkmate::assert_data_frame(tab)
   # compile axes
                           # all, because it could be a vector
-  if (length(grid_x) == 1 & all(grid_x %% 1 == 0)) {
+  if (length(grid_x) == 1 & is.integer(grid_x)) {
     axis_x <- make_grid_sequence(
-      as.integer(grid_x), tab[["x"]],
+      grid_x, tab[["x"]],
       ifelse(
         "mapped_discrete" %in% class(tab[["x"]]),
         "discrete",
@@ -114,9 +115,9 @@ make_grid_axes_in_geom <- function(tab, grid_x, grid_y) {
   } else {
     axis_x <- grid_x
   }
-  if (length(grid_y) == 1 & all(grid_y %% 1 == 0)) {
+  if (length(grid_y) == 1 & is.integer(grid_y)) {
     axis_y <- make_grid_sequence(
-      as.integer(grid_y), tab[["y"]],
+      grid_y, tab[["y"]],
       ifelse(
         "mapped_discrete" %in% class(tab[["y"]]),
         "discrete",

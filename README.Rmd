@@ -50,7 +50,7 @@ p2 <- ggplot(df) +
   coord + ggtitle("geom_jitter")
 
 p3 <- ggplot(df) +
-  ggpointgrid::geom_pointgrid(aes(x, y, color = var), grid_x = 15, grid_y = 15) +
+  ggpointgrid::geom_pointgrid(aes(x, y, color = var), grid_x = 15L, grid_y = 15L) +
   coord + ggtitle("geom_pointgrid")
 
 p4 <- ggplot(df) +
