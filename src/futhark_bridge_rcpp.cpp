@@ -95,8 +95,8 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
     Rcpp::NumericVector ys,
     Rcpp::NumericVector ring_offsets,
     Rcpp::NumericVector polygon_ring_counts,
-    double nx,
-    double ny
+    Rcpp::NumericVector gx,
+    Rcpp::NumericVector gy
 ) {
   // Basic input checks
   if (xs.size() != ys.size()) {
@@ -108,8 +108,8 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
   if (polygon_ring_counts.size() < 1) {
     Rcpp::stop("polygon_ring_counts must have length at least 1.");
   }
-  if (nx < 1 || ny < 1) {
-    Rcpp::stop("nx and ny must be >= 1.");
+  if (gx.size() < 1 || gy.size() < 1) {
+    Rcpp::stop("gx and gy must each have length at least 1.");
   }
 
   // Convert R numeric vectors to int64_t vectors for Futhark i64 inputs
@@ -122,9 +122,6 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
   for (R_xlen_t i = 0; i < polygon_ring_counts.size(); ++i) {
     polygon_ring_counts_i64[i] = static_cast<int64_t>(polygon_ring_counts[i]);
   }
-
-  int64_t nx_i64 = static_cast<int64_t>(nx);
-  int64_t ny_i64 = static_cast<int64_t>(ny);
 
   // Create Futhark context
   futhark_context_config* cfg = futhark_context_config_new();
@@ -143,12 +140,16 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
   futhark_f64_1d* in1 = futhark_new_f64_1d(ctx, ys.begin(), (int64_t) ys.size());
   futhark_i64_1d* in2 = futhark_new_i64_1d(ctx, ring_offsets_i64.data(), (int64_t) ring_offsets_i64.size());
   futhark_i64_1d* in3 = futhark_new_i64_1d(ctx, polygon_ring_counts_i64.data(), (int64_t) polygon_ring_counts_i64.size());
+  futhark_f64_1d* in4 = futhark_new_f64_1d(ctx, gx.begin(), (int64_t) gx.size());
+  futhark_f64_1d* in5 = futhark_new_f64_1d(ctx, gy.begin(), (int64_t) gy.size());
 
-  if (!in0 || !in1 || !in2 || !in3) {
+  if (!in0 || !in1 || !in2 || !in3 || !in4 || !in5) {
     if (in0) futhark_free_f64_1d(ctx, in0);
     if (in1) futhark_free_f64_1d(ctx, in1);
     if (in2) futhark_free_i64_1d(ctx, in2);
     if (in3) futhark_free_i64_1d(ctx, in3);
+    if (in4) futhark_free_f64_1d(ctx, in4);
+    if (in5) futhark_free_f64_1d(ctx, in5);
     futhark_context_free(ctx);
     futhark_context_config_free(cfg);
     Rcpp::stop("Failed to create Futhark input arrays.");
@@ -161,8 +162,7 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
   // Call Futhark entry point
   int rc = futhark_entry_grid_in_polygons(
     ctx, &out0, &out1,
-    in0, in1, in2, in3,
-    nx_i64, ny_i64
+    in0, in1, in2, in3, in4, in5
   );
 
   if (rc != 0) {
@@ -172,6 +172,8 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
     futhark_free_f64_1d(ctx, in1);
     futhark_free_i64_1d(ctx, in2);
     futhark_free_i64_1d(ctx, in3);
+    futhark_free_f64_1d(ctx, in4);
+    futhark_free_f64_1d(ctx, in5);
     futhark_context_free(ctx);
     futhark_context_config_free(cfg);
 
@@ -200,6 +202,8 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
     futhark_free_f64_1d(ctx, in1);
     futhark_free_i64_1d(ctx, in2);
     futhark_free_i64_1d(ctx, in3);
+    futhark_free_f64_1d(ctx, in4);
+    futhark_free_f64_1d(ctx, in5);
     futhark_context_free(ctx);
     futhark_context_config_free(cfg);
     Rcpp::stop("Failed to copy Futhark output values.");
@@ -215,6 +219,8 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
     futhark_free_f64_1d(ctx, in1);
     futhark_free_i64_1d(ctx, in2);
     futhark_free_i64_1d(ctx, in3);
+    futhark_free_f64_1d(ctx, in4);
+    futhark_free_f64_1d(ctx, in5);
     futhark_context_free(ctx);
     futhark_context_config_free(cfg);
 
@@ -232,6 +238,8 @@ Rcpp::List futhark_entry_grid_in_polygons_cpp(
   futhark_free_f64_1d(ctx, in1);
   futhark_free_i64_1d(ctx, in2);
   futhark_free_i64_1d(ctx, in3);
+  futhark_free_f64_1d(ctx, in4);
+  futhark_free_f64_1d(ctx, in5);
   futhark_context_free(ctx);
   futhark_context_config_free(cfg);
 

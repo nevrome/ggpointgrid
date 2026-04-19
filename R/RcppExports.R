@@ -5,7 +5,7 @@ futhark_entry_arrange_from_coordinates_cpp <- function(grid_xs, grid_ys, pts_x, 
     .Call('_ggpointgrid_futhark_entry_arrange_from_coordinates_cpp', PACKAGE = 'ggpointgrid', grid_xs, grid_ys, pts_x, pts_y)
 }
 
-futhark_entry_grid_in_polygons_cpp <- function(xs, ys, ring_offsets, polygon_ring_counts, nx, ny) {
-    .Call('_ggpointgrid_futhark_entry_grid_in_polygons_cpp', PACKAGE = 'ggpointgrid', xs, ys, ring_offsets, polygon_ring_counts, nx, ny)
+futhark_entry_grid_in_polygons_cpp <- function(xs, ys, ring_offsets, polygon_ring_counts, gx, gy) {
+    .Call('_ggpointgrid_futhark_entry_grid_in_polygons_cpp', PACKAGE = 'ggpointgrid', xs, ys, ring_offsets, polygon_ring_counts, gx, gy)
 }
 

@@ -83,14 +83,6 @@ def point_in_any_polygon [n][k][m]
        (map (\p -> point_in_polygon xs ys ring_offsets polygon_offsets p px py)
             poly_ids)
 
--- make grid along one axis
-def make_grid_by_count (xymin: f64) (xymax: f64) (nxy: i64) : []f64 =
-  if nxy <= 1
-  then [xymin]
-  else
-    let dxy = (xymax - xymin) / f64.i64 (nxy - 1)
-    in map (\j -> xymin + f64.i64 j * dxy) (iota nxy)
-
 -- expand two 1D axes into a flattened grid (optional helper)
 def expand_grid [nx] [ny] (xs: [nx]f64) (ys: [ny]f64)
     : ([ny * nx]f64, [ny * nx]f64) =
@@ -112,15 +104,12 @@ entry grid_in_polygons_
   (ring_offsets: []i64)
   -- polygon_ring_counts: list with number of rings per polygon
   (polygon_ring_counts: []i64)
-  -- nx + ny: Number of grid steps in x and y direction
-  (nx: i64)
-  (ny: i64)
+  -- gx + gy: Grid coordinates in x and y direction
+  (gx: []f64)
+  (gy: []f64)
   -- return good grid points as separate x/y arrays
   : ([]f64, []f64) =
   let polygon_offsets = [0] ++ scan (+) 0 polygon_ring_counts
-  let (xmin, ymin, xmax, ymax) = bbox_points xs ys
-  let gx = make_grid_by_count xmin xmax nx
-  let gy = make_grid_by_count ymin ymax ny
   let (cand_x, cand_y) = expand_grid gx gy
   let flat_ids = indices cand_x
   let inside =
@@ -132,6 +121,6 @@ entry grid_in_polygons_
   in (out_x, out_y)
   
 -- direct test on the command line
--- futhark c makeGridInPolygon.fut
--- echo [0,10,10,0, 3,7,7,3] [0,0,10,10, 3,3,7,7] [0,4,8] [2] 5 5 | ./makeGridInPolygon -e grid_in_polygons_
+-- futhark c grid.fut
+-- echo [0,10,10,0, 3,7,7,3] [0,0,10,10, 3,3,7,7] [0,4,8] [2] [0,2,4,6,8,10] [0,2,4,6,8,10] | ./grid -e grid_in_polygons_
   

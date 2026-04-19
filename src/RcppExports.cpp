@@ -25,8 +25,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // futhark_entry_grid_in_polygons_cpp
-Rcpp::List futhark_entry_grid_in_polygons_cpp(Rcpp::NumericVector xs, Rcpp::NumericVector ys, Rcpp::NumericVector ring_offsets, Rcpp::NumericVector polygon_ring_counts, double nx, double ny);
-RcppExport SEXP _ggpointgrid_futhark_entry_grid_in_polygons_cpp(SEXP xsSEXP, SEXP ysSEXP, SEXP ring_offsetsSEXP, SEXP polygon_ring_countsSEXP, SEXP nxSEXP, SEXP nySEXP) {
+Rcpp::List futhark_entry_grid_in_polygons_cpp(Rcpp::NumericVector xs, Rcpp::NumericVector ys, Rcpp::NumericVector ring_offsets, Rcpp::NumericVector polygon_ring_counts, Rcpp::NumericVector gx, Rcpp::NumericVector gy);
+RcppExport SEXP _ggpointgrid_futhark_entry_grid_in_polygons_cpp(SEXP xsSEXP, SEXP ysSEXP, SEXP ring_offsetsSEXP, SEXP polygon_ring_countsSEXP, SEXP gxSEXP, SEXP gySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -34,9 +34,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type ys(ysSEXP);
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type ring_offsets(ring_offsetsSEXP);
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type polygon_ring_counts(polygon_ring_countsSEXP);
-    Rcpp::traits::input_parameter< double >::type nx(nxSEXP);
-    Rcpp::traits::input_parameter< double >::type ny(nySEXP);
-    rcpp_result_gen = Rcpp::wrap(futhark_entry_grid_in_polygons_cpp(xs, ys, ring_offsets, polygon_ring_counts, nx, ny));
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type gx(gxSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type gy(gySEXP);
+    rcpp_result_gen = Rcpp::wrap(futhark_entry_grid_in_polygons_cpp(xs, ys, ring_offsets, polygon_ring_counts, gx, gy));
     return rcpp_result_gen;
 END_RCPP
 }

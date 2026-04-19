@@ -12,7 +12,7 @@ entry grid_in_polygons
   (ys: []f64)
   (ring_offsets: []i64)
   (polygon_ring_counts: []i64)
-  (nx: i64)
-  (ny: i64)
+  (gx: []f64)
+  (gy: []f64)
   : ([]f64, []f64) =
-  grid_in_polygons_ xs ys ring_offsets polygon_ring_counts nx ny
+  grid_in_polygons_ xs ys ring_offsets polygon_ring_counts gx gy

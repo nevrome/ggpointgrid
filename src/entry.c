@@ -76,7 +76,7 @@ const int64_t *futhark_shape_i64_1d(struct futhark_context *ctx, struct futhark_
 
 // Entry points
 int futhark_entry_arrange_from_coordinates(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_f64_1d *in2, const struct futhark_f64_1d *in3);
-int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const int64_t in4, const int64_t in5);
+int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const struct futhark_f64_1d *in4, const struct futhark_f64_1d *in5);
 
 // Miscellaneous
 int futhark_context_sync(struct futhark_context *ctx);
@@ -4245,8 +4245,8 @@ GEN_LMAD_COPY(8b, uint64_t)
 
 #define FUTHARK_FUN_ATTR static
 
-FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_25197, struct memblock *mem_out_p_25198, int64_t *out_prim_out_25199, struct memblock grid_xs_mem_24892, struct memblock grid_ys_mem_24893, struct memblock pts_x_mem_24894, struct memblock pts_y_mem_24895, int64_t dz2080U_14778, int64_t dz2081U_14779, int64_t dz2082U_14780, int64_t dz2083U_14781);
-FUTHARK_FUN_ATTR int futrts_entry_grid_in_polygons(struct futhark_context *ctx, struct memblock *mem_out_p_25232, struct memblock *mem_out_p_25233, int64_t *out_prim_out_25234, struct memblock xs_mem_24892, struct memblock ys_mem_24893, struct memblock ring_offsets_mem_24894, struct memblock polygon_ring_counts_mem_24895, int64_t dz2081U_16397, int64_t dz2082U_16398, int64_t dz2083U_16399, int64_t nx_16404, int64_t ny_16405);
+FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_24791, struct memblock *mem_out_p_24792, int64_t *out_prim_out_24793, struct memblock grid_xs_mem_24486, struct memblock grid_ys_mem_24487, struct memblock pts_x_mem_24488, struct memblock pts_y_mem_24489, int64_t dz2080U_14598, int64_t dz2081U_14599, int64_t dz2082U_14600, int64_t dz2083U_14601);
+FUTHARK_FUN_ATTR int futrts_entry_grid_in_polygons(struct futhark_context *ctx, struct memblock *mem_out_p_24826, struct memblock *mem_out_p_24827, int64_t *out_prim_out_24828, struct memblock xs_mem_24486, struct memblock ys_mem_24487, struct memblock ring_offsets_mem_24488, struct memblock polygon_ring_counts_mem_24489, struct memblock gx_mem_24490, struct memblock gy_mem_24491, int64_t dz2081U_16013, int64_t dz2082U_16014, int64_t dz2083U_16015, int64_t dz2084U_16016, int64_t dz2085U_16017);
 
 static int init_constants(struct futhark_context *ctx)
 {
@@ -4434,3504 +4434,3163 @@ const int64_t *futhark_shape_f64_1d(struct futhark_context *ctx, struct futhark_
     return arr->shape;
 }
 
-FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_25197, struct memblock *mem_out_p_25198, int64_t *out_prim_out_25199, struct memblock grid_xs_mem_24892, struct memblock grid_ys_mem_24893, struct memblock pts_x_mem_24894, struct memblock pts_y_mem_24895, int64_t dz2080U_14778, int64_t dz2081U_14779, int64_t dz2082U_14780, int64_t dz2083U_14781)
+FUTHARK_FUN_ATTR int futrts_entry_arrange_from_coordinates(struct futhark_context *ctx, struct memblock *mem_out_p_24791, struct memblock *mem_out_p_24792, int64_t *out_prim_out_24793, struct memblock grid_xs_mem_24486, struct memblock grid_ys_mem_24487, struct memblock pts_x_mem_24488, struct memblock pts_y_mem_24489, int64_t dz2080U_14598, int64_t dz2081U_14599, int64_t dz2082U_14600, int64_t dz2083U_14601)
 {
     (void) ctx;
     
     int err = 0;
-    int64_t mem_24897_cached_sizze_25200 = 0;
-    unsigned char *mem_24897 = NULL;
-    int64_t mem_24905_cached_sizze_25201 = 0;
-    unsigned char *mem_24905 = NULL;
-    int64_t mem_24907_cached_sizze_25202 = 0;
-    unsigned char *mem_24907 = NULL;
-    int64_t mem_24915_cached_sizze_25203 = 0;
-    unsigned char *mem_24915 = NULL;
-    int64_t mem_24917_cached_sizze_25204 = 0;
-    unsigned char *mem_24917 = NULL;
-    int64_t mem_24919_cached_sizze_25205 = 0;
-    unsigned char *mem_24919 = NULL;
-    int64_t mem_24921_cached_sizze_25206 = 0;
-    unsigned char *mem_24921 = NULL;
-    int64_t mem_24923_cached_sizze_25207 = 0;
-    unsigned char *mem_24923 = NULL;
-    int64_t mem_24955_cached_sizze_25208 = 0;
-    unsigned char *mem_24955 = NULL;
-    int64_t mem_24957_cached_sizze_25209 = 0;
-    unsigned char *mem_24957 = NULL;
-    int64_t mem_24958_cached_sizze_25210 = 0;
-    unsigned char *mem_24958 = NULL;
-    int64_t mem_24959_cached_sizze_25211 = 0;
-    unsigned char *mem_24959 = NULL;
-    int64_t mem_24966_cached_sizze_25212 = 0;
-    unsigned char *mem_24966 = NULL;
-    int64_t mem_24969_cached_sizze_25213 = 0;
-    unsigned char *mem_24969 = NULL;
-    int64_t mem_24972_cached_sizze_25214 = 0;
-    unsigned char *mem_24972 = NULL;
-    int64_t mem_24975_cached_sizze_25215 = 0;
-    unsigned char *mem_24975 = NULL;
-    int64_t mem_24978_cached_sizze_25216 = 0;
-    unsigned char *mem_24978 = NULL;
-    int64_t mem_24995_cached_sizze_25217 = 0;
-    unsigned char *mem_24995 = NULL;
-    int64_t mem_24996_cached_sizze_25218 = 0;
-    unsigned char *mem_24996 = NULL;
-    int64_t mem_24997_cached_sizze_25219 = 0;
-    unsigned char *mem_24997 = NULL;
-    int64_t mem_24998_cached_sizze_25220 = 0;
-    unsigned char *mem_24998 = NULL;
-    int64_t mem_24999_cached_sizze_25221 = 0;
-    unsigned char *mem_24999 = NULL;
-    int64_t mem_25000_cached_sizze_25222 = 0;
-    unsigned char *mem_25000 = NULL;
-    int64_t mem_25001_cached_sizze_25223 = 0;
-    unsigned char *mem_25001 = NULL;
-    int64_t mem_25032_cached_sizze_25224 = 0;
-    unsigned char *mem_25032 = NULL;
-    int64_t mem_25033_cached_sizze_25225 = 0;
-    unsigned char *mem_25033 = NULL;
-    int64_t mem_25058_cached_sizze_25226 = 0;
-    unsigned char *mem_25058 = NULL;
-    int64_t mem_25066_cached_sizze_25227 = 0;
-    unsigned char *mem_25066 = NULL;
-    int64_t mem_25080_cached_sizze_25228 = 0;
-    unsigned char *mem_25080 = NULL;
-    int64_t mem_25082_cached_sizze_25229 = 0;
-    unsigned char *mem_25082 = NULL;
-    int64_t mem_25083_cached_sizze_25230 = 0;
-    unsigned char *mem_25083 = NULL;
-    int64_t mem_25084_cached_sizze_25231 = 0;
-    unsigned char *mem_25084 = NULL;
-    struct memblock mem_25112;
+    int64_t mem_24491_cached_sizze_24794 = 0;
+    unsigned char *mem_24491 = NULL;
+    int64_t mem_24499_cached_sizze_24795 = 0;
+    unsigned char *mem_24499 = NULL;
+    int64_t mem_24501_cached_sizze_24796 = 0;
+    unsigned char *mem_24501 = NULL;
+    int64_t mem_24509_cached_sizze_24797 = 0;
+    unsigned char *mem_24509 = NULL;
+    int64_t mem_24511_cached_sizze_24798 = 0;
+    unsigned char *mem_24511 = NULL;
+    int64_t mem_24513_cached_sizze_24799 = 0;
+    unsigned char *mem_24513 = NULL;
+    int64_t mem_24515_cached_sizze_24800 = 0;
+    unsigned char *mem_24515 = NULL;
+    int64_t mem_24517_cached_sizze_24801 = 0;
+    unsigned char *mem_24517 = NULL;
+    int64_t mem_24549_cached_sizze_24802 = 0;
+    unsigned char *mem_24549 = NULL;
+    int64_t mem_24551_cached_sizze_24803 = 0;
+    unsigned char *mem_24551 = NULL;
+    int64_t mem_24552_cached_sizze_24804 = 0;
+    unsigned char *mem_24552 = NULL;
+    int64_t mem_24553_cached_sizze_24805 = 0;
+    unsigned char *mem_24553 = NULL;
+    int64_t mem_24560_cached_sizze_24806 = 0;
+    unsigned char *mem_24560 = NULL;
+    int64_t mem_24563_cached_sizze_24807 = 0;
+    unsigned char *mem_24563 = NULL;
+    int64_t mem_24566_cached_sizze_24808 = 0;
+    unsigned char *mem_24566 = NULL;
+    int64_t mem_24569_cached_sizze_24809 = 0;
+    unsigned char *mem_24569 = NULL;
+    int64_t mem_24572_cached_sizze_24810 = 0;
+    unsigned char *mem_24572 = NULL;
+    int64_t mem_24589_cached_sizze_24811 = 0;
+    unsigned char *mem_24589 = NULL;
+    int64_t mem_24590_cached_sizze_24812 = 0;
+    unsigned char *mem_24590 = NULL;
+    int64_t mem_24591_cached_sizze_24813 = 0;
+    unsigned char *mem_24591 = NULL;
+    int64_t mem_24592_cached_sizze_24814 = 0;
+    unsigned char *mem_24592 = NULL;
+    int64_t mem_24593_cached_sizze_24815 = 0;
+    unsigned char *mem_24593 = NULL;
+    int64_t mem_24594_cached_sizze_24816 = 0;
+    unsigned char *mem_24594 = NULL;
+    int64_t mem_24595_cached_sizze_24817 = 0;
+    unsigned char *mem_24595 = NULL;
+    int64_t mem_24626_cached_sizze_24818 = 0;
+    unsigned char *mem_24626 = NULL;
+    int64_t mem_24627_cached_sizze_24819 = 0;
+    unsigned char *mem_24627 = NULL;
+    int64_t mem_24652_cached_sizze_24820 = 0;
+    unsigned char *mem_24652 = NULL;
+    int64_t mem_24660_cached_sizze_24821 = 0;
+    unsigned char *mem_24660 = NULL;
+    int64_t mem_24674_cached_sizze_24822 = 0;
+    unsigned char *mem_24674 = NULL;
+    int64_t mem_24676_cached_sizze_24823 = 0;
+    unsigned char *mem_24676 = NULL;
+    int64_t mem_24677_cached_sizze_24824 = 0;
+    unsigned char *mem_24677 = NULL;
+    int64_t mem_24678_cached_sizze_24825 = 0;
+    unsigned char *mem_24678 = NULL;
+    struct memblock mem_24706;
     
-    mem_25112.references = NULL;
+    mem_24706.references = NULL;
     
-    struct memblock mem_25110;
+    struct memblock mem_24704;
     
-    mem_25110.references = NULL;
+    mem_24704.references = NULL;
     
-    struct memblock mem_out_25141;
+    struct memblock mem_out_24735;
     
-    mem_out_25141.references = NULL;
+    mem_out_24735.references = NULL;
     
-    struct memblock mem_out_25140;
+    struct memblock mem_out_24734;
     
-    mem_out_25140.references = NULL;
+    mem_out_24734.references = NULL;
     
-    int64_t prim_out_25142;
+    int64_t prim_out_24736;
     
     // arrange.fut:22:12-15
     
-    int64_t dzlz7bUZLztZRz20Umz20Unz7dUzg_22346 = mul64(dz2080U_14778, dz2082U_14780);
+    int64_t dzlz7bUZLztZRz20Umz20Unz7dUzg_21964 = mul64(dz2080U_14598, dz2082U_14600);
     
     // arrange.fut:22:6-15
     
-    bool bounds_invalid_upwards_22347 = slt64(dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, (int64_t) 0);
+    bool bounds_invalid_upwards_21965 = slt64(dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, (int64_t) 0);
     
     // arrange.fut:22:6-15
     
-    bool valid_22348 = !bounds_invalid_upwards_22347;
+    bool valid_21966 = !bounds_invalid_upwards_21965;
     
     // arrange.fut:22:6-15
     
-    bool range_valid_c_22349;
+    bool range_valid_c_21967;
     
-    if (!valid_22348) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, " is invalid.", "-> #0  arrange.fut:22:6-15\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
+    if (!valid_21966) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, " is invalid.", "-> #0  arrange.fut:22:6-15\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // arrange.fut:17:15-18
     
-    bool zzero_22351 = dz2082U_14780 == (int64_t) 0;
+    bool zzero_21969 = dz2082U_14600 == (int64_t) 0;
     
     // arrange.fut:17:15-18
     
-    bool nonzzero_22352 = !zzero_22351;
+    bool nonzzero_21970 = !zzero_21969;
     
     // arrange.fut:17:15-18
     
-    bool nonzzero_cert_22353;
+    bool nonzzero_cert_21971;
     
-    if (!nonzzero_22352) {
+    if (!nonzzero_21970) {
         set_error(ctx, msgprintf("Error: %s\n\nBacktrace:\n%s", "division by zero", "-> #0  arrange.fut:17:15-18\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // arrange.fut:16:3-22:17
     
-    int64_t bytes_24896 = (int64_t) 4 * dzlz7bUZLztZRz20Umz20Unz7dUzg_22346;
+    int64_t bytes_24490 = (int64_t) 4 * dzlz7bUZLztZRz20Umz20Unz7dUzg_21964;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:220:15-59
     
-    bool cond_22383 = dzlz7bUZLztZRz20Umz20Unz7dUzg_22346 == (int64_t) 0;
+    bool cond_22001 = dzlz7bUZLztZRz20Umz20Unz7dUzg_21964 == (int64_t) 0;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:220:15-59
     
-    int32_t iters_22384;
+    int32_t iters_22002;
     
-    if (cond_22383) {
-        iters_22384 = 0;
+    if (cond_22001) {
+        iters_22002 = 0;
     } else {
-        iters_22384 = 16;
+        iters_22002 = 16;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:222:20-27
     
-    int64_t n_blocks_22385 = sdiv64(dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, (int64_t) 256);
+    int64_t n_blocks_22003 = sdiv64(dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, (int64_t) 256);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:223:16-23
     
-    int64_t rest_22386 = smod64(dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, (int64_t) 256);
+    int64_t rest_22004 = smod64(dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, (int64_t) 256);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:224:19-42
     
-    int64_t arg_22387 = mul64((int64_t) 256, n_blocks_22385);
+    int64_t arg_22005 = mul64((int64_t) 256, n_blocks_22003);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:224:19-42
     
-    int64_t dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388 = add64(rest_22386, arg_22387);
+    int64_t dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006 = add64(rest_22004, arg_22005);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:224:12-46
     
-    bool dim_match_22389 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388 == dzlz7bUZLztZRz20Umz20Unz7dUzg_22346;
+    bool dim_match_22007 = dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006 == dzlz7bUZLztZRz20Umz20Unz7dUzg_21964;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:224:12-46
     
-    bool empty_or_match_cert_22390;
+    bool empty_or_match_cert_22008;
     
-    if (!dim_match_22389) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Value of (desugared) shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, "] cannot match shape of type \"[", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388, "](f32, i64)\".", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:224:12-46\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #4  arrange.fut:7:3-71\n   #5  arrange.fut:58:13-33\n   #6  entry.fut:8:3-56\n"));
+    if (!dim_match_22007) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Value of (desugared) shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, "] cannot match shape of type \"[", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006, "](f32, i64)\".", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:224:12-46\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #4  arrange.fut:7:3-71\n   #5  arrange.fut:58:13-33\n   #6  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    int64_t bytes_24904 = (int64_t) 4 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388;
+    int64_t bytes_24498 = (int64_t) 4 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    int64_t bytes_24906 = (int64_t) 8 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388;
+    int64_t bytes_24500 = (int64_t) 8 * dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool loop_nonempty_22394 = slt32(0, iters_22384);
+    bool loop_nonempty_22012 = slt32(0, iters_22002);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
     
-    int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395 = add64((int64_t) 1, n_blocks_22385);
+    int64_t dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013 = add64((int64_t) 1, n_blocks_22003);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
     
-    int64_t dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22396 = mul64((int64_t) 4, dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395);
+    int64_t dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22014 = mul64((int64_t) 4, dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool empty_slice_22397 = arg_22387 == (int64_t) 0;
+    bool empty_slice_22015 = arg_22005 == (int64_t) 0;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    int64_t m_22398 = sub64(arg_22387, (int64_t) 1);
+    int64_t m_22016 = sub64(arg_22005, (int64_t) 1);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool zzero_leq_i_p_m_t_s_22399 = sle64((int64_t) 0, m_22398);
+    bool zzero_leq_i_p_m_t_s_22017 = sle64((int64_t) 0, m_22016);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool i_p_m_t_s_leq_w_22400 = slt64(m_22398, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388);
+    bool i_p_m_t_s_leq_w_22018 = slt64(m_22016, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool i_lte_j_22401 = sle64((int64_t) 0, arg_22387);
+    bool i_lte_j_22019 = sle64((int64_t) 0, arg_22005);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool y_22402 = zzero_leq_i_p_m_t_s_22399 && i_p_m_t_s_leq_w_22400;
+    bool y_22020 = zzero_leq_i_p_m_t_s_22017 && i_p_m_t_s_leq_w_22018;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool forwards_ok_22403 = i_lte_j_22401 && y_22402;
+    bool forwards_ok_22021 = i_lte_j_22019 && y_22020;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool ok_or_empty_22404 = empty_slice_22397 || forwards_ok_22403;
+    bool ok_or_empty_22022 = empty_slice_22015 || forwards_ok_22021;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool loop_not_taken_22405 = !loop_nonempty_22394;
+    bool loop_not_taken_22023 = !loop_nonempty_22012;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool protect_assert_disj_22406 = ok_or_empty_22404 || loop_not_taken_22405;
+    bool protect_assert_disj_22024 = ok_or_empty_22022 || loop_not_taken_22023;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool index_certs_22407;
+    bool index_certs_22025;
     
-    if (!protect_assert_disj_22406) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) (int64_t) 0, ":", (long long) arg_22387, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
+    if (!protect_assert_disj_22024) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) (int64_t) 0, ":", (long long) arg_22005, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool empty_slice_22408 = rest_22386 == (int64_t) 0;
+    bool empty_slice_22026 = rest_22004 == (int64_t) 0;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    int64_t m_22409 = sub64(rest_22386, (int64_t) 1);
+    int64_t m_22027 = sub64(rest_22004, (int64_t) 1);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    int64_t i_p_m_t_s_22410 = add64(arg_22387, m_22409);
+    int64_t i_p_m_t_s_22028 = add64(arg_22005, m_22027);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool zzero_leq_i_p_m_t_s_22411 = sle64((int64_t) 0, i_p_m_t_s_22410);
+    bool zzero_leq_i_p_m_t_s_22029 = sle64((int64_t) 0, i_p_m_t_s_22028);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool i_p_m_t_s_leq_w_22412 = slt64(i_p_m_t_s_22410, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388);
+    bool i_p_m_t_s_leq_w_22030 = slt64(i_p_m_t_s_22028, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool i_lte_j_22413 = sle64(arg_22387, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388);
+    bool i_lte_j_22031 = sle64(arg_22005, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool y_22414 = zzero_leq_i_p_m_t_s_22411 && i_p_m_t_s_leq_w_22412;
+    bool y_22032 = zzero_leq_i_p_m_t_s_22029 && i_p_m_t_s_leq_w_22030;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool forwards_ok_22415 = i_lte_j_22413 && y_22414;
+    bool forwards_ok_22033 = i_lte_j_22031 && y_22032;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool ok_or_empty_22416 = empty_slice_22408 || forwards_ok_22415;
+    bool ok_or_empty_22034 = empty_slice_22026 || forwards_ok_22033;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool protect_assert_disj_22417 = loop_not_taken_22405 || ok_or_empty_22416;
+    bool protect_assert_disj_22035 = loop_not_taken_22023 || ok_or_empty_22034;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32
     
-    bool index_certs_22418;
+    bool index_certs_22036;
     
-    if (!protect_assert_disj_22417) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) arg_22387, ":", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
+    if (!protect_assert_disj_22035) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) arg_22005, ":", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-164:32\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-168:21
     
-    bool binop_x_22419 = sle64((int64_t) 0, n_blocks_22385);
+    bool binop_x_22037 = sle64((int64_t) 0, n_blocks_22003);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool protect_assert_disj_22420 = loop_not_taken_22405 || binop_x_22419;
+    bool protect_assert_disj_22038 = loop_not_taken_22023 || binop_x_22037;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-168:21
     
-    bool dim_ok_cert_22421;
+    bool dim_ok_cert_22039;
     
-    if (!protect_assert_disj_22420) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Cannot unflatten array of shape [", (long long) arg_22387, "] to array of shape [", (long long) n_blocks_22385, "][", (long long) (int64_t) 256, "]", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-168:21\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
+    if (!protect_assert_disj_22038) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Cannot unflatten array of shape [", (long long) arg_22005, "] to array of shape [", (long long) n_blocks_22003, "][", (long long) (int64_t) 256, "]", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:163:34-168:21\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:122:7-16
     
-    bool y_22423 = slt64((int64_t) 0, dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22396);
+    bool y_22041 = slt64((int64_t) 0, dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22014);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool protect_assert_disj_22424 = loop_not_taken_22405 || y_22423;
+    bool protect_assert_disj_22042 = loop_not_taken_22023 || y_22041;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:122:7-16
     
-    bool index_certs_22425;
+    bool index_certs_22043;
     
-    if (!protect_assert_disj_22424) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) (int64_t) 0, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22396, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:122:7-16\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:178:5-20\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #5  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #6  arrange.fut:7:3-71\n   #7  arrange.fut:58:13-33\n   #8  entry.fut:8:3-56\n"));
+    if (!protect_assert_disj_22042) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) (int64_t) 0, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22014, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:122:7-16\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:178:5-20\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #5  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #6  arrange.fut:7:3-71\n   #7  arrange.fut:58:13-33\n   #8  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
     
-    bool x_22427 = sle64((int64_t) 0, m_22409);
+    bool x_22045 = sle64((int64_t) 0, m_22027);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
     
-    bool y_22428 = slt64(m_22409, rest_22386);
+    bool y_22046 = slt64(m_22027, rest_22004);
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
     
-    bool bounds_check_22429 = x_22427 && y_22428;
+    bool bounds_check_22047 = x_22045 && y_22046;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool protect_assert_disj_22430 = empty_slice_22408 || bounds_check_22429;
+    bool protect_assert_disj_22048 = empty_slice_22026 || bounds_check_22047;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     
-    bool protect_assert_disj_22431 = loop_not_taken_22405 || protect_assert_disj_22430;
+    bool protect_assert_disj_22049 = loop_not_taken_22023 || protect_assert_disj_22048;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
     
-    bool index_certs_22432;
+    bool index_certs_22050;
     
-    if (!protect_assert_disj_22431) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) m_22409, "] out of bounds for array of shape [", (long long) rest_22386, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:166:5-45\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #5  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #6  arrange.fut:7:3-71\n   #7  arrange.fut:58:13-33\n   #8  entry.fut:8:3-56\n"));
+    if (!protect_assert_disj_22049) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) m_22027, "] out of bounds for array of shape [", (long long) rest_22004, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:166:5-45\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #5  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #6  arrange.fut:7:3-71\n   #7  arrange.fut:58:13-33\n   #8  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
     
-    int64_t bytes_24914 = (int64_t) 2 * rest_22386;
+    int64_t bytes_24508 = (int64_t) 2 * rest_22004;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
     
-    int64_t bytes_24954 = (int64_t) 8 * rest_22386;
+    int64_t bytes_24548 = (int64_t) 8 * rest_22004;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
     
-    int64_t bytes_24956 = (int64_t) 4 * rest_22386;
+    int64_t bytes_24550 = (int64_t) 4 * rest_22004;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
     
-    int64_t bytes_24968 = (int64_t) 8 * n_blocks_22385;
+    int64_t bytes_24562 = (int64_t) 8 * n_blocks_22003;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
     
-    int64_t bytes_24971 = (int64_t) 32 * n_blocks_22385;
+    int64_t bytes_24565 = (int64_t) 32 * n_blocks_22003;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
     
-    int64_t bytes_24974 = (int64_t) 2048 * n_blocks_22385;
+    int64_t bytes_24568 = (int64_t) 2048 * n_blocks_22003;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
     
-    int64_t bytes_24977 = (int64_t) 1024 * n_blocks_22385;
+    int64_t bytes_24571 = (int64_t) 1024 * n_blocks_22003;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:120:5-18
     
-    int64_t bytes_25057 = (int64_t) 32 * dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395;
+    int64_t bytes_24651 = (int64_t) 32 * dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:225:6-11
     
-    bool dim_match_22819 = dzlz7bUZLztZRz20Umz20Unz7dUzg_22346 == dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388;
+    bool dim_match_22437 = dzlz7bUZLztZRz20Umz20Unz7dUzg_21964 == dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006;
     
     // lib/github.com/diku-dk/sorts/radix_sort.fut:225:6-11
     
-    bool empty_or_match_cert_22820;
+    bool empty_or_match_cert_22438;
     
-    if (!dim_match_22819) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Value of (desugared) shape [", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388, "] cannot match shape of type \"[", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, "](f32, i64)\".", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:225:6-11\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:225:14-227:50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
+    if (!dim_match_22437) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Value of (desugared) shape [", (long long) dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006, "] cannot match shape of type \"[", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, "](f32, i64)\".", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:225:6-11\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:225:14-227:50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // arrange.fut:29:16-32
     
-    int64_t bytes_25079 = (int64_t) 8 * dz2082U_14780;
+    int64_t bytes_24673 = (int64_t) 8 * dz2082U_14600;
     
     // arrange.fut:34:5-47:65
     
-    bool cond_22827 = slt64((int64_t) 0, dzlz7bUZLztZRz20Umz20Unz7dUzg_22346);
+    bool cond_22445 = slt64((int64_t) 0, dzlz7bUZLztZRz20Umz20Unz7dUzg_21964);
     
     // arrange.fut:36:24-27
     
-    bool loop_cond_t_res_22828 = slt64((int64_t) 0, dz2082U_14780);
+    bool loop_cond_t_res_22446 = slt64((int64_t) 0, dz2082U_14600);
     
     // arrange.fut:59:18-54
     
-    bool x_22829 = cond_22827 && loop_cond_t_res_22828;
+    bool x_22447 = cond_22445 && loop_cond_t_res_22446;
     
     // arrange.fut:59:18-54
     
-    bool loop_not_taken_22832 = !x_22829;
+    bool loop_not_taken_22450 = !x_22447;
     
     // arrange.fut:59:18-54
     
-    bool protect_assert_disj_22833 = nonzzero_22352 || loop_not_taken_22832;
+    bool protect_assert_disj_22451 = nonzzero_21970 || loop_not_taken_22450;
     
     // arrange.fut:38:17-20
     
-    bool nonzzero_cert_22834;
+    bool nonzzero_cert_22452;
     
-    if (!protect_assert_disj_22833) {
+    if (!protect_assert_disj_22451) {
         set_error(ctx, msgprintf("Error: %s\n\nBacktrace:\n%s", "division by zero", "-> #0  arrange.fut:38:17-20\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
     // arrange.fut:16:3-22:17
-    if (mem_24897_cached_sizze_25200 < bytes_24896) {
-        err = lexical_realloc(ctx, &mem_24897, &mem_24897_cached_sizze_25200, bytes_24896);
+    if (mem_24491_cached_sizze_24794 < bytes_24490) {
+        err = lexical_realloc(ctx, &mem_24491, &mem_24491_cached_sizze_24794, bytes_24490);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // arrange.fut:16:3-22:17
-    for (int64_t i_24752 = 0; i_24752 < dzlz7bUZLztZRz20Umz20Unz7dUzg_22346; i_24752++) {
+    for (int64_t i_24346 = 0; i_24346 < dzlz7bUZLztZRz20Umz20Unz7dUzg_21964; i_24346++) {
         // arrange.fut:17:15-18
         
-        int64_t g_22356 = sdiv64(i_24752, dz2082U_14780);
+        int64_t g_21974 = sdiv64(i_24346, dz2082U_14600);
         
         // arrange.fut:18:15-18
         
-        int64_t p_22357 = smod64(i_24752, dz2082U_14780);
+        int64_t p_21975 = smod64(i_24346, dz2082U_14600);
         
         // arrange.fut:19:14-24
         
-        bool x_22358 = sle64((int64_t) 0, g_22356);
+        bool x_21976 = sle64((int64_t) 0, g_21974);
         
         // arrange.fut:19:14-24
         
-        bool y_22359 = slt64(g_22356, dz2080U_14778);
+        bool y_21977 = slt64(g_21974, dz2080U_14598);
         
         // arrange.fut:19:14-24
         
-        bool bounds_check_22360 = x_22358 && y_22359;
+        bool bounds_check_21978 = x_21976 && y_21977;
         
         // arrange.fut:19:14-24
         
-        bool index_certs_22361;
+        bool index_certs_21979;
         
-        if (!bounds_check_22360) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_22356, "] out of bounds for array of shape [", (long long) dz2080U_14778, "].", "-> #0  arrange.fut:19:14-24\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
+        if (!bounds_check_21978) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_21974, "] out of bounds for array of shape [", (long long) dz2080U_14598, "].", "-> #0  arrange.fut:19:14-24\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:19:27-35
         
-        bool x_22363 = sle64((int64_t) 0, p_22357);
+        bool x_21981 = sle64((int64_t) 0, p_21975);
         
         // arrange.fut:19:27-35
         
-        bool y_22364 = slt64(p_22357, dz2082U_14780);
+        bool y_21982 = slt64(p_21975, dz2082U_14600);
         
         // arrange.fut:19:27-35
         
-        bool bounds_check_22365 = x_22363 && y_22364;
+        bool bounds_check_21983 = x_21981 && y_21982;
         
         // arrange.fut:19:27-35
         
-        bool index_certs_22366;
+        bool index_certs_21984;
         
-        if (!bounds_check_22365) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_22357, "] out of bounds for array of shape [", (long long) dz2082U_14780, "].", "-> #0  arrange.fut:19:27-35\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
+        if (!bounds_check_21983) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_21975, "] out of bounds for array of shape [", (long long) dz2082U_14600, "].", "-> #0  arrange.fut:19:27-35\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:20:14-24
         
-        bool y_22369 = slt64(g_22356, dz2081U_14779);
+        bool y_21987 = slt64(g_21974, dz2081U_14599);
         
         // arrange.fut:20:14-24
         
-        bool bounds_check_22370 = x_22358 && y_22369;
+        bool bounds_check_21988 = x_21976 && y_21987;
         
         // arrange.fut:20:14-24
         
-        bool index_certs_22371;
+        bool index_certs_21989;
         
-        if (!bounds_check_22370) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_22356, "] out of bounds for array of shape [", (long long) dz2081U_14779, "].", "-> #0  arrange.fut:20:14-24\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
+        if (!bounds_check_21988) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_21974, "] out of bounds for array of shape [", (long long) dz2081U_14599, "].", "-> #0  arrange.fut:20:14-24\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:20:27-35
         
-        bool y_22373 = slt64(p_22357, dz2083U_14781);
+        bool y_21991 = slt64(p_21975, dz2083U_14601);
         
         // arrange.fut:20:27-35
         
-        bool bounds_check_22374 = x_22363 && y_22373;
+        bool bounds_check_21992 = x_21981 && y_21991;
         
         // arrange.fut:20:27-35
         
-        bool index_certs_22375;
+        bool index_certs_21993;
         
-        if (!bounds_check_22374) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_22357, "] out of bounds for array of shape [", (long long) dz2083U_14781, "].", "-> #0  arrange.fut:20:27-35\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
+        if (!bounds_check_21992) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_21975, "] out of bounds for array of shape [", (long long) dz2083U_14601, "].", "-> #0  arrange.fut:20:27-35\n   #1  arrange.fut:57:15-73\n   #2  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:19:14-24
         
-        double zm_lhs_22362 = ((double *) grid_xs_mem_24892.mem)[g_22356];
+        double zm_lhs_21980 = ((double *) grid_xs_mem_24486.mem)[g_21974];
         
         // arrange.fut:19:27-35
         
-        double zm_rhs_22367 = ((double *) pts_x_mem_24894.mem)[p_22357];
+        double zm_rhs_21985 = ((double *) pts_x_mem_24488.mem)[p_21975];
         
         // arrange.fut:19:25-35
         
-        double dx_22368 = zm_lhs_22362 - zm_rhs_22367;
+        double dx_21986 = zm_lhs_21980 - zm_rhs_21985;
         
         // arrange.fut:20:14-24
         
-        double zm_lhs_22372 = ((double *) grid_ys_mem_24893.mem)[g_22356];
+        double zm_lhs_21990 = ((double *) grid_ys_mem_24487.mem)[g_21974];
         
         // arrange.fut:20:27-35
         
-        double zm_rhs_22376 = ((double *) pts_y_mem_24895.mem)[p_22357];
+        double zm_rhs_21994 = ((double *) pts_y_mem_24489.mem)[p_21975];
         
         // arrange.fut:20:25-35
         
-        double dy_22377 = zm_lhs_22372 - zm_rhs_22376;
+        double dy_21995 = zm_lhs_21990 - zm_rhs_21994;
         
         // arrange.fut:21:19-22
         
-        double zp_lhs_22378 = dx_22368 * dx_22368;
+        double zp_lhs_21996 = dx_21986 * dx_21986;
         
         // arrange.fut:21:27-30
         
-        double zp_rhs_22379 = dy_22377 * dy_22377;
+        double zp_rhs_21997 = dy_21995 * dy_21995;
         
         // arrange.fut:21:23-30
         
-        double f64_arg0_22380 = zp_lhs_22378 + zp_rhs_22379;
+        double f64_arg0_21998 = zp_lhs_21996 + zp_rhs_21997;
         
         // arrange.fut:21:8-30
         
-        float f64_res_22381 = fpconv_f64_f32(f64_arg0_22380);
+        float f64_res_21999 = fpconv_f64_f32(f64_arg0_21998);
         
-        ((float *) mem_24897)[i_24752] = f64_res_22381;
+        ((float *) mem_24491)[i_24346] = f64_res_21999;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
-    if (mem_24905_cached_sizze_25201 < bytes_24904) {
-        err = lexical_realloc(ctx, &mem_24905, &mem_24905_cached_sizze_25201, bytes_24904);
+    if (mem_24499_cached_sizze_24795 < bytes_24498) {
+        err = lexical_realloc(ctx, &mem_24499, &mem_24499_cached_sizze_24795, bytes_24498);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
-    lmad_copy_4b(ctx, 1, (uint32_t *) mem_24905, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24897, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388});
+    lmad_copy_4b(ctx, 1, (uint32_t *) mem_24499, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24491, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006});
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
-    if (mem_24907_cached_sizze_25202 < bytes_24906) {
-        err = lexical_realloc(ctx, &mem_24907, &mem_24907_cached_sizze_25202, bytes_24906);
+    if (mem_24501_cached_sizze_24796 < bytes_24500) {
+        err = lexical_realloc(ctx, &mem_24501, &mem_24501_cached_sizze_24796, bytes_24500);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48
-    for (int64_t i_25144 = 0; i_25144 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388; i_25144++) {
-        int64_t x_25145 = (int64_t) 0 + i_25144 * (int64_t) 1;
+    for (int64_t i_24738 = 0; i_24738 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006; i_24738++) {
+        int64_t x_24739 = (int64_t) 0 + i_24738 * (int64_t) 1;
         
-        ((int64_t *) mem_24907)[i_25144] = x_25145;
+        ((int64_t *) mem_24501)[i_24738] = x_24739;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24915_cached_sizze_25203 < bytes_24914) {
-        err = lexical_realloc(ctx, &mem_24915, &mem_24915_cached_sizze_25203, bytes_24914);
+    if (mem_24509_cached_sizze_24797 < bytes_24508) {
+        err = lexical_realloc(ctx, &mem_24509, &mem_24509_cached_sizze_24797, bytes_24508);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24917_cached_sizze_25204 < bytes_24914) {
-        err = lexical_realloc(ctx, &mem_24917, &mem_24917_cached_sizze_25204, bytes_24914);
+    if (mem_24511_cached_sizze_24798 < bytes_24508) {
+        err = lexical_realloc(ctx, &mem_24511, &mem_24511_cached_sizze_24798, bytes_24508);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24919_cached_sizze_25205 < bytes_24914) {
-        err = lexical_realloc(ctx, &mem_24919, &mem_24919_cached_sizze_25205, bytes_24914);
+    if (mem_24513_cached_sizze_24799 < bytes_24508) {
+        err = lexical_realloc(ctx, &mem_24513, &mem_24513_cached_sizze_24799, bytes_24508);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24921_cached_sizze_25206 < bytes_24914) {
-        err = lexical_realloc(ctx, &mem_24921, &mem_24921_cached_sizze_25206, bytes_24914);
+    if (mem_24515_cached_sizze_24800 < bytes_24508) {
+        err = lexical_realloc(ctx, &mem_24515, &mem_24515_cached_sizze_24800, bytes_24508);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24923_cached_sizze_25207 < bytes_24914) {
-        err = lexical_realloc(ctx, &mem_24923, &mem_24923_cached_sizze_25207, bytes_24914);
+    if (mem_24517_cached_sizze_24801 < bytes_24508) {
+        err = lexical_realloc(ctx, &mem_24517, &mem_24517_cached_sizze_24801, bytes_24508);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
-    if (mem_24955_cached_sizze_25208 < bytes_24954) {
-        err = lexical_realloc(ctx, &mem_24955, &mem_24955_cached_sizze_25208, bytes_24954);
+    if (mem_24549_cached_sizze_24802 < bytes_24548) {
+        err = lexical_realloc(ctx, &mem_24549, &mem_24549_cached_sizze_24802, bytes_24548);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
-    if (mem_24957_cached_sizze_25209 < bytes_24956) {
-        err = lexical_realloc(ctx, &mem_24957, &mem_24957_cached_sizze_25209, bytes_24956);
+    if (mem_24551_cached_sizze_24803 < bytes_24550) {
+        err = lexical_realloc(ctx, &mem_24551, &mem_24551_cached_sizze_24803, bytes_24550);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-    if (mem_24958_cached_sizze_25210 < (int64_t) 8) {
-        err = lexical_realloc(ctx, &mem_24958, &mem_24958_cached_sizze_25210, (int64_t) 8);
+    if (mem_24552_cached_sizze_24804 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_24552, &mem_24552_cached_sizze_24804, (int64_t) 8);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-    if (mem_24959_cached_sizze_25211 < (int64_t) 32) {
-        err = lexical_realloc(ctx, &mem_24959, &mem_24959_cached_sizze_25211, (int64_t) 32);
+    if (mem_24553_cached_sizze_24805 < (int64_t) 32) {
+        err = lexical_realloc(ctx, &mem_24553, &mem_24553_cached_sizze_24805, (int64_t) 32);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:166:5-45
-    if (mem_24966_cached_sizze_25212 < (int64_t) 8) {
-        err = lexical_realloc(ctx, &mem_24966, &mem_24966_cached_sizze_25212, (int64_t) 8);
+    if (mem_24560_cached_sizze_24806 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_24560, &mem_24560_cached_sizze_24806, (int64_t) 8);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
-    if (mem_24969_cached_sizze_25213 < bytes_24968) {
-        err = lexical_realloc(ctx, &mem_24969, &mem_24969_cached_sizze_25213, bytes_24968);
+    if (mem_24563_cached_sizze_24807 < bytes_24562) {
+        err = lexical_realloc(ctx, &mem_24563, &mem_24563_cached_sizze_24807, bytes_24562);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
-    if (mem_24972_cached_sizze_25214 < bytes_24971) {
-        err = lexical_realloc(ctx, &mem_24972, &mem_24972_cached_sizze_25214, bytes_24971);
+    if (mem_24566_cached_sizze_24808 < bytes_24565) {
+        err = lexical_realloc(ctx, &mem_24566, &mem_24566_cached_sizze_24808, bytes_24565);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
-    if (mem_24975_cached_sizze_25215 < bytes_24974) {
-        err = lexical_realloc(ctx, &mem_24975, &mem_24975_cached_sizze_25215, bytes_24974);
+    if (mem_24569_cached_sizze_24809 < bytes_24568) {
+        err = lexical_realloc(ctx, &mem_24569, &mem_24569_cached_sizze_24809, bytes_24568);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
-    if (mem_24978_cached_sizze_25216 < bytes_24977) {
-        err = lexical_realloc(ctx, &mem_24978, &mem_24978_cached_sizze_25216, bytes_24977);
+    if (mem_24572_cached_sizze_24810 < bytes_24571) {
+        err = lexical_realloc(ctx, &mem_24572, &mem_24572_cached_sizze_24810, bytes_24571);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_24995_cached_sizze_25217 < (int64_t) 1024) {
-        err = lexical_realloc(ctx, &mem_24995, &mem_24995_cached_sizze_25217, (int64_t) 1024);
+    if (mem_24589_cached_sizze_24811 < (int64_t) 1024) {
+        err = lexical_realloc(ctx, &mem_24589, &mem_24589_cached_sizze_24811, (int64_t) 1024);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    if (mem_24996_cached_sizze_25218 < (int64_t) 2048) {
-        err = lexical_realloc(ctx, &mem_24996, &mem_24996_cached_sizze_25218, (int64_t) 2048);
-        if (err != FUTHARK_SUCCESS)
-            goto cleanup;
-    }
-    // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24997_cached_sizze_25219 < (int64_t) 512) {
-        err = lexical_realloc(ctx, &mem_24997, &mem_24997_cached_sizze_25219, (int64_t) 512);
+    if (mem_24590_cached_sizze_24812 < (int64_t) 2048) {
+        err = lexical_realloc(ctx, &mem_24590, &mem_24590_cached_sizze_24812, (int64_t) 2048);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24998_cached_sizze_25220 < (int64_t) 512) {
-        err = lexical_realloc(ctx, &mem_24998, &mem_24998_cached_sizze_25220, (int64_t) 512);
+    if (mem_24591_cached_sizze_24813 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_24591, &mem_24591_cached_sizze_24813, (int64_t) 512);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_24999_cached_sizze_25221 < (int64_t) 512) {
-        err = lexical_realloc(ctx, &mem_24999, &mem_24999_cached_sizze_25221, (int64_t) 512);
+    if (mem_24592_cached_sizze_24814 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_24592, &mem_24592_cached_sizze_24814, (int64_t) 512);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_25000_cached_sizze_25222 < (int64_t) 512) {
-        err = lexical_realloc(ctx, &mem_25000, &mem_25000_cached_sizze_25222, (int64_t) 512);
+    if (mem_24593_cached_sizze_24815 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_24593, &mem_24593_cached_sizze_24815, (int64_t) 512);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
-    if (mem_25001_cached_sizze_25223 < (int64_t) 512) {
-        err = lexical_realloc(ctx, &mem_25001, &mem_25001_cached_sizze_25223, (int64_t) 512);
+    if (mem_24594_cached_sizze_24816 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_24594, &mem_24594_cached_sizze_24816, (int64_t) 512);
+        if (err != FUTHARK_SUCCESS)
+            goto cleanup;
+    }
+    // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
+    if (mem_24595_cached_sizze_24817 < (int64_t) 512) {
+        err = lexical_realloc(ctx, &mem_24595, &mem_24595_cached_sizze_24817, (int64_t) 512);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-    if (mem_25032_cached_sizze_25224 < (int64_t) 8) {
-        err = lexical_realloc(ctx, &mem_25032, &mem_25032_cached_sizze_25224, (int64_t) 8);
+    if (mem_24626_cached_sizze_24818 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_24626, &mem_24626_cached_sizze_24818, (int64_t) 8);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-    if (mem_25033_cached_sizze_25225 < (int64_t) 32) {
-        err = lexical_realloc(ctx, &mem_25033, &mem_25033_cached_sizze_25225, (int64_t) 32);
+    if (mem_24627_cached_sizze_24819 < (int64_t) 32) {
+        err = lexical_realloc(ctx, &mem_24627, &mem_24627_cached_sizze_24819, (int64_t) 32);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:120:5-18
-    if (mem_25058_cached_sizze_25226 < bytes_25057) {
-        err = lexical_realloc(ctx, &mem_25058, &mem_25058_cached_sizze_25226, bytes_25057);
+    if (mem_24652_cached_sizze_24820 < bytes_24651) {
+        err = lexical_realloc(ctx, &mem_24652, &mem_24652_cached_sizze_24820, bytes_24651);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:121:8-14
-    if (mem_25066_cached_sizze_25227 < bytes_25057) {
-        err = lexical_realloc(ctx, &mem_25066, &mem_25066_cached_sizze_25227, bytes_25057);
+    if (mem_24660_cached_sizze_24821 < bytes_24651) {
+        err = lexical_realloc(ctx, &mem_24660, &mem_24660_cached_sizze_24821, bytes_24651);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // lib/github.com/diku-dk/sorts/radix_sort.fut:226:6-227:50
-    for (int32_t i_22435 = 0; i_22435 < iters_22384; i_22435++) {
+    for (int32_t i_22053 = 0; i_22053 < iters_22002; i_22053++) {
         // lib/github.com/diku-dk/sorts/radix_sort.fut:227:43-46
         
-        int32_t blocked_radix_sort_step_arg1_22438 = mul32(2, i_22435);
+        int32_t blocked_radix_sort_step_arg1_22056 = mul32(2, i_22053);
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:139:40-42
         
-        int32_t get_bit_arg0_22443 = add32(1, blocked_radix_sort_step_arg1_22438);
+        int32_t get_bit_arg0_22061 = add32(1, blocked_radix_sort_step_arg1_22056);
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:268:44-57
         
-        bool cond_f_res_22444 = get_bit_arg0_22443 == 31;
+        bool cond_f_res_22062 = get_bit_arg0_22061 == 31;
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:268:44-57
         
-        bool cond_f_res_22445 = blocked_radix_sort_step_arg1_22438 == 31;
+        bool cond_f_res_22063 = blocked_radix_sort_step_arg1_22056 == 31;
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
         
-        int16_t discard_24774;
-        int16_t discard_24775;
-        int16_t discard_24776;
-        int16_t discard_24777;
-        int16_t scanacc_24759;
-        int16_t scanacc_24760;
-        int16_t scanacc_24761;
-        int16_t scanacc_24762;
+        int16_t discard_24368;
+        int16_t discard_24369;
+        int16_t discard_24370;
+        int16_t discard_24371;
+        int16_t scanacc_24353;
+        int16_t scanacc_24354;
+        int16_t scanacc_24355;
+        int16_t scanacc_24356;
         
-        scanacc_24759 = (int16_t) 0;
-        scanacc_24760 = (int16_t) 0;
-        scanacc_24761 = (int16_t) 0;
-        scanacc_24762 = (int16_t) 0;
-        for (int64_t i_24768 = 0; i_24768 < rest_22386; i_24768++) {
-            int64_t index_primexp_24881 = arg_22387 + i_24768;
-            float eta_p_23560 = ((float *) mem_24905)[index_primexp_24881];
+        scanacc_24353 = (int16_t) 0;
+        scanacc_24354 = (int16_t) 0;
+        scanacc_24355 = (int16_t) 0;
+        scanacc_24356 = (int16_t) 0;
+        for (int64_t i_24362 = 0; i_24362 < rest_22004; i_24362++) {
+            int64_t index_primexp_24475 = arg_22005 + i_24362;
+            float eta_p_23178 = ((float *) mem_24499)[index_primexp_24475];
             
             // arrange.fut:7:60-71
             
-            int32_t i32_arg0_23561 = fptobits_f32_i32(eta_p_23560);
+            int32_t i32_arg0_23179 = fptobits_f32_i32(eta_p_23178);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23562 = ashr32(i32_arg0_23561, get_bit_arg0_22443);
+            int32_t unsign_arg0_23180 = ashr32(i32_arg0_23179, get_bit_arg0_22061);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23563 = 1 & unsign_arg0_23562;
+            int32_t unsign_arg0_23181 = 1 & unsign_arg0_23180;
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23564 = ashr32(i32_arg0_23561, 31);
+            int32_t unsign_arg0_23182 = ashr32(i32_arg0_23179, 31);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23565 = 1 & unsign_arg0_23564;
+            int32_t unsign_arg0_23183 = 1 & unsign_arg0_23182;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
             
-            bool cond_23566 = unsign_arg0_23565 == 1;
+            bool cond_23184 = unsign_arg0_23183 == 1;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:24-45
             
-            bool x_23567 = !cond_23566;
+            bool x_23185 = !cond_23184;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:24-45
             
-            bool y_23568 = cond_f_res_22444 && x_23567;
+            bool y_23186 = cond_f_res_22062 && x_23185;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:24-45
             
-            bool cond_23569 = cond_23566 || y_23568;
+            bool cond_23187 = cond_23184 || y_23186;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
             
-            int32_t defunc_0_get_bit_res_23570;
+            int32_t defunc_0_get_bit_res_23188;
             
-            if (cond_23569) {
+            if (cond_23187) {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:269:15-18
                 
-                int32_t defunc_0_get_bit_res_t_res_23997 = 1 ^ unsign_arg0_23563;
+                int32_t defunc_0_get_bit_res_t_res_23615 = 1 ^ unsign_arg0_23181;
                 
-                defunc_0_get_bit_res_23570 = defunc_0_get_bit_res_t_res_23997;
+                defunc_0_get_bit_res_23188 = defunc_0_get_bit_res_t_res_23615;
             } else {
-                defunc_0_get_bit_res_23570 = unsign_arg0_23563;
+                defunc_0_get_bit_res_23188 = unsign_arg0_23181;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:46-49
             
-            int32_t zp_lhs_23572 = mul32(2, defunc_0_get_bit_res_23570);
+            int32_t zp_lhs_23190 = mul32(2, defunc_0_get_bit_res_23188);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23573 = ashr32(i32_arg0_23561, blocked_radix_sort_step_arg1_22438);
+            int32_t unsign_arg0_23191 = ashr32(i32_arg0_23179, blocked_radix_sort_step_arg1_22056);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23574 = 1 & unsign_arg0_23573;
+            int32_t unsign_arg0_23192 = 1 & unsign_arg0_23191;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:52-69
             
-            bool y_23575 = cond_f_res_22445 && x_23567;
+            bool y_23193 = cond_f_res_22063 && x_23185;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:52-69
             
-            bool cond_23576 = cond_23566 || y_23575;
+            bool cond_23194 = cond_23184 || y_23193;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
             
-            int32_t defunc_0_get_bit_res_23577;
+            int32_t defunc_0_get_bit_res_23195;
             
-            if (cond_23576) {
+            if (cond_23194) {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:269:15-18
                 
-                int32_t defunc_0_get_bit_res_t_res_23998 = 1 ^ unsign_arg0_23574;
+                int32_t defunc_0_get_bit_res_t_res_23616 = 1 ^ unsign_arg0_23192;
                 
-                defunc_0_get_bit_res_23577 = defunc_0_get_bit_res_t_res_23998;
+                defunc_0_get_bit_res_23195 = defunc_0_get_bit_res_t_res_23616;
             } else {
-                defunc_0_get_bit_res_23577 = unsign_arg0_23574;
+                defunc_0_get_bit_res_23195 = unsign_arg0_23192;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:50-69
             
-            int32_t i32_arg0_23579 = add32(zp_lhs_23572, defunc_0_get_bit_res_23577);
+            int32_t i32_arg0_23197 = add32(zp_lhs_23190, defunc_0_get_bit_res_23195);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:139:15-69
             
-            int16_t i32_res_23580 = sext_i32_i16(i32_arg0_23579);
+            int16_t i32_res_23198 = sext_i32_i16(i32_arg0_23197);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:144:20-23
             
-            bool bool_arg0_23583 = i32_res_23580 == (int16_t) 0;
+            bool bool_arg0_23201 = i32_res_23198 == (int16_t) 0;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:144:9-23
             
-            int16_t bool_res_23584 = btoi_bool_i16(bool_arg0_23583);
+            int16_t bool_res_23202 = btoi_bool_i16(bool_arg0_23201);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:145:20-23
             
-            bool bool_arg0_23585 = i32_res_23580 == (int16_t) 1;
+            bool bool_arg0_23203 = i32_res_23198 == (int16_t) 1;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:145:9-23
             
-            int16_t bool_res_23586 = btoi_bool_i16(bool_arg0_23585);
+            int16_t bool_res_23204 = btoi_bool_i16(bool_arg0_23203);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:146:20-23
             
-            bool bool_arg0_23587 = i32_res_23580 == (int16_t) 2;
+            bool bool_arg0_23205 = i32_res_23198 == (int16_t) 2;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:146:9-23
             
-            int16_t bool_res_23588 = btoi_bool_i16(bool_arg0_23587);
+            int16_t bool_res_23206 = btoi_bool_i16(bool_arg0_23205);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:147:20-23
             
-            bool bool_arg0_23589 = i32_res_23580 == (int16_t) 3;
+            bool bool_arg0_23207 = i32_res_23198 == (int16_t) 3;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:147:9-23
             
-            int16_t bool_res_23590 = btoi_bool_i16(bool_arg0_23589);
+            int16_t bool_res_23208 = btoi_bool_i16(bool_arg0_23207);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
             
-            int16_t defunc_0_op_res_22502 = add16(bool_res_23584, scanacc_24759);
+            int16_t defunc_0_op_res_22120 = add16(bool_res_23202, scanacc_24353);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
             
-            int16_t defunc_0_op_res_22503 = add16(bool_res_23586, scanacc_24760);
+            int16_t defunc_0_op_res_22121 = add16(bool_res_23204, scanacc_24354);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
             
-            int16_t defunc_0_op_res_22504 = add16(bool_res_23588, scanacc_24761);
+            int16_t defunc_0_op_res_22122 = add16(bool_res_23206, scanacc_24355);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
             
-            int16_t defunc_0_op_res_22505 = add16(bool_res_23590, scanacc_24762);
+            int16_t defunc_0_op_res_22123 = add16(bool_res_23208, scanacc_24356);
             
-            ((int16_t *) mem_24915)[i_24768] = defunc_0_op_res_22502;
-            ((int16_t *) mem_24917)[i_24768] = defunc_0_op_res_22503;
-            ((int16_t *) mem_24919)[i_24768] = defunc_0_op_res_22504;
-            ((int16_t *) mem_24921)[i_24768] = defunc_0_op_res_22505;
-            ((int16_t *) mem_24923)[i_24768] = i32_res_23580;
+            ((int16_t *) mem_24509)[i_24362] = defunc_0_op_res_22120;
+            ((int16_t *) mem_24511)[i_24362] = defunc_0_op_res_22121;
+            ((int16_t *) mem_24513)[i_24362] = defunc_0_op_res_22122;
+            ((int16_t *) mem_24515)[i_24362] = defunc_0_op_res_22123;
+            ((int16_t *) mem_24517)[i_24362] = i32_res_23198;
             
-            int16_t scanacc_tmp_25148 = defunc_0_op_res_22502;
-            int16_t scanacc_tmp_25149 = defunc_0_op_res_22503;
-            int16_t scanacc_tmp_25150 = defunc_0_op_res_22504;
-            int16_t scanacc_tmp_25151 = defunc_0_op_res_22505;
+            int16_t scanacc_tmp_24742 = defunc_0_op_res_22120;
+            int16_t scanacc_tmp_24743 = defunc_0_op_res_22121;
+            int16_t scanacc_tmp_24744 = defunc_0_op_res_22122;
+            int16_t scanacc_tmp_24745 = defunc_0_op_res_22123;
             
-            scanacc_24759 = scanacc_tmp_25148;
-            scanacc_24760 = scanacc_tmp_25149;
-            scanacc_24761 = scanacc_tmp_25150;
-            scanacc_24762 = scanacc_tmp_25151;
+            scanacc_24353 = scanacc_tmp_24742;
+            scanacc_24354 = scanacc_tmp_24743;
+            scanacc_24355 = scanacc_tmp_24744;
+            scanacc_24356 = scanacc_tmp_24745;
         }
-        discard_24774 = scanacc_24759;
-        discard_24775 = scanacc_24760;
-        discard_24776 = scanacc_24761;
-        discard_24777 = scanacc_24762;
+        discard_24368 = scanacc_24353;
+        discard_24369 = scanacc_24354;
+        discard_24370 = scanacc_24355;
+        discard_24371 = scanacc_24356;
         // lib/github.com/diku-dk/sorts/radix_sort.fut:149:23-65
         
-        int16_t defunc_0_radix_sort_step_i16_res_22510;
-        int16_t defunc_0_radix_sort_step_i16_res_22511;
-        int16_t defunc_0_radix_sort_step_i16_res_22512;
-        int16_t defunc_0_radix_sort_step_i16_res_22513;
+        int16_t defunc_0_radix_sort_step_i16_res_22128;
+        int16_t defunc_0_radix_sort_step_i16_res_22129;
+        int16_t defunc_0_radix_sort_step_i16_res_22130;
+        int16_t defunc_0_radix_sort_step_i16_res_22131;
         
-        if (empty_slice_22408) {
-            defunc_0_radix_sort_step_i16_res_22510 = (int16_t) 0;
-            defunc_0_radix_sort_step_i16_res_22511 = (int16_t) 0;
-            defunc_0_radix_sort_step_i16_res_22512 = (int16_t) 0;
-            defunc_0_radix_sort_step_i16_res_22513 = (int16_t) 0;
+        if (empty_slice_22026) {
+            defunc_0_radix_sort_step_i16_res_22128 = (int16_t) 0;
+            defunc_0_radix_sort_step_i16_res_22129 = (int16_t) 0;
+            defunc_0_radix_sort_step_i16_res_22130 = (int16_t) 0;
+            defunc_0_radix_sort_step_i16_res_22131 = (int16_t) 0;
         } else {
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22514 = ((int16_t *) mem_24915)[m_22409];
+            int16_t last_res_22132 = ((int16_t *) mem_24509)[m_22027];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22515 = ((int16_t *) mem_24917)[m_22409];
+            int16_t last_res_22133 = ((int16_t *) mem_24511)[m_22027];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22516 = ((int16_t *) mem_24919)[m_22409];
+            int16_t last_res_22134 = ((int16_t *) mem_24513)[m_22027];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22517 = ((int16_t *) mem_24921)[m_22409];
+            int16_t last_res_22135 = ((int16_t *) mem_24515)[m_22027];
             
-            defunc_0_radix_sort_step_i16_res_22510 = last_res_22514;
-            defunc_0_radix_sort_step_i16_res_22511 = last_res_22515;
-            defunc_0_radix_sort_step_i16_res_22512 = last_res_22516;
-            defunc_0_radix_sort_step_i16_res_22513 = last_res_22517;
+            defunc_0_radix_sort_step_i16_res_22128 = last_res_22132;
+            defunc_0_radix_sort_step_i16_res_22129 = last_res_22133;
+            defunc_0_radix_sort_step_i16_res_22130 = last_res_22134;
+            defunc_0_radix_sort_step_i16_res_22131 = last_res_22135;
         }
         // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
         // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
-        lmad_copy_8b(ctx, 1, (uint64_t *) mem_24955, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24907, (int64_t) 0 + (int64_t) 1 * arg_22387, (int64_t []) {(int64_t) 1}, (int64_t []) {rest_22386});
+        lmad_copy_8b(ctx, 1, (uint64_t *) mem_24549, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24501, (int64_t) 0 + (int64_t) 1 * arg_22005, (int64_t []) {(int64_t) 1}, (int64_t []) {rest_22004});
         // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
         // lib/github.com/diku-dk/sorts/radix_sort.fut:156:16-23
-        lmad_copy_4b(ctx, 1, (uint32_t *) mem_24957, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24905, (int64_t) 0 + (int64_t) 1 * arg_22387, (int64_t []) {(int64_t) 1}, (int64_t []) {rest_22386});
+        lmad_copy_4b(ctx, 1, (uint32_t *) mem_24551, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24499, (int64_t) 0 + (int64_t) 1 * arg_22005, (int64_t []) {(int64_t) 1}, (int64_t []) {rest_22004});
         // lib/github.com/diku-dk/sorts/radix_sort.fut:156:7-30
         
-        bool acc_cert_23337;
-        bool acc_cert_23338;
+        bool acc_cert_22955;
+        bool acc_cert_22956;
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:155:12-156:30
-        for (int64_t i_24780 = 0; i_24780 < rest_22386; i_24780++) {
-            int16_t eta_p_23405 = ((int16_t *) mem_24923)[i_24780];
-            int16_t eta_p_23406 = ((int16_t *) mem_24915)[i_24780];
-            int16_t eta_p_23407 = ((int16_t *) mem_24917)[i_24780];
-            int16_t eta_p_23408 = ((int16_t *) mem_24919)[i_24780];
-            int16_t eta_p_23409 = ((int16_t *) mem_24921)[i_24780];
-            int64_t index_primexp_24880 = arg_22387 + i_24780;
-            float v_23412 = ((float *) mem_24905)[index_primexp_24880];
-            int64_t v_23413 = ((int64_t *) mem_24907)[index_primexp_24880];
+        for (int64_t i_24374 = 0; i_24374 < rest_22004; i_24374++) {
+            int16_t eta_p_23023 = ((int16_t *) mem_24517)[i_24374];
+            int16_t eta_p_23024 = ((int16_t *) mem_24509)[i_24374];
+            int16_t eta_p_23025 = ((int16_t *) mem_24511)[i_24374];
+            int16_t eta_p_23026 = ((int16_t *) mem_24513)[i_24374];
+            int16_t eta_p_23027 = ((int16_t *) mem_24515)[i_24374];
+            int64_t index_primexp_24474 = arg_22005 + i_24374;
+            float v_23030 = ((float *) mem_24499)[index_primexp_24474];
+            int64_t v_23031 = ((int64_t *) mem_24501)[index_primexp_24474];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:28-32
             
-            bool bool_arg0_23414 = eta_p_23405 == (int16_t) 0;
+            bool bool_arg0_23032 = eta_p_23023 == (int16_t) 0;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:14-32
             
-            int16_t bool_res_23415 = btoi_bool_i16(bool_arg0_23414);
+            int16_t bool_res_23033 = btoi_bool_i16(bool_arg0_23032);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:11-33
             
-            int16_t zp_rhs_23416 = mul16(eta_p_23406, bool_res_23415);
+            int16_t zp_rhs_23034 = mul16(eta_p_23024, bool_res_23033);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:7-33
             
-            int16_t zp_lhs_23417 = add16((int16_t) -1, zp_rhs_23416);
+            int16_t zp_lhs_23035 = add16((int16_t) -1, zp_rhs_23034);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:57-60
             
-            bool bool_arg0_23418 = slt16((int16_t) 0, eta_p_23405);
+            bool bool_arg0_23036 = slt16((int16_t) 0, eta_p_23023);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:43-60
             
-            int16_t bool_res_23419 = btoi_bool_i16(bool_arg0_23418);
+            int16_t bool_res_23037 = btoi_bool_i16(bool_arg0_23036);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:40-61
             
-            int16_t zp_rhs_23420 = mul16(defunc_0_radix_sort_step_i16_res_22510, bool_res_23419);
+            int16_t zp_rhs_23038 = mul16(defunc_0_radix_sort_step_i16_res_22128, bool_res_23037);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:151:35-61
             
-            int16_t zp_lhs_23421 = add16(zp_lhs_23417, zp_rhs_23420);
+            int16_t zp_lhs_23039 = add16(zp_lhs_23035, zp_rhs_23038);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:28-32
             
-            bool bool_arg0_23422 = eta_p_23405 == (int16_t) 1;
+            bool bool_arg0_23040 = eta_p_23023 == (int16_t) 1;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:14-32
             
-            int16_t bool_res_23423 = btoi_bool_i16(bool_arg0_23422);
+            int16_t bool_res_23041 = btoi_bool_i16(bool_arg0_23040);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:11-33
             
-            int16_t zp_rhs_23424 = mul16(eta_p_23407, bool_res_23423);
+            int16_t zp_rhs_23042 = mul16(eta_p_23025, bool_res_23041);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:7-33
             
-            int16_t zp_lhs_23425 = add16(zp_lhs_23421, zp_rhs_23424);
+            int16_t zp_lhs_23043 = add16(zp_lhs_23039, zp_rhs_23042);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:57-60
             
-            bool bool_arg0_23426 = slt16((int16_t) 1, eta_p_23405);
+            bool bool_arg0_23044 = slt16((int16_t) 1, eta_p_23023);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:43-60
             
-            int16_t bool_res_23427 = btoi_bool_i16(bool_arg0_23426);
+            int16_t bool_res_23045 = btoi_bool_i16(bool_arg0_23044);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:40-61
             
-            int16_t zp_rhs_23428 = mul16(defunc_0_radix_sort_step_i16_res_22511, bool_res_23427);
+            int16_t zp_rhs_23046 = mul16(defunc_0_radix_sort_step_i16_res_22129, bool_res_23045);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:152:35-61
             
-            int16_t zp_lhs_23429 = add16(zp_lhs_23425, zp_rhs_23428);
+            int16_t zp_lhs_23047 = add16(zp_lhs_23043, zp_rhs_23046);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:28-32
             
-            bool bool_arg0_23430 = eta_p_23405 == (int16_t) 2;
+            bool bool_arg0_23048 = eta_p_23023 == (int16_t) 2;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:14-32
             
-            int16_t bool_res_23431 = btoi_bool_i16(bool_arg0_23430);
+            int16_t bool_res_23049 = btoi_bool_i16(bool_arg0_23048);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:11-33
             
-            int16_t zp_rhs_23432 = mul16(eta_p_23408, bool_res_23431);
+            int16_t zp_rhs_23050 = mul16(eta_p_23026, bool_res_23049);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:7-33
             
-            int16_t zp_lhs_23433 = add16(zp_lhs_23429, zp_rhs_23432);
+            int16_t zp_lhs_23051 = add16(zp_lhs_23047, zp_rhs_23050);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:57-60
             
-            bool bool_arg0_23434 = slt16((int16_t) 2, eta_p_23405);
+            bool bool_arg0_23052 = slt16((int16_t) 2, eta_p_23023);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:43-60
             
-            int16_t bool_res_23435 = btoi_bool_i16(bool_arg0_23434);
+            int16_t bool_res_23053 = btoi_bool_i16(bool_arg0_23052);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:40-61
             
-            int16_t zp_rhs_23436 = mul16(defunc_0_radix_sort_step_i16_res_22512, bool_res_23435);
+            int16_t zp_rhs_23054 = mul16(defunc_0_radix_sort_step_i16_res_22130, bool_res_23053);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:153:35-61
             
-            int16_t zp_lhs_23437 = add16(zp_lhs_23433, zp_rhs_23436);
+            int16_t zp_lhs_23055 = add16(zp_lhs_23051, zp_rhs_23054);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:154:28-32
             
-            bool bool_arg0_23438 = eta_p_23405 == (int16_t) 3;
+            bool bool_arg0_23056 = eta_p_23023 == (int16_t) 3;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:154:14-32
             
-            int16_t bool_res_23439 = btoi_bool_i16(bool_arg0_23438);
+            int16_t bool_res_23057 = btoi_bool_i16(bool_arg0_23056);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:154:11-33
             
-            int16_t zp_rhs_23440 = mul16(eta_p_23409, bool_res_23439);
+            int16_t zp_rhs_23058 = mul16(eta_p_23027, bool_res_23057);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:154:7-33
             
-            int16_t i16_arg0_23441 = add16(zp_lhs_23437, zp_rhs_23440);
+            int16_t i16_arg0_23059 = add16(zp_lhs_23055, zp_rhs_23058);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:150:25-154:33
             
-            int64_t i16_res_23442 = sext_i16_i64(i16_arg0_23441);
+            int64_t i16_res_23060 = sext_i16_i64(i16_arg0_23059);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:156:7-30
             // UpdateAcc
-            if (sle64((int64_t) 0, i16_res_23442) && slt64(i16_res_23442, rest_22386)) {
-                ((float *) mem_24957)[i16_res_23442] = v_23412;
+            if (sle64((int64_t) 0, i16_res_23060) && slt64(i16_res_23060, rest_22004)) {
+                ((float *) mem_24551)[i16_res_23060] = v_23030;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:156:7-30
             // UpdateAcc
-            if (sle64((int64_t) 0, i16_res_23442) && slt64(i16_res_23442, rest_22386)) {
-                ((int64_t *) mem_24955)[i16_res_23442] = v_23413;
+            if (sle64((int64_t) 0, i16_res_23060) && slt64(i16_res_23060, rest_22004)) {
+                ((int64_t *) mem_24549)[i16_res_23060] = v_23031;
             }
         }
         // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-        ((int16_t *) mem_24958)[(int64_t) 0] = defunc_0_radix_sort_step_i16_res_22510;
-        ((int16_t *) mem_24958)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_22511;
-        ((int16_t *) mem_24958)[(int64_t) 2] = defunc_0_radix_sort_step_i16_res_22512;
-        ((int16_t *) mem_24958)[(int64_t) 3] = defunc_0_radix_sort_step_i16_res_22513;
+        ((int16_t *) mem_24552)[(int64_t) 0] = defunc_0_radix_sort_step_i16_res_22128;
+        ((int16_t *) mem_24552)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_22129;
+        ((int16_t *) mem_24552)[(int64_t) 2] = defunc_0_radix_sort_step_i16_res_22130;
+        ((int16_t *) mem_24552)[(int64_t) 3] = defunc_0_radix_sort_step_i16_res_22131;
         // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-        for (int64_t i_24783 = 0; i_24783 < (int64_t) 4; i_24783++) {
-            int16_t eta_p_22575 = ((int16_t *) mem_24958)[i_24783];
+        for (int64_t i_24377 = 0; i_24377 < (int64_t) 4; i_24377++) {
+            int16_t eta_p_22193 = ((int16_t *) mem_24552)[i_24377];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:157:11-18
             
-            int64_t i16_res_22576 = sext_i16_i64(eta_p_22575);
+            int64_t i16_res_22194 = sext_i16_i64(eta_p_22193);
             
-            ((int64_t *) mem_24959)[i_24783] = i16_res_22576;
+            ((int64_t *) mem_24553)[i_24377] = i16_res_22194;
         }
         // lib/github.com/diku-dk/sorts/radix_sort.fut:158:18-22
         
-        int16_t tmp_22578 = add16(defunc_0_radix_sort_step_i16_res_22510, defunc_0_radix_sort_step_i16_res_22511);
+        int16_t tmp_22196 = add16(defunc_0_radix_sort_step_i16_res_22128, defunc_0_radix_sort_step_i16_res_22129);
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:158:32-36
         
-        int16_t tmp_22579 = add16(defunc_0_radix_sort_step_i16_res_22512, tmp_22578);
+        int16_t tmp_22197 = add16(defunc_0_radix_sort_step_i16_res_22130, tmp_22196);
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:166:5-45
-        ((int16_t *) mem_24966)[(int64_t) 0] = (int16_t) 0;
-        ((int16_t *) mem_24966)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_22510;
-        ((int16_t *) mem_24966)[(int64_t) 2] = tmp_22578;
-        ((int16_t *) mem_24966)[(int64_t) 3] = tmp_22579;
+        ((int16_t *) mem_24560)[(int64_t) 0] = (int16_t) 0;
+        ((int16_t *) mem_24560)[(int64_t) 1] = defunc_0_radix_sort_step_i16_res_22128;
+        ((int16_t *) mem_24560)[(int64_t) 2] = tmp_22196;
+        ((int16_t *) mem_24560)[(int64_t) 3] = tmp_22197;
         // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
-        for (int64_t i_24824 = 0; i_24824 < n_blocks_22385; i_24824++) {
-            lmad_copy_4b(ctx, 1, (uint32_t *) mem_24995, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24905, (int64_t) 0 + i_24824 * ((int64_t) 1 * (int64_t) 256), (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
-            lmad_copy_8b(ctx, 1, (uint64_t *) mem_24996, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24907, (int64_t) 0 + i_24824 * ((int64_t) 1 * (int64_t) 256), (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+        for (int64_t i_24418 = 0; i_24418 < n_blocks_22003; i_24418++) {
+            lmad_copy_4b(ctx, 1, (uint32_t *) mem_24589, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24499, (int64_t) 0 + i_24418 * ((int64_t) 1 * (int64_t) 256), (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            lmad_copy_8b(ctx, 1, (uint64_t *) mem_24590, (int64_t) 0, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24501, (int64_t) 0 + i_24418 * ((int64_t) 1 * (int64_t) 256), (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
             
-            int64_t binop_x_24877 = (int64_t) 256 * i_24824;
+            int64_t binop_x_24471 = (int64_t) 256 * i_24418;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:142:17-148:52
             
-            int16_t discard_24805;
-            int16_t discard_24806;
-            int16_t discard_24807;
-            int16_t discard_24808;
-            int16_t scanacc_24790;
-            int16_t scanacc_24791;
-            int16_t scanacc_24792;
-            int16_t scanacc_24793;
+            int16_t discard_24399;
+            int16_t discard_24400;
+            int16_t discard_24401;
+            int16_t discard_24402;
+            int16_t scanacc_24384;
+            int16_t scanacc_24385;
+            int16_t scanacc_24386;
+            int16_t scanacc_24387;
             
-            scanacc_24790 = (int16_t) 0;
-            scanacc_24791 = (int16_t) 0;
-            scanacc_24792 = (int16_t) 0;
-            scanacc_24793 = (int16_t) 0;
-            for (int64_t i_24799 = 0; i_24799 < (int64_t) 256; i_24799++) {
-                int64_t index_primexp_24878 = i_24799 + binop_x_24877;
-                float eta_p_23829 = ((float *) mem_24905)[index_primexp_24878];
+            scanacc_24384 = (int16_t) 0;
+            scanacc_24385 = (int16_t) 0;
+            scanacc_24386 = (int16_t) 0;
+            scanacc_24387 = (int16_t) 0;
+            for (int64_t i_24393 = 0; i_24393 < (int64_t) 256; i_24393++) {
+                int64_t index_primexp_24472 = i_24393 + binop_x_24471;
+                float eta_p_23447 = ((float *) mem_24499)[index_primexp_24472];
                 
                 // arrange.fut:7:60-71
                 
-                int32_t i32_arg0_23830 = fptobits_f32_i32(eta_p_23829);
+                int32_t i32_arg0_23448 = fptobits_f32_i32(eta_p_23447);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23831 = ashr32(i32_arg0_23830, get_bit_arg0_22443);
+                int32_t unsign_arg0_23449 = ashr32(i32_arg0_23448, get_bit_arg0_22061);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23832 = 1 & unsign_arg0_23831;
+                int32_t unsign_arg0_23450 = 1 & unsign_arg0_23449;
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23833 = ashr32(i32_arg0_23830, 31);
+                int32_t unsign_arg0_23451 = ashr32(i32_arg0_23448, 31);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23834 = 1 & unsign_arg0_23833;
+                int32_t unsign_arg0_23452 = 1 & unsign_arg0_23451;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
                 
-                bool cond_23835 = unsign_arg0_23834 == 1;
+                bool cond_23453 = unsign_arg0_23452 == 1;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:24-45
                 
-                bool x_23836 = !cond_23835;
+                bool x_23454 = !cond_23453;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:24-45
                 
-                bool y_23837 = cond_f_res_22444 && x_23836;
+                bool y_23455 = cond_f_res_22062 && x_23454;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:24-45
                 
-                bool cond_23838 = cond_23835 || y_23837;
+                bool cond_23456 = cond_23453 || y_23455;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
                 
-                int32_t defunc_0_get_bit_res_23839;
+                int32_t defunc_0_get_bit_res_23457;
                 
-                if (cond_23838) {
+                if (cond_23456) {
                     // lib/github.com/diku-dk/sorts/radix_sort.fut:269:15-18
                     
-                    int32_t defunc_0_get_bit_res_t_res_24002 = 1 ^ unsign_arg0_23832;
+                    int32_t defunc_0_get_bit_res_t_res_23620 = 1 ^ unsign_arg0_23450;
                     
-                    defunc_0_get_bit_res_23839 = defunc_0_get_bit_res_t_res_24002;
+                    defunc_0_get_bit_res_23457 = defunc_0_get_bit_res_t_res_23620;
                 } else {
-                    defunc_0_get_bit_res_23839 = unsign_arg0_23832;
+                    defunc_0_get_bit_res_23457 = unsign_arg0_23450;
                 }
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:46-49
                 
-                int32_t zp_lhs_23841 = mul32(2, defunc_0_get_bit_res_23839);
+                int32_t zp_lhs_23459 = mul32(2, defunc_0_get_bit_res_23457);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23842 = ashr32(i32_arg0_23830, blocked_radix_sort_step_arg1_22438);
+                int32_t unsign_arg0_23460 = ashr32(i32_arg0_23448, blocked_radix_sort_step_arg1_22056);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23843 = 1 & unsign_arg0_23842;
+                int32_t unsign_arg0_23461 = 1 & unsign_arg0_23460;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:52-69
                 
-                bool y_23844 = cond_f_res_22445 && x_23836;
+                bool y_23462 = cond_f_res_22063 && x_23454;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:52-69
                 
-                bool cond_23845 = cond_23835 || y_23844;
+                bool cond_23463 = cond_23453 || y_23462;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
                 
-                int32_t defunc_0_get_bit_res_23846;
+                int32_t defunc_0_get_bit_res_23464;
                 
-                if (cond_23845) {
+                if (cond_23463) {
                     // lib/github.com/diku-dk/sorts/radix_sort.fut:269:15-18
                     
-                    int32_t defunc_0_get_bit_res_t_res_24003 = 1 ^ unsign_arg0_23843;
+                    int32_t defunc_0_get_bit_res_t_res_23621 = 1 ^ unsign_arg0_23461;
                     
-                    defunc_0_get_bit_res_23846 = defunc_0_get_bit_res_t_res_24003;
+                    defunc_0_get_bit_res_23464 = defunc_0_get_bit_res_t_res_23621;
                 } else {
-                    defunc_0_get_bit_res_23846 = unsign_arg0_23843;
+                    defunc_0_get_bit_res_23464 = unsign_arg0_23461;
                 }
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:50-69
                 
-                int32_t i32_arg0_23848 = add32(zp_lhs_23841, defunc_0_get_bit_res_23846);
+                int32_t i32_arg0_23466 = add32(zp_lhs_23459, defunc_0_get_bit_res_23464);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:139:15-69
                 
-                int16_t i32_res_23849 = sext_i32_i16(i32_arg0_23848);
+                int16_t i32_res_23467 = sext_i32_i16(i32_arg0_23466);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:144:20-23
                 
-                bool bool_arg0_23852 = i32_res_23849 == (int16_t) 0;
+                bool bool_arg0_23470 = i32_res_23467 == (int16_t) 0;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:144:9-23
                 
-                int16_t bool_res_23853 = btoi_bool_i16(bool_arg0_23852);
+                int16_t bool_res_23471 = btoi_bool_i16(bool_arg0_23470);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:145:20-23
                 
-                bool bool_arg0_23854 = i32_res_23849 == (int16_t) 1;
+                bool bool_arg0_23472 = i32_res_23467 == (int16_t) 1;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:145:9-23
                 
-                int16_t bool_res_23855 = btoi_bool_i16(bool_arg0_23854);
+                int16_t bool_res_23473 = btoi_bool_i16(bool_arg0_23472);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:146:20-23
                 
-                bool bool_arg0_23856 = i32_res_23849 == (int16_t) 2;
+                bool bool_arg0_23474 = i32_res_23467 == (int16_t) 2;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:146:9-23
                 
-                int16_t bool_res_23857 = btoi_bool_i16(bool_arg0_23856);
+                int16_t bool_res_23475 = btoi_bool_i16(bool_arg0_23474);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:147:20-23
                 
-                bool bool_arg0_23858 = i32_res_23849 == (int16_t) 3;
+                bool bool_arg0_23476 = i32_res_23467 == (int16_t) 3;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:147:9-23
                 
-                int16_t bool_res_23859 = btoi_bool_i16(bool_arg0_23858);
+                int16_t bool_res_23477 = btoi_bool_i16(bool_arg0_23476);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
                 
-                int16_t defunc_0_op_res_22649 = add16(bool_res_23853, scanacc_24790);
+                int16_t defunc_0_op_res_22267 = add16(bool_res_23471, scanacc_24384);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
                 
-                int16_t defunc_0_op_res_22650 = add16(bool_res_23855, scanacc_24791);
+                int16_t defunc_0_op_res_22268 = add16(bool_res_23473, scanacc_24385);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
                 
-                int16_t defunc_0_op_res_22651 = add16(bool_res_23857, scanacc_24792);
+                int16_t defunc_0_op_res_22269 = add16(bool_res_23475, scanacc_24386);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:148:32-35
                 
-                int16_t defunc_0_op_res_22652 = add16(bool_res_23859, scanacc_24793);
+                int16_t defunc_0_op_res_22270 = add16(bool_res_23477, scanacc_24387);
                 
-                ((int16_t *) mem_24997)[i_24799] = defunc_0_op_res_22649;
-                ((int16_t *) mem_24998)[i_24799] = defunc_0_op_res_22650;
-                ((int16_t *) mem_24999)[i_24799] = defunc_0_op_res_22651;
-                ((int16_t *) mem_25000)[i_24799] = defunc_0_op_res_22652;
-                ((int16_t *) mem_25001)[i_24799] = i32_res_23849;
+                ((int16_t *) mem_24591)[i_24393] = defunc_0_op_res_22267;
+                ((int16_t *) mem_24592)[i_24393] = defunc_0_op_res_22268;
+                ((int16_t *) mem_24593)[i_24393] = defunc_0_op_res_22269;
+                ((int16_t *) mem_24594)[i_24393] = defunc_0_op_res_22270;
+                ((int16_t *) mem_24595)[i_24393] = i32_res_23467;
                 
-                int16_t scanacc_tmp_25164 = defunc_0_op_res_22649;
-                int16_t scanacc_tmp_25165 = defunc_0_op_res_22650;
-                int16_t scanacc_tmp_25166 = defunc_0_op_res_22651;
-                int16_t scanacc_tmp_25167 = defunc_0_op_res_22652;
+                int16_t scanacc_tmp_24758 = defunc_0_op_res_22267;
+                int16_t scanacc_tmp_24759 = defunc_0_op_res_22268;
+                int16_t scanacc_tmp_24760 = defunc_0_op_res_22269;
+                int16_t scanacc_tmp_24761 = defunc_0_op_res_22270;
                 
-                scanacc_24790 = scanacc_tmp_25164;
-                scanacc_24791 = scanacc_tmp_25165;
-                scanacc_24792 = scanacc_tmp_25166;
-                scanacc_24793 = scanacc_tmp_25167;
+                scanacc_24384 = scanacc_tmp_24758;
+                scanacc_24385 = scanacc_tmp_24759;
+                scanacc_24386 = scanacc_tmp_24760;
+                scanacc_24387 = scanacc_tmp_24761;
             }
-            discard_24805 = scanacc_24790;
-            discard_24806 = scanacc_24791;
-            discard_24807 = scanacc_24792;
-            discard_24808 = scanacc_24793;
+            discard_24399 = scanacc_24384;
+            discard_24400 = scanacc_24385;
+            discard_24401 = scanacc_24386;
+            discard_24402 = scanacc_24387;
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22657 = ((int16_t *) mem_24997)[(int64_t) 255];
-            
-            // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
-            
-            int16_t last_res_22658 = ((int16_t *) mem_24998)[(int64_t) 255];
+            int16_t last_res_22275 = ((int16_t *) mem_24591)[(int64_t) 255];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22659 = ((int16_t *) mem_24999)[(int64_t) 255];
+            int16_t last_res_22276 = ((int16_t *) mem_24592)[(int64_t) 255];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
             
-            int16_t last_res_22660 = ((int16_t *) mem_25000)[(int64_t) 255];
+            int16_t last_res_22277 = ((int16_t *) mem_24593)[(int64_t) 255];
+            
+            // lib/github.com/diku-dk/sorts/radix_sort.fut:149:53-65
+            
+            int16_t last_res_22278 = ((int16_t *) mem_24594)[(int64_t) 255];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:156:7-30
             
-            bool acc_cert_23606;
-            bool acc_cert_23607;
+            bool acc_cert_23224;
+            bool acc_cert_23225;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:155:12-156:30
-            for (int64_t i_24811 = 0; i_24811 < (int64_t) 256; i_24811++) {
-                int16_t eta_p_23674 = ((int16_t *) mem_25001)[i_24811];
-                int16_t eta_p_23675 = ((int16_t *) mem_24997)[i_24811];
-                int16_t eta_p_23676 = ((int16_t *) mem_24998)[i_24811];
-                int16_t eta_p_23677 = ((int16_t *) mem_24999)[i_24811];
-                int16_t eta_p_23678 = ((int16_t *) mem_25000)[i_24811];
-                int64_t index_primexp_24876 = i_24811 + binop_x_24877;
-                float v_23681 = ((float *) mem_24905)[index_primexp_24876];
-                int64_t v_23682 = ((int64_t *) mem_24907)[index_primexp_24876];
+            for (int64_t i_24405 = 0; i_24405 < (int64_t) 256; i_24405++) {
+                int16_t eta_p_23292 = ((int16_t *) mem_24595)[i_24405];
+                int16_t eta_p_23293 = ((int16_t *) mem_24591)[i_24405];
+                int16_t eta_p_23294 = ((int16_t *) mem_24592)[i_24405];
+                int16_t eta_p_23295 = ((int16_t *) mem_24593)[i_24405];
+                int16_t eta_p_23296 = ((int16_t *) mem_24594)[i_24405];
+                int64_t index_primexp_24470 = i_24405 + binop_x_24471;
+                float v_23299 = ((float *) mem_24499)[index_primexp_24470];
+                int64_t v_23300 = ((int64_t *) mem_24501)[index_primexp_24470];
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:28-32
                 
-                bool bool_arg0_23683 = eta_p_23674 == (int16_t) 0;
+                bool bool_arg0_23301 = eta_p_23292 == (int16_t) 0;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:14-32
                 
-                int16_t bool_res_23684 = btoi_bool_i16(bool_arg0_23683);
+                int16_t bool_res_23302 = btoi_bool_i16(bool_arg0_23301);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:11-33
                 
-                int16_t zp_rhs_23685 = mul16(eta_p_23675, bool_res_23684);
+                int16_t zp_rhs_23303 = mul16(eta_p_23293, bool_res_23302);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:7-33
                 
-                int16_t zp_lhs_23686 = add16((int16_t) -1, zp_rhs_23685);
+                int16_t zp_lhs_23304 = add16((int16_t) -1, zp_rhs_23303);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:57-60
                 
-                bool bool_arg0_23687 = slt16((int16_t) 0, eta_p_23674);
+                bool bool_arg0_23305 = slt16((int16_t) 0, eta_p_23292);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:43-60
                 
-                int16_t bool_res_23688 = btoi_bool_i16(bool_arg0_23687);
+                int16_t bool_res_23306 = btoi_bool_i16(bool_arg0_23305);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:40-61
                 
-                int16_t zp_rhs_23689 = mul16(last_res_22657, bool_res_23688);
+                int16_t zp_rhs_23307 = mul16(last_res_22275, bool_res_23306);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:151:35-61
                 
-                int16_t zp_lhs_23690 = add16(zp_lhs_23686, zp_rhs_23689);
+                int16_t zp_lhs_23308 = add16(zp_lhs_23304, zp_rhs_23307);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:28-32
                 
-                bool bool_arg0_23691 = eta_p_23674 == (int16_t) 1;
+                bool bool_arg0_23309 = eta_p_23292 == (int16_t) 1;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:14-32
                 
-                int16_t bool_res_23692 = btoi_bool_i16(bool_arg0_23691);
+                int16_t bool_res_23310 = btoi_bool_i16(bool_arg0_23309);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:11-33
                 
-                int16_t zp_rhs_23693 = mul16(eta_p_23676, bool_res_23692);
+                int16_t zp_rhs_23311 = mul16(eta_p_23294, bool_res_23310);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:7-33
                 
-                int16_t zp_lhs_23694 = add16(zp_lhs_23690, zp_rhs_23693);
+                int16_t zp_lhs_23312 = add16(zp_lhs_23308, zp_rhs_23311);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:57-60
                 
-                bool bool_arg0_23695 = slt16((int16_t) 1, eta_p_23674);
+                bool bool_arg0_23313 = slt16((int16_t) 1, eta_p_23292);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:43-60
                 
-                int16_t bool_res_23696 = btoi_bool_i16(bool_arg0_23695);
+                int16_t bool_res_23314 = btoi_bool_i16(bool_arg0_23313);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:40-61
                 
-                int16_t zp_rhs_23697 = mul16(last_res_22658, bool_res_23696);
+                int16_t zp_rhs_23315 = mul16(last_res_22276, bool_res_23314);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:152:35-61
                 
-                int16_t zp_lhs_23698 = add16(zp_lhs_23694, zp_rhs_23697);
+                int16_t zp_lhs_23316 = add16(zp_lhs_23312, zp_rhs_23315);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:28-32
                 
-                bool bool_arg0_23699 = eta_p_23674 == (int16_t) 2;
+                bool bool_arg0_23317 = eta_p_23292 == (int16_t) 2;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:14-32
                 
-                int16_t bool_res_23700 = btoi_bool_i16(bool_arg0_23699);
+                int16_t bool_res_23318 = btoi_bool_i16(bool_arg0_23317);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:11-33
                 
-                int16_t zp_rhs_23701 = mul16(eta_p_23677, bool_res_23700);
+                int16_t zp_rhs_23319 = mul16(eta_p_23295, bool_res_23318);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:7-33
                 
-                int16_t zp_lhs_23702 = add16(zp_lhs_23698, zp_rhs_23701);
+                int16_t zp_lhs_23320 = add16(zp_lhs_23316, zp_rhs_23319);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:57-60
                 
-                bool bool_arg0_23703 = slt16((int16_t) 2, eta_p_23674);
+                bool bool_arg0_23321 = slt16((int16_t) 2, eta_p_23292);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:43-60
                 
-                int16_t bool_res_23704 = btoi_bool_i16(bool_arg0_23703);
+                int16_t bool_res_23322 = btoi_bool_i16(bool_arg0_23321);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:40-61
                 
-                int16_t zp_rhs_23705 = mul16(last_res_22659, bool_res_23704);
+                int16_t zp_rhs_23323 = mul16(last_res_22277, bool_res_23322);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:153:35-61
                 
-                int16_t zp_lhs_23706 = add16(zp_lhs_23702, zp_rhs_23705);
+                int16_t zp_lhs_23324 = add16(zp_lhs_23320, zp_rhs_23323);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:154:28-32
                 
-                bool bool_arg0_23707 = eta_p_23674 == (int16_t) 3;
+                bool bool_arg0_23325 = eta_p_23292 == (int16_t) 3;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:154:14-32
                 
-                int16_t bool_res_23708 = btoi_bool_i16(bool_arg0_23707);
+                int16_t bool_res_23326 = btoi_bool_i16(bool_arg0_23325);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:154:11-33
                 
-                int16_t zp_rhs_23709 = mul16(eta_p_23678, bool_res_23708);
+                int16_t zp_rhs_23327 = mul16(eta_p_23296, bool_res_23326);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:154:7-33
                 
-                int16_t i16_arg0_23710 = add16(zp_lhs_23706, zp_rhs_23709);
+                int16_t i16_arg0_23328 = add16(zp_lhs_23324, zp_rhs_23327);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:150:25-154:33
                 
-                int64_t i16_res_23711 = sext_i16_i64(i16_arg0_23710);
+                int64_t i16_res_23329 = sext_i16_i64(i16_arg0_23328);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:156:7-30
                 // UpdateAcc
-                if (sle64((int64_t) 0, i16_res_23711) && slt64(i16_res_23711, (int64_t) 256)) {
-                    ((float *) mem_24995)[i16_res_23711] = v_23681;
+                if (sle64((int64_t) 0, i16_res_23329) && slt64(i16_res_23329, (int64_t) 256)) {
+                    ((float *) mem_24589)[i16_res_23329] = v_23299;
                 }
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:156:7-30
                 // UpdateAcc
-                if (sle64((int64_t) 0, i16_res_23711) && slt64(i16_res_23711, (int64_t) 256)) {
-                    ((int64_t *) mem_24996)[i16_res_23711] = v_23682;
+                if (sle64((int64_t) 0, i16_res_23329) && slt64(i16_res_23329, (int64_t) 256)) {
+                    ((int64_t *) mem_24590)[i16_res_23329] = v_23300;
                 }
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-            ((int16_t *) mem_25032)[(int64_t) 0] = last_res_22657;
-            ((int16_t *) mem_25032)[(int64_t) 1] = last_res_22658;
-            ((int16_t *) mem_25032)[(int64_t) 2] = last_res_22659;
-            ((int16_t *) mem_25032)[(int64_t) 3] = last_res_22660;
+            ((int16_t *) mem_24626)[(int64_t) 0] = last_res_22275;
+            ((int16_t *) mem_24626)[(int64_t) 1] = last_res_22276;
+            ((int16_t *) mem_24626)[(int64_t) 2] = last_res_22277;
+            ((int16_t *) mem_24626)[(int64_t) 3] = last_res_22278;
             // lib/github.com/diku-dk/sorts/radix_sort.fut:157:7-35
-            for (int64_t i_24814 = 0; i_24814 < (int64_t) 4; i_24814++) {
-                int16_t eta_p_22716 = ((int16_t *) mem_25032)[i_24814];
+            for (int64_t i_24408 = 0; i_24408 < (int64_t) 4; i_24408++) {
+                int16_t eta_p_22334 = ((int16_t *) mem_24626)[i_24408];
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:157:11-18
                 
-                int64_t i16_res_22717 = sext_i16_i64(eta_p_22716);
+                int64_t i16_res_22335 = sext_i16_i64(eta_p_22334);
                 
-                ((int64_t *) mem_25033)[i_24814] = i16_res_22717;
+                ((int64_t *) mem_24627)[i_24408] = i16_res_22335;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:158:18-22
             
-            int16_t tmp_22719 = add16(last_res_22657, last_res_22658);
+            int16_t tmp_22337 = add16(last_res_22275, last_res_22276);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:158:32-36
             
-            int16_t tmp_22720 = add16(last_res_22659, tmp_22719);
+            int16_t tmp_22338 = add16(last_res_22277, tmp_22337);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:169:5-49
-            ((int16_t *) mem_24969)[i_24824 * (int64_t) 4] = (int16_t) 0;
-            ((int16_t *) mem_24969)[i_24824 * (int64_t) 4 + (int64_t) 1] = last_res_22657;
-            ((int16_t *) mem_24969)[i_24824 * (int64_t) 4 + (int64_t) 2] = tmp_22719;
-            ((int16_t *) mem_24969)[i_24824 * (int64_t) 4 + (int64_t) 3] = tmp_22720;
-            lmad_copy_8b(ctx, 1, (uint64_t *) mem_24972, i_24824 * (int64_t) 4, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_25033, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 4});
-            lmad_copy_8b(ctx, 1, (uint64_t *) mem_24975, i_24824 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24996, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
-            lmad_copy_4b(ctx, 1, (uint32_t *) mem_24978, i_24824 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24995, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            ((int16_t *) mem_24563)[i_24418 * (int64_t) 4] = (int16_t) 0;
+            ((int16_t *) mem_24563)[i_24418 * (int64_t) 4 + (int64_t) 1] = last_res_22275;
+            ((int16_t *) mem_24563)[i_24418 * (int64_t) 4 + (int64_t) 2] = tmp_22337;
+            ((int16_t *) mem_24563)[i_24418 * (int64_t) 4 + (int64_t) 3] = tmp_22338;
+            lmad_copy_8b(ctx, 1, (uint64_t *) mem_24566, i_24418 * (int64_t) 4, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24627, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 4});
+            lmad_copy_8b(ctx, 1, (uint64_t *) mem_24569, i_24418 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint64_t *) mem_24590, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
+            lmad_copy_4b(ctx, 1, (uint32_t *) mem_24572, i_24418 * (int64_t) 256, (int64_t []) {(int64_t) 1}, (uint32_t *) mem_24589, (int64_t) 0, (int64_t []) {(int64_t) 1}, (int64_t []) {(int64_t) 256});
         }
         // lib/github.com/diku-dk/sorts/radix_sort.fut:120:5-18
         
-        int64_t discard_24836;
-        int64_t scanacc_24832 = (int64_t) 0;
+        int64_t discard_24430;
+        int64_t scanacc_24426 = (int64_t) 0;
         
-        for (int64_t i_24834 = 0; i_24834 < dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22396; i_24834++) {
-            int64_t new_index_24863 = squot64(i_24834, dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395);
-            int64_t binop_y_24865 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395 * new_index_24863;
-            int64_t new_index_24866 = i_24834 - binop_y_24865;
-            bool index_concat_cmp_24868 = sle64(n_blocks_22385, new_index_24866);
-            int64_t index_concat_branch_24872;
+        for (int64_t i_24428 = 0; i_24428 < dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22014; i_24428++) {
+            int64_t new_index_24457 = squot64(i_24428, dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013);
+            int64_t binop_y_24459 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013 * new_index_24457;
+            int64_t new_index_24460 = i_24428 - binop_y_24459;
+            bool index_concat_cmp_24462 = sle64(n_blocks_22003, new_index_24460);
+            int64_t index_concat_branch_24466;
             
-            if (index_concat_cmp_24868) {
-                int64_t index_concat_24870 = ((int64_t *) mem_24959)[new_index_24863];
+            if (index_concat_cmp_24462) {
+                int64_t index_concat_24464 = ((int64_t *) mem_24553)[new_index_24457];
                 
-                index_concat_branch_24872 = index_concat_24870;
+                index_concat_branch_24466 = index_concat_24464;
             } else {
-                int64_t index_concat_24871 = ((int64_t *) mem_24972)[new_index_24866 * (int64_t) 4 + new_index_24863];
+                int64_t index_concat_24465 = ((int64_t *) mem_24566)[new_index_24460 * (int64_t) 4 + new_index_24457];
                 
-                index_concat_branch_24872 = index_concat_24871;
+                index_concat_branch_24466 = index_concat_24465;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:178:15-18
             
-            int64_t defunc_0_op_res_22738 = add64(scanacc_24832, index_concat_branch_24872);
+            int64_t defunc_0_op_res_22356 = add64(scanacc_24426, index_concat_branch_24466);
             
-            ((int64_t *) mem_25058)[i_24834] = defunc_0_op_res_22738;
+            ((int64_t *) mem_24652)[i_24428] = defunc_0_op_res_22356;
             
-            int64_t scanacc_tmp_25176 = defunc_0_op_res_22738;
+            int64_t scanacc_tmp_24770 = defunc_0_op_res_22356;
             
-            scanacc_24832 = scanacc_tmp_25176;
+            scanacc_24426 = scanacc_tmp_24770;
         }
-        discard_24836 = scanacc_24832;
+        discard_24430 = scanacc_24426;
         // lib/github.com/diku-dk/sorts/radix_sort.fut:121:8-14
-        for (int64_t i_24839 = 0; i_24839 < dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22396; i_24839++) {
+        for (int64_t i_24433 = 0; i_24433 < dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22014; i_24433++) {
             // lib/github.com/diku-dk/sorts/radix_sort.fut:121:8-14
             
-            int64_t zv_lhs_22742 = add64((int64_t) -1, i_24839);
-            
-            // lib/github.com/diku-dk/sorts/radix_sort.fut:121:8-14
-            
-            int64_t tmp_22743 = smod64(zv_lhs_22742, dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22396);
+            int64_t zv_lhs_22360 = add64((int64_t) -1, i_24433);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:121:8-14
             
-            int64_t lifted_lambda_res_22744 = ((int64_t *) mem_25058)[tmp_22743];
+            int64_t tmp_22361 = smod64(zv_lhs_22360, dzlz7bUZLztZRz20U4z20UZLZLzpZRz20Unz20U1ZRz7dUzg_22014);
             
-            ((int64_t *) mem_25066)[i_24839] = lifted_lambda_res_22744;
+            // lib/github.com/diku-dk/sorts/radix_sort.fut:121:8-14
+            
+            int64_t lifted_lambda_res_22362 = ((int64_t *) mem_24652)[tmp_22361];
+            
+            ((int64_t *) mem_24660)[i_24433] = lifted_lambda_res_22362;
         }
         // lib/github.com/diku-dk/sorts/radix_sort.fut:122:7-16
-        ((int64_t *) mem_25066)[(int64_t) 0] = (int64_t) 0;
+        ((int64_t *) mem_24660)[(int64_t) 0] = (int64_t) 0;
         // lib/github.com/diku-dk/sorts/radix_sort.fut:193:6-26
         
-        bool acc_cert_23169;
-        bool acc_cert_23170;
+        bool acc_cert_22787;
+        bool acc_cert_22788;
         
         // lib/github.com/diku-dk/sorts/radix_sort.fut:182:5-193:26
-        for (int64_t i_24843 = 0; i_24843 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388; i_24843++) {
-            bool index_concat_cmp_24854 = sle64(arg_22387, i_24843);
-            float index_concat_branch_24858;
+        for (int64_t i_24437 = 0; i_24437 < dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006; i_24437++) {
+            bool index_concat_cmp_24448 = sle64(arg_22005, i_24437);
+            float index_concat_branch_24452;
             
-            if (index_concat_cmp_24854) {
-                int64_t index_concat_i_24855 = sub64(i_24843, arg_22387);
-                float index_concat_24856 = ((float *) mem_24957)[index_concat_i_24855];
+            if (index_concat_cmp_24448) {
+                int64_t index_concat_i_24449 = sub64(i_24437, arg_22005);
+                float index_concat_24450 = ((float *) mem_24551)[index_concat_i_24449];
                 
-                index_concat_branch_24858 = index_concat_24856;
+                index_concat_branch_24452 = index_concat_24450;
             } else {
-                int64_t new_index_24888 = squot64(i_24843, (int64_t) 256);
-                int64_t binop_y_24890 = (int64_t) 256 * new_index_24888;
-                int64_t new_index_24891 = i_24843 - binop_y_24890;
-                float index_concat_24857 = ((float *) mem_24978)[new_index_24888 * (int64_t) 256 + new_index_24891];
+                int64_t new_index_24482 = squot64(i_24437, (int64_t) 256);
+                int64_t binop_y_24484 = (int64_t) 256 * new_index_24482;
+                int64_t new_index_24485 = i_24437 - binop_y_24484;
+                float index_concat_24451 = ((float *) mem_24572)[new_index_24482 * (int64_t) 256 + new_index_24485];
                 
-                index_concat_branch_24858 = index_concat_24857;
+                index_concat_branch_24452 = index_concat_24451;
             }
             
-            int64_t index_concat_branch_24852;
+            int64_t index_concat_branch_24446;
             
-            if (index_concat_cmp_24854) {
-                int64_t index_concat_i_24849 = sub64(i_24843, arg_22387);
-                int64_t index_concat_24850 = ((int64_t *) mem_24955)[index_concat_i_24849];
+            if (index_concat_cmp_24448) {
+                int64_t index_concat_i_24443 = sub64(i_24437, arg_22005);
+                int64_t index_concat_24444 = ((int64_t *) mem_24549)[index_concat_i_24443];
                 
-                index_concat_branch_24852 = index_concat_24850;
+                index_concat_branch_24446 = index_concat_24444;
             } else {
-                int64_t new_index_24884 = squot64(i_24843, (int64_t) 256);
-                int64_t binop_y_24886 = (int64_t) 256 * new_index_24884;
-                int64_t new_index_24887 = i_24843 - binop_y_24886;
-                int64_t index_concat_24851 = ((int64_t *) mem_24975)[new_index_24884 * (int64_t) 256 + new_index_24887];
+                int64_t new_index_24478 = squot64(i_24437, (int64_t) 256);
+                int64_t binop_y_24480 = (int64_t) 256 * new_index_24478;
+                int64_t new_index_24481 = i_24437 - binop_y_24480;
+                int64_t index_concat_24445 = ((int64_t *) mem_24569)[new_index_24478 * (int64_t) 256 + new_index_24481];
                 
-                index_concat_branch_24852 = index_concat_24851;
+                index_concat_branch_24446 = index_concat_24445;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
             
-            float index_concat_branch_23266;
+            float index_concat_branch_22884;
             
-            if (index_concat_cmp_24854) {
+            if (index_concat_cmp_24448) {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                int64_t index_concat_i_24012 = sub64(i_24843, arg_22387);
+                int64_t index_concat_i_23630 = sub64(i_24437, arg_22005);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                float index_concat_24013 = ((float *) mem_24957)[index_concat_i_24012];
+                float index_concat_23631 = ((float *) mem_24551)[index_concat_i_23630];
                 
-                index_concat_branch_23266 = index_concat_24013;
+                index_concat_branch_22884 = index_concat_23631;
             } else {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                int64_t new_index_23269 = squot64(i_24843, (int64_t) 256);
+                int64_t new_index_22887 = squot64(i_24437, (int64_t) 256);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                int64_t binop_y_23270 = (int64_t) 256 * new_index_23269;
+                int64_t binop_y_22888 = (int64_t) 256 * new_index_22887;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                int64_t new_index_23271 = i_24843 - binop_y_23270;
+                int64_t new_index_22889 = i_24437 - binop_y_22888;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                float index_concat_23272 = ((float *) mem_24978)[new_index_23269 * (int64_t) 256 + new_index_23271];
+                float index_concat_22890 = ((float *) mem_24572)[new_index_22887 * (int64_t) 256 + new_index_22889];
                 
-                index_concat_branch_23266 = index_concat_23272;
+                index_concat_branch_22884 = index_concat_22890;
             }
             // arrange.fut:7:60-71
             
-            int32_t i32_arg0_23273 = fptobits_f32_i32(index_concat_branch_23266);
+            int32_t i32_arg0_22891 = fptobits_f32_i32(index_concat_branch_22884);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23274 = ashr32(i32_arg0_23273, 31);
+            int32_t unsign_arg0_22892 = ashr32(i32_arg0_22891, 31);
             
             // arrange.fut:7:60-71
             
-            int32_t unsign_arg0_23275 = 1 & unsign_arg0_23274;
+            int32_t unsign_arg0_22893 = 1 & unsign_arg0_22892;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
             
-            bool cond_23276 = unsign_arg0_23275 == 1;
+            bool cond_22894 = unsign_arg0_22893 == 1;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:132:12-35
             
-            bool x_23277 = !cond_23276;
+            bool x_22895 = !cond_22894;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:131:3-132:41
             
-            int32_t zlzb_rhs_23278;
-            int32_t acc_23280 = 0;
+            int32_t zlzb_rhs_22896;
+            int32_t acc_22898 = 0;
             
-            for (int32_t i_23279 = 0; i_23279 < 2; i_23279++) {
+            for (int32_t i_22897 = 0; i_22897 < 2; i_22897++) {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:132:29-32
                 
-                int32_t get_bit_arg0_23281 = add32(blocked_radix_sort_step_arg1_22438, i_23279);
+                int32_t get_bit_arg0_22899 = add32(blocked_radix_sort_step_arg1_22056, i_22897);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23282 = ashr32(i32_arg0_23273, get_bit_arg0_23281);
+                int32_t unsign_arg0_22900 = ashr32(i32_arg0_22891, get_bit_arg0_22899);
                 
                 // arrange.fut:7:60-71
                 
-                int32_t unsign_arg0_23283 = 1 & unsign_arg0_23282;
+                int32_t unsign_arg0_22901 = 1 & unsign_arg0_22900;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:268:44-57
                 
-                bool cond_f_res_23284 = get_bit_arg0_23281 == 31;
+                bool cond_f_res_22902 = get_bit_arg0_22899 == 31;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:132:12-35
                 
-                bool y_23285 = x_23277 && cond_f_res_23284;
+                bool y_22903 = x_22895 && cond_f_res_22902;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:132:12-35
                 
-                bool cond_23286 = cond_23276 || y_23285;
+                bool cond_22904 = cond_22894 || y_22903;
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:268:8-269:25
                 
-                int32_t defunc_0_get_bit_res_23287;
+                int32_t defunc_0_get_bit_res_22905;
                 
-                if (cond_23286) {
+                if (cond_22904) {
                     // lib/github.com/diku-dk/sorts/radix_sort.fut:269:15-18
                     
-                    int32_t defunc_0_get_bit_res_t_res_24014 = 1 ^ unsign_arg0_23283;
+                    int32_t defunc_0_get_bit_res_t_res_23632 = 1 ^ unsign_arg0_22901;
                     
-                    defunc_0_get_bit_res_23287 = defunc_0_get_bit_res_t_res_24014;
+                    defunc_0_get_bit_res_22905 = defunc_0_get_bit_res_t_res_23632;
                 } else {
-                    defunc_0_get_bit_res_23287 = unsign_arg0_23283;
+                    defunc_0_get_bit_res_22905 = unsign_arg0_22901;
                 }
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:132:36-40
                 
-                int32_t zp_rhs_23289 = shl32(defunc_0_get_bit_res_23287, i_23279);
+                int32_t zp_rhs_22907 = shl32(defunc_0_get_bit_res_22905, i_22897);
                 
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:132:9-40
                 
-                int32_t loopres_23290 = add32(acc_23280, zp_rhs_23289);
-                int32_t acc_tmp_25181 = loopres_23290;
+                int32_t loopres_22908 = add32(acc_22898, zp_rhs_22907);
+                int32_t acc_tmp_24775 = loopres_22908;
                 
-                acc_23280 = acc_tmp_25181;
+                acc_22898 = acc_tmp_24775;
             }
-            zlzb_rhs_23278 = acc_23280;
+            zlzb_rhs_22896 = acc_22898;
             // lib/github.com/diku-dk/sorts/radix_sort.fut:130:3-10
             
-            int64_t i32_res_23291 = sext_i32_i64(zlzb_rhs_23278);
+            int64_t i32_res_22909 = sext_i32_i64(zlzb_rhs_22896);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:186:27-30
             
-            int64_t block_idx_23292 = sdiv64(i_24843, (int64_t) 256);
+            int64_t block_idx_22910 = sdiv64(i_24437, (int64_t) 256);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48
             
-            bool x_23293 = sle64((int64_t) 0, block_idx_23292);
+            bool x_22911 = sle64((int64_t) 0, block_idx_22910);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48
             
-            bool y_23294 = slt64(block_idx_23292, dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395);
+            bool y_22912 = slt64(block_idx_22910, dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48
             
-            bool bounds_check_23295 = x_23293 && y_23294;
+            bool bounds_check_22913 = x_22911 && y_22912;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48
             
-            bool index_certs_23296;
+            bool index_certs_22914;
             
-            if (!bounds_check_23295) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) block_idx_23292, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
+            if (!bounds_check_22913) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) block_idx_22910, "] out of bounds for array of shape [", (long long) dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-48\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53
             
-            bool x_23297 = sle64((int64_t) 0, i32_res_23291);
+            bool x_22915 = sle64((int64_t) 0, i32_res_22909);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53
             
-            bool y_23298 = slt64(i32_res_23291, (int64_t) 4);
+            bool y_22916 = slt64(i32_res_22909, (int64_t) 4);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53
             
-            bool bounds_check_23299 = x_23297 && y_23298;
+            bool bounds_check_22917 = x_22915 && y_22916;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53
             
-            bool index_certs_23300;
+            bool index_certs_22918;
             
-            if (!bounds_check_23299) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i32_res_23291, "] out of bounds for array of shape [", (long long) (int64_t) 4, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
+            if (!bounds_check_22917) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i32_res_22909, "] out of bounds for array of shape [", (long long) (int64_t) 4, "].", "-> #0  lib/github.com/diku-dk/sorts/radix_sort.fut:187:26-53\n   #1  lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50\n   #2  lib/github.com/diku-dk/sorts/radix_sort.fut:270:6-51\n   #3  lib/github.com/diku-dk/sorts/radix_sort.fut:67:3-48\n   #4  lib/github.com/diku-dk/sorts/radix_sort.fut:280:6-51\n   #5  arrange.fut:7:3-71\n   #6  arrange.fut:58:13-33\n   #7  entry.fut:8:3-56\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
             
-            int64_t binop_x_23301 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_22395 * i32_res_23291;
+            int64_t binop_x_22919 = dzlz7bUZLzpZRz20Unz20U1z7dUzg_22013 * i32_res_22909;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
             
-            int64_t index_primexp_23302 = block_idx_23292 + binop_x_23301;
+            int64_t index_primexp_22920 = block_idx_22910 + binop_x_22919;
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
             
-            int64_t new_offset_23303 = ((int64_t *) mem_25066)[index_primexp_23302];
+            int64_t new_offset_22921 = ((int64_t *) mem_24660)[index_primexp_22920];
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
             
-            bool index_concat_cmp_23304 = sle64(n_blocks_22385, block_idx_23292);
+            bool index_concat_cmp_22922 = sle64(n_blocks_22003, block_idx_22910);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
             
-            int16_t index_concat_branch_23305;
+            int16_t index_concat_branch_22923;
             
-            if (index_concat_cmp_23304) {
+            if (index_concat_cmp_22922) {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                int16_t index_concat_24015 = ((int16_t *) mem_24966)[i32_res_23291];
+                int16_t index_concat_23633 = ((int16_t *) mem_24560)[i32_res_22909];
                 
-                index_concat_branch_23305 = index_concat_24015;
+                index_concat_branch_22923 = index_concat_23633;
             } else {
                 // lib/github.com/diku-dk/sorts/radix_sort.fut:227:8-50
                 
-                int16_t index_concat_23307 = ((int16_t *) mem_24969)[block_idx_23292 * (int64_t) 4 + i32_res_23291];
+                int16_t index_concat_22925 = ((int16_t *) mem_24563)[block_idx_22910 * (int64_t) 4 + i32_res_22909];
                 
-                index_concat_branch_23305 = index_concat_23307;
+                index_concat_branch_22923 = index_concat_22925;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:188:32-67
             
-            int64_t i16_res_23308 = sext_i16_i64(index_concat_branch_23305);
+            int64_t i16_res_22926 = sext_i16_i64(index_concat_branch_22923);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:189:28-39
             
-            int64_t zp_lhs_23309 = mul64((int64_t) 256, block_idx_23292);
+            int64_t zp_lhs_22927 = mul64((int64_t) 256, block_idx_22910);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:189:40-58
             
-            int64_t old_offset_23310 = add64(i16_res_23308, zp_lhs_23309);
+            int64_t old_offset_22928 = add64(i16_res_22926, zp_lhs_22927);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:190:22-34
             
-            int64_t zp_lhs_23311 = sub64(i_24843, old_offset_23310);
+            int64_t zp_lhs_22929 = sub64(i_24437, old_offset_22928);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:190:36-48
             
-            int64_t idx_23312 = add64(new_offset_23303, zp_lhs_23311);
+            int64_t idx_22930 = add64(new_offset_22921, zp_lhs_22929);
             
             // lib/github.com/diku-dk/sorts/radix_sort.fut:193:6-26
             // UpdateAcc
-            if (sle64((int64_t) 0, idx_23312) && slt64(idx_23312, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388)) {
-                ((float *) mem_24905)[idx_23312] = index_concat_branch_24858;
+            if (sle64((int64_t) 0, idx_22930) && slt64(idx_22930, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006)) {
+                ((float *) mem_24499)[idx_22930] = index_concat_branch_24452;
             }
             // lib/github.com/diku-dk/sorts/radix_sort.fut:193:6-26
             // UpdateAcc
-            if (sle64((int64_t) 0, idx_23312) && slt64(idx_23312, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22388)) {
-                ((int64_t *) mem_24907)[idx_23312] = index_concat_branch_24852;
+            if (sle64((int64_t) 0, idx_22930) && slt64(idx_22930, dzlz7bUZLzpZRz20UZLZLztZRz20Un_blocksz20UblockZRz20Urestz7dUzg_22006)) {
+                ((int64_t *) mem_24501)[idx_22930] = index_concat_branch_24446;
             }
         }
     }
     // arrange.fut:29:16-32
-    if (mem_25080_cached_sizze_25228 < bytes_25079) {
-        err = lexical_realloc(ctx, &mem_25080, &mem_25080_cached_sizze_25228, bytes_25079);
+    if (mem_24674_cached_sizze_24822 < bytes_24673) {
+        err = lexical_realloc(ctx, &mem_24674, &mem_24674_cached_sizze_24822, bytes_24673);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // arrange.fut:29:16-32
-    for (int64_t nest_i_25182 = 0; nest_i_25182 < dz2082U_14780; nest_i_25182++) {
-        ((int64_t *) mem_25080)[nest_i_25182] = (int64_t) 0;
+    for (int64_t nest_i_24776 = 0; nest_i_24776 < dz2082U_14600; nest_i_24776++) {
+        ((int64_t *) mem_24674)[nest_i_24776] = (int64_t) 0;
     }
     // arrange.fut:30:16-32
-    if (mem_25082_cached_sizze_25229 < bytes_25079) {
-        err = lexical_realloc(ctx, &mem_25082, &mem_25082_cached_sizze_25229, bytes_25079);
+    if (mem_24676_cached_sizze_24823 < bytes_24673) {
+        err = lexical_realloc(ctx, &mem_24676, &mem_24676_cached_sizze_24823, bytes_24673);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // arrange.fut:30:16-32
-    for (int64_t nest_i_25183 = 0; nest_i_25183 < dz2082U_14780; nest_i_25183++) {
-        ((int64_t *) mem_25082)[nest_i_25183] = (int64_t) 0;
+    for (int64_t nest_i_24777 = 0; nest_i_24777 < dz2082U_14600; nest_i_24777++) {
+        ((int64_t *) mem_24676)[nest_i_24777] = (int64_t) 0;
     }
     // arrange.fut:31:21-38
-    if (mem_25083_cached_sizze_25230 < dz2080U_14778) {
-        err = lexical_realloc(ctx, &mem_25083, &mem_25083_cached_sizze_25230, dz2080U_14778);
+    if (mem_24677_cached_sizze_24824 < dz2080U_14598) {
+        err = lexical_realloc(ctx, &mem_24677, &mem_24677_cached_sizze_24824, dz2080U_14598);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // arrange.fut:31:21-38
-    for (int64_t nest_i_25184 = 0; nest_i_25184 < dz2080U_14778; nest_i_25184++) {
-        ((bool *) mem_25083)[nest_i_25184] = 0;
+    for (int64_t nest_i_24778 = 0; nest_i_24778 < dz2080U_14598; nest_i_24778++) {
+        ((bool *) mem_24677)[nest_i_24778] = 0;
     }
     // arrange.fut:32:22-39
-    if (mem_25084_cached_sizze_25231 < dz2082U_14780) {
-        err = lexical_realloc(ctx, &mem_25084, &mem_25084_cached_sizze_25231, dz2082U_14780);
+    if (mem_24678_cached_sizze_24825 < dz2082U_14600) {
+        err = lexical_realloc(ctx, &mem_24678, &mem_24678_cached_sizze_24825, dz2082U_14600);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
     // arrange.fut:32:22-39
-    for (int64_t nest_i_25185 = 0; nest_i_25185 < dz2082U_14780; nest_i_25185++) {
-        ((bool *) mem_25084)[nest_i_25185] = 0;
+    for (int64_t nest_i_24779 = 0; nest_i_24779 < dz2082U_14600; nest_i_24779++) {
+        ((bool *) mem_24678)[nest_i_24779] = 0;
     }
     // arrange.fut:34:5-47:65
     
-    bool greedy_match_from_sorted_idx_res_22835;
-    int64_t greedy_match_from_sorted_idx_res_22836;
-    int64_t greedy_match_from_sorted_idx_res_22837;
-    bool loop_while_22842;
-    int64_t i_22843;
-    int64_t cnt_22844;
+    bool greedy_match_from_sorted_idx_res_22453;
+    int64_t greedy_match_from_sorted_idx_res_22454;
+    int64_t greedy_match_from_sorted_idx_res_22455;
+    bool loop_while_22460;
+    int64_t i_22461;
+    int64_t cnt_22462;
     
-    loop_while_22842 = x_22829;
-    i_22843 = (int64_t) 0;
-    cnt_22844 = (int64_t) 0;
-    while (loop_while_22842) {
+    loop_while_22460 = x_22447;
+    i_22461 = (int64_t) 0;
+    cnt_22462 = (int64_t) 0;
+    while (loop_while_22460) {
         // arrange.fut:37:15-21
         
-        bool x_22849 = sle64((int64_t) 0, i_22843);
-        
-        // arrange.fut:37:15-21
-        
-        bool y_22850 = slt64(i_22843, dzlz7bUZLztZRz20Umz20Unz7dUzg_22346);
+        bool x_22467 = sle64((int64_t) 0, i_22461);
         
         // arrange.fut:37:15-21
         
-        bool bounds_check_22851 = x_22849 && y_22850;
+        bool y_22468 = slt64(i_22461, dzlz7bUZLztZRz20Umz20Unz7dUzg_21964);
         
         // arrange.fut:37:15-21
         
-        bool index_certs_22852;
+        bool bounds_check_22469 = x_22467 && y_22468;
         
-        if (!bounds_check_22851) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i_22843, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_22346, "].", "-> #0  arrange.fut:37:15-21\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
+        // arrange.fut:37:15-21
+        
+        bool index_certs_22470;
+        
+        if (!bounds_check_22469) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i_22461, "] out of bounds for array of shape [", (long long) dzlz7bUZLztZRz20Umz20Unz7dUzg_21964, "].", "-> #0  arrange.fut:37:15-21\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         
-        int64_t j_22853 = ((int64_t *) mem_24907)[i_22843];
+        int64_t j_22471 = ((int64_t *) mem_24501)[i_22461];
         
         // arrange.fut:38:17-20
         
-        int64_t g_22854 = sdiv64(j_22853, dz2082U_14780);
+        int64_t g_22472 = sdiv64(j_22471, dz2082U_14600);
         
         // arrange.fut:40:18-31
         
-        bool x_22856 = sle64((int64_t) 0, g_22854);
+        bool x_22474 = sle64((int64_t) 0, g_22472);
         
         // arrange.fut:40:18-31
         
-        bool y_22857 = slt64(g_22854, dz2080U_14778);
+        bool y_22475 = slt64(g_22472, dz2080U_14598);
         
         // arrange.fut:40:18-31
         
-        bool bounds_check_22858 = x_22856 && y_22857;
+        bool bounds_check_22476 = x_22474 && y_22475;
         
         // arrange.fut:40:18-31
         
-        bool index_certs_22859;
+        bool index_certs_22477;
         
-        if (!bounds_check_22858) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_22854, "] out of bounds for array of shape [", (long long) dz2080U_14778, "].", "-> #0  arrange.fut:40:18-31\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
+        if (!bounds_check_22476) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) g_22472, "] out of bounds for array of shape [", (long long) dz2080U_14598, "].", "-> #0  arrange.fut:40:18-31\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:39:17-20
         
-        int64_t p_22855 = smod64(j_22853, dz2082U_14780);
+        int64_t p_22473 = smod64(j_22471, dz2082U_14600);
         
         // arrange.fut:40:18-31
         
-        bool not_arg0_22860 = ((bool *) mem_25083)[g_22854];
+        bool not_arg0_22478 = ((bool *) mem_24677)[g_22472];
         
         // arrange.fut:40:11-47:65
         
-        bool not_res_22861 = !not_arg0_22860;
+        bool not_res_22479 = !not_arg0_22478;
         
         // arrange.fut:40:11-47:65
         
-        bool cond_22862;
+        bool cond_22480;
         
-        if (not_res_22861) {
+        if (not_res_22479) {
             // arrange.fut:40:39-53
             
-            bool x_24033 = sle64((int64_t) 0, p_22855);
-            
-            // arrange.fut:40:39-53
-            
-            bool y_24034 = slt64(p_22855, dz2082U_14780);
+            bool x_23651 = sle64((int64_t) 0, p_22473);
             
             // arrange.fut:40:39-53
             
-            bool bounds_check_24035 = x_24033 && y_24034;
+            bool y_23652 = slt64(p_22473, dz2082U_14600);
             
             // arrange.fut:40:39-53
             
-            bool index_certs_24036;
+            bool bounds_check_23653 = x_23651 && y_23652;
             
-            if (!bounds_check_24035) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_22855, "] out of bounds for array of shape [", (long long) dz2082U_14780, "].", "-> #0  arrange.fut:40:39-53\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
+            // arrange.fut:40:39-53
+            
+            bool index_certs_23654;
+            
+            if (!bounds_check_23653) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_22473, "] out of bounds for array of shape [", (long long) dz2082U_14600, "].", "-> #0  arrange.fut:40:39-53\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // arrange.fut:40:39-53
             
-            bool not_arg0_24037 = ((bool *) mem_25084)[p_22855];
+            bool not_arg0_23655 = ((bool *) mem_24678)[p_22473];
             
             // arrange.fut:40:35-53
             
-            bool not_res_24038 = !not_arg0_24037;
+            bool not_res_23656 = !not_arg0_23655;
             
-            cond_22862 = not_res_24038;
+            cond_22480 = not_res_23656;
         } else {
-            cond_22862 = 0;
+            cond_22480 = 0;
         }
         // arrange.fut:40:11-47:65
         
-        int64_t loopres_22869;
-        int64_t loopres_22870;
+        int64_t loopres_22487;
+        int64_t loopres_22488;
         
-        if (cond_22862) {
+        if (cond_22480) {
             // arrange.fut:41:26-46
             
-            bool x_24039 = sle64((int64_t) 0, cnt_22844);
-            
-            // arrange.fut:41:26-46
-            
-            bool y_24040 = slt64(cnt_22844, dz2082U_14780);
+            bool x_23657 = sle64((int64_t) 0, cnt_22462);
             
             // arrange.fut:41:26-46
             
-            bool bounds_check_24041 = x_24039 && y_24040;
+            bool y_23658 = slt64(cnt_22462, dz2082U_14600);
             
             // arrange.fut:41:26-46
             
-            bool index_certs_24042;
+            bool bounds_check_23659 = x_23657 && y_23658;
             
-            if (!bounds_check_24041) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) cnt_22844, "] out of bounds for array of shape [", (long long) dz2082U_14780, "].", "-> #0  arrange.fut:41:26-46\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
+            // arrange.fut:41:26-46
+            
+            bool index_certs_23660;
+            
+            if (!bounds_check_23659) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) cnt_22462, "] out of bounds for array of shape [", (long long) dz2082U_14600, "].", "-> #0  arrange.fut:41:26-46\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // arrange.fut:44:32-59
             
-            bool x_24046 = sle64((int64_t) 0, p_22855);
+            bool x_23664 = sle64((int64_t) 0, p_22473);
             
             // arrange.fut:44:32-59
             
-            bool y_24047 = slt64(p_22855, dz2082U_14780);
+            bool y_23665 = slt64(p_22473, dz2082U_14600);
             
             // arrange.fut:44:32-59
             
-            bool bounds_check_24048 = x_24046 && y_24047;
+            bool bounds_check_23666 = x_23664 && y_23665;
             
             // arrange.fut:44:32-59
             
-            bool index_certs_24049;
+            bool index_certs_23667;
             
-            if (!bounds_check_24048) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_22855, "] out of bounds for array of shape [", (long long) dz2082U_14780, "].", "-> #0  arrange.fut:44:32-59\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
+            if (!bounds_check_23666) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) p_22473, "] out of bounds for array of shape [", (long long) dz2082U_14600, "].", "-> #0  arrange.fut:44:32-59\n   #1  arrange.fut:59:18-54\n   #2  entry.fut:8:3-56\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // arrange.fut:41:26-46
-            ((int64_t *) mem_25080)[cnt_22844] = g_22854;
+            ((int64_t *) mem_24674)[cnt_22462] = g_22472;
             // arrange.fut:42:26-46
-            ((int64_t *) mem_25082)[cnt_22844] = p_22855;
+            ((int64_t *) mem_24676)[cnt_22462] = p_22473;
             // arrange.fut:43:31-57
-            ((bool *) mem_25083)[g_22854] = 1;
+            ((bool *) mem_24677)[g_22472] = 1;
             // arrange.fut:44:32-59
-            ((bool *) mem_25084)[p_22855] = 1;
+            ((bool *) mem_24678)[p_22473] = 1;
             // arrange.fut:45:18-20
             
-            int64_t tmp_24051 = add64((int64_t) 1, i_22843);
+            int64_t tmp_23669 = add64((int64_t) 1, i_22461);
             
             // arrange.fut:45:25-27
             
-            int64_t tmp_24052 = add64((int64_t) 1, cnt_22844);
+            int64_t tmp_23670 = add64((int64_t) 1, cnt_22462);
             
-            loopres_22869 = tmp_24051;
-            loopres_22870 = tmp_24052;
+            loopres_22487 = tmp_23669;
+            loopres_22488 = tmp_23670;
         } else {
             // arrange.fut:47:18-20
             
-            int64_t tmp_22889 = add64((int64_t) 1, i_22843);
+            int64_t tmp_22507 = add64((int64_t) 1, i_22461);
             
-            loopres_22869 = tmp_22889;
-            loopres_22870 = cnt_22844;
+            loopres_22487 = tmp_22507;
+            loopres_22488 = cnt_22462;
         }
         // arrange.fut:36:11-27
         
-        bool cond_22890 = slt64(loopres_22869, dzlz7bUZLztZRz20Umz20Unz7dUzg_22346);
+        bool cond_22508 = slt64(loopres_22487, dzlz7bUZLztZRz20Umz20Unz7dUzg_21964);
         
         // arrange.fut:36:24-27
         
-        bool loop_cond_t_res_22891 = slt64(loopres_22870, dz2082U_14780);
+        bool loop_cond_t_res_22509 = slt64(loopres_22488, dz2082U_14600);
         
         // arrange.fut:59:18-54
         
-        bool x_22892 = cond_22890 && loop_cond_t_res_22891;
-        bool loop_while_tmp_25186 = x_22892;
-        int64_t i_tmp_25187 = loopres_22869;
-        int64_t cnt_tmp_25188 = loopres_22870;
+        bool x_22510 = cond_22508 && loop_cond_t_res_22509;
+        bool loop_while_tmp_24780 = x_22510;
+        int64_t i_tmp_24781 = loopres_22487;
+        int64_t cnt_tmp_24782 = loopres_22488;
         
-        loop_while_22842 = loop_while_tmp_25186;
-        i_22843 = i_tmp_25187;
-        cnt_22844 = cnt_tmp_25188;
+        loop_while_22460 = loop_while_tmp_24780;
+        i_22461 = i_tmp_24781;
+        cnt_22462 = cnt_tmp_24782;
     }
-    greedy_match_from_sorted_idx_res_22835 = loop_while_22842;
-    greedy_match_from_sorted_idx_res_22836 = i_22843;
-    greedy_match_from_sorted_idx_res_22837 = cnt_22844;
+    greedy_match_from_sorted_idx_res_22453 = loop_while_22460;
+    greedy_match_from_sorted_idx_res_22454 = i_22461;
+    greedy_match_from_sorted_idx_res_22455 = cnt_22462;
     // arrange.fut:63:24-39
-    if (memblock_alloc(ctx, &mem_25110, bytes_25079, "mem_25110")) {
+    if (memblock_alloc(ctx, &mem_24704, bytes_24673, "mem_24704")) {
         err = 1;
         goto cleanup;
     }
     // arrange.fut:63:24-39
-    for (int64_t nest_i_25193 = 0; nest_i_25193 < dz2082U_14780; nest_i_25193++) {
-        ((double *) mem_25110.mem)[nest_i_25193] = 0.0;
+    for (int64_t nest_i_24787 = 0; nest_i_24787 < dz2082U_14600; nest_i_24787++) {
+        ((double *) mem_24704.mem)[nest_i_24787] = 0.0;
     }
     // arrange.fut:62:24-39
-    if (memblock_alloc(ctx, &mem_25112, bytes_25079, "mem_25112")) {
+    if (memblock_alloc(ctx, &mem_24706, bytes_24673, "mem_24706")) {
         err = 1;
         goto cleanup;
     }
     // arrange.fut:62:24-39
-    for (int64_t nest_i_25194 = 0; nest_i_25194 < dz2082U_14780; nest_i_25194++) {
-        ((double *) mem_25112.mem)[nest_i_25194] = 0.0;
+    for (int64_t nest_i_24788 = 0; nest_i_24788 < dz2082U_14600; nest_i_24788++) {
+        ((double *) mem_24706.mem)[nest_i_24788] = 0.0;
     }
     // arrange.fut:62:15-63:53
     
-    bool acc_cert_23078;
-    bool acc_cert_23123;
+    bool acc_cert_22696;
+    bool acc_cert_22741;
     
     // arrange.fut:60:19-63:53
-    for (int64_t i_24846 = 0; i_24846 < dz2082U_14780; i_24846++) {
-        int64_t eta_p_23966 = ((int64_t *) mem_25080)[i_24846];
-        int64_t v_23968 = ((int64_t *) mem_25082)[i_24846];
+    for (int64_t i_24440 = 0; i_24440 < dz2082U_14600; i_24440++) {
+        int64_t eta_p_23584 = ((int64_t *) mem_24674)[i_24440];
+        int64_t v_23586 = ((int64_t *) mem_24676)[i_24440];
         
         // arrange.fut:60:30-40
         
-        bool x_23972 = sle64((int64_t) 0, eta_p_23966);
+        bool x_23590 = sle64((int64_t) 0, eta_p_23584);
         
         // arrange.fut:60:30-40
         
-        bool y_23973 = slt64(eta_p_23966, dz2080U_14778);
+        bool y_23591 = slt64(eta_p_23584, dz2080U_14598);
         
         // arrange.fut:60:30-40
         
-        bool bounds_check_23974 = x_23972 && y_23973;
+        bool bounds_check_23592 = x_23590 && y_23591;
         
         // arrange.fut:60:30-40
         
-        bool index_certs_23975;
+        bool index_certs_23593;
         
-        if (!bounds_check_23974) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_23966, "] out of bounds for array of shape [", (long long) dz2080U_14778, "].", "-> #0  arrange.fut:60:30-40\n   #1  entry.fut:8:3-56\n"));
+        if (!bounds_check_23592) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_23584, "] out of bounds for array of shape [", (long long) dz2080U_14598, "].", "-> #0  arrange.fut:60:30-40\n   #1  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:60:30-40
         
-        double lifted_lambda_res_23976 = ((double *) grid_xs_mem_24892.mem)[eta_p_23966];
+        double lifted_lambda_res_23594 = ((double *) grid_xs_mem_24486.mem)[eta_p_23584];
         
         // arrange.fut:62:15-53
         // UpdateAcc
-        if (sle64((int64_t) 0, v_23968) && slt64(v_23968, dz2082U_14780)) {
-            ((double *) mem_25112.mem)[v_23968] = lifted_lambda_res_23976;
+        if (sle64((int64_t) 0, v_23586) && slt64(v_23586, dz2082U_14600)) {
+            ((double *) mem_24706.mem)[v_23586] = lifted_lambda_res_23594;
         }
         // arrange.fut:61:30-40
         
-        bool y_23984 = slt64(eta_p_23966, dz2081U_14779);
+        bool y_23602 = slt64(eta_p_23584, dz2081U_14599);
         
         // arrange.fut:61:30-40
         
-        bool bounds_check_23985 = x_23972 && y_23984;
+        bool bounds_check_23603 = x_23590 && y_23602;
         
         // arrange.fut:61:30-40
         
-        bool index_certs_23986;
+        bool index_certs_23604;
         
-        if (!bounds_check_23985) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_23966, "] out of bounds for array of shape [", (long long) dz2081U_14779, "].", "-> #0  arrange.fut:61:30-40\n   #1  entry.fut:8:3-56\n"));
+        if (!bounds_check_23603) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_23584, "] out of bounds for array of shape [", (long long) dz2081U_14599, "].", "-> #0  arrange.fut:61:30-40\n   #1  entry.fut:8:3-56\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // arrange.fut:61:30-40
         
-        double lifted_lambda_res_23987 = ((double *) grid_ys_mem_24893.mem)[eta_p_23966];
+        double lifted_lambda_res_23605 = ((double *) grid_ys_mem_24487.mem)[eta_p_23584];
         
         // arrange.fut:63:15-53
         // UpdateAcc
-        if (sle64((int64_t) 0, v_23968) && slt64(v_23968, dz2082U_14780)) {
-            ((double *) mem_25110.mem)[v_23968] = lifted_lambda_res_23987;
+        if (sle64((int64_t) 0, v_23586) && slt64(v_23586, dz2082U_14600)) {
+            ((double *) mem_24704.mem)[v_23586] = lifted_lambda_res_23605;
         }
     }
-    if (memblock_set(ctx, &mem_out_25140, &mem_25112, "mem_25112") != 0)
+    if (memblock_set(ctx, &mem_out_24734, &mem_24706, "mem_24706") != 0)
         return 1;
-    if (memblock_set(ctx, &mem_out_25141, &mem_25110, "mem_25110") != 0)
+    if (memblock_set(ctx, &mem_out_24735, &mem_24704, "mem_24704") != 0)
         return 1;
-    prim_out_25142 = dz2082U_14780;
-    if (memblock_set(ctx, &*mem_out_p_25197, &mem_out_25140, "mem_out_25140") != 0)
+    prim_out_24736 = dz2082U_14600;
+    if (memblock_set(ctx, &*mem_out_p_24791, &mem_out_24734, "mem_out_24734") != 0)
         return 1;
-    if (memblock_set(ctx, &*mem_out_p_25198, &mem_out_25141, "mem_out_25141") != 0)
+    if (memblock_set(ctx, &*mem_out_p_24792, &mem_out_24735, "mem_out_24735") != 0)
         return 1;
-    *out_prim_out_25199 = prim_out_25142;
+    *out_prim_out_24793 = prim_out_24736;
     
   cleanup:
     {
-        free(mem_24897);
-        free(mem_24905);
-        free(mem_24907);
-        free(mem_24915);
-        free(mem_24917);
-        free(mem_24919);
-        free(mem_24921);
-        free(mem_24923);
-        free(mem_24955);
-        free(mem_24957);
-        free(mem_24958);
-        free(mem_24959);
-        free(mem_24966);
-        free(mem_24969);
-        free(mem_24972);
-        free(mem_24975);
-        free(mem_24978);
-        free(mem_24995);
-        free(mem_24996);
-        free(mem_24997);
-        free(mem_24998);
-        free(mem_24999);
-        free(mem_25000);
-        free(mem_25001);
-        free(mem_25032);
-        free(mem_25033);
-        free(mem_25058);
-        free(mem_25066);
-        free(mem_25080);
-        free(mem_25082);
-        free(mem_25083);
-        free(mem_25084);
-        if (memblock_unref(ctx, &mem_25112, "mem_25112") != 0)
+        free(mem_24491);
+        free(mem_24499);
+        free(mem_24501);
+        free(mem_24509);
+        free(mem_24511);
+        free(mem_24513);
+        free(mem_24515);
+        free(mem_24517);
+        free(mem_24549);
+        free(mem_24551);
+        free(mem_24552);
+        free(mem_24553);
+        free(mem_24560);
+        free(mem_24563);
+        free(mem_24566);
+        free(mem_24569);
+        free(mem_24572);
+        free(mem_24589);
+        free(mem_24590);
+        free(mem_24591);
+        free(mem_24592);
+        free(mem_24593);
+        free(mem_24594);
+        free(mem_24595);
+        free(mem_24626);
+        free(mem_24627);
+        free(mem_24652);
+        free(mem_24660);
+        free(mem_24674);
+        free(mem_24676);
+        free(mem_24677);
+        free(mem_24678);
+        if (memblock_unref(ctx, &mem_24706, "mem_24706") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_25110, "mem_25110") != 0)
+        if (memblock_unref(ctx, &mem_24704, "mem_24704") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_out_25141, "mem_out_25141") != 0)
+        if (memblock_unref(ctx, &mem_out_24735, "mem_out_24735") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_out_25140, "mem_out_25140") != 0)
+        if (memblock_unref(ctx, &mem_out_24734, "mem_out_24734") != 0)
             return 1;
     }
     return err;
 }
-FUTHARK_FUN_ATTR int futrts_entry_grid_in_polygons(struct futhark_context *ctx, struct memblock *mem_out_p_25232, struct memblock *mem_out_p_25233, int64_t *out_prim_out_25234, struct memblock xs_mem_24892, struct memblock ys_mem_24893, struct memblock ring_offsets_mem_24894, struct memblock polygon_ring_counts_mem_24895, int64_t dz2081U_16397, int64_t dz2082U_16398, int64_t dz2083U_16399, int64_t nx_16404, int64_t ny_16405)
+FUTHARK_FUN_ATTR int futrts_entry_grid_in_polygons(struct futhark_context *ctx, struct memblock *mem_out_p_24826, struct memblock *mem_out_p_24827, int64_t *out_prim_out_24828, struct memblock xs_mem_24486, struct memblock ys_mem_24487, struct memblock ring_offsets_mem_24488, struct memblock polygon_ring_counts_mem_24489, struct memblock gx_mem_24490, struct memblock gy_mem_24491, int64_t dz2081U_16013, int64_t dz2082U_16014, int64_t dz2083U_16015, int64_t dz2084U_16016, int64_t dz2085U_16017)
 {
     (void) ctx;
     
     int err = 0;
-    int64_t mem_24897_cached_sizze_25235 = 0;
-    unsigned char *mem_24897 = NULL;
-    int64_t mem_24932_cached_sizze_25236 = 0;
-    unsigned char *mem_24932 = NULL;
-    int64_t mem_24943_cached_sizze_25237 = 0;
-    unsigned char *mem_24943 = NULL;
-    int64_t mem_24945_cached_sizze_25238 = 0;
-    unsigned char *mem_24945 = NULL;
-    int64_t mem_24946_cached_sizze_25239 = 0;
-    unsigned char *mem_24946 = NULL;
-    struct memblock mem_24956;
+    int64_t mem_24493_cached_sizze_24829 = 0;
+    unsigned char *mem_24493 = NULL;
+    int64_t mem_24502_cached_sizze_24830 = 0;
+    unsigned char *mem_24502 = NULL;
+    int64_t mem_24513_cached_sizze_24831 = 0;
+    unsigned char *mem_24513 = NULL;
+    int64_t mem_24515_cached_sizze_24832 = 0;
+    unsigned char *mem_24515 = NULL;
+    int64_t mem_24516_cached_sizze_24833 = 0;
+    unsigned char *mem_24516 = NULL;
+    struct memblock mem_24526;
     
-    mem_24956.references = NULL;
+    mem_24526.references = NULL;
     
-    struct memblock mem_24954;
+    struct memblock mem_24524;
     
-    mem_24954.references = NULL;
+    mem_24524.references = NULL;
     
-    struct memblock mem_24918;
+    struct memblock mem_out_24735;
     
-    mem_24918.references = NULL;
+    mem_out_24735.references = NULL;
     
-    struct memblock mem_24926;
+    struct memblock mem_out_24734;
     
-    mem_24926.references = NULL;
+    mem_out_24734.references = NULL;
     
-    struct memblock ext_mem_24929;
+    int64_t prim_out_24736;
     
-    ext_mem_24929.references = NULL;
+    // grid.fut:112:32-62
     
-    struct memblock mem_24905;
+    int64_t bytes_24492 = (int64_t) 8 * dz2083U_16015;
     
-    mem_24905.references = NULL;
-    
-    struct memblock mem_24913;
-    
-    mem_24913.references = NULL;
-    
-    struct memblock ext_mem_24916;
-    
-    ext_mem_24916.references = NULL;
-    
-    struct memblock mem_out_25141;
-    
-    mem_out_25141.references = NULL;
-    
-    struct memblock mem_out_25140;
-    
-    mem_out_25140.references = NULL;
-    
-    int64_t prim_out_25142;
-    
-    // grid.fut:120:32-62
-    
-    int64_t bytes_24896 = (int64_t) 8 * dz2083U_16399;
-    
-    // grid.fut:120:32-62
-    if (mem_24897_cached_sizze_25235 < bytes_24896) {
-        err = lexical_realloc(ctx, &mem_24897, &mem_24897_cached_sizze_25235, bytes_24896);
+    // grid.fut:112:32-62
+    if (mem_24493_cached_sizze_24829 < bytes_24492) {
+        err = lexical_realloc(ctx, &mem_24493, &mem_24493_cached_sizze_24829, bytes_24492);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    // grid.fut:120:32-62
+    // grid.fut:112:32-62
     
-    int64_t discard_24755;
-    int64_t scanacc_24751 = (int64_t) 0;
+    int64_t discard_24349;
+    int64_t scanacc_24345 = (int64_t) 0;
     
-    for (int64_t i_24753 = 0; i_24753 < dz2083U_16399; i_24753++) {
-        int64_t x_18274 = ((int64_t *) polygon_ring_counts_mem_24895.mem)[i_24753];
+    for (int64_t i_24347 = 0; i_24347 < dz2083U_16015; i_24347++) {
+        int64_t x_17894 = ((int64_t *) polygon_ring_counts_mem_24489.mem)[i_24347];
         
-        // grid.fut:120:37-40
+        // grid.fut:112:37-40
         
-        int64_t defunc_0_op_res_18277 = add64(x_18274, scanacc_24751);
+        int64_t defunc_0_op_res_17897 = add64(x_17894, scanacc_24345);
         
-        ((int64_t *) mem_24897)[i_24753] = defunc_0_op_res_18277;
+        ((int64_t *) mem_24493)[i_24347] = defunc_0_op_res_17897;
         
-        int64_t scanacc_tmp_25143 = defunc_0_op_res_18277;
+        int64_t scanacc_tmp_24737 = defunc_0_op_res_17897;
         
-        scanacc_24751 = scanacc_tmp_25143;
+        scanacc_24345 = scanacc_tmp_24737;
     }
-    discard_24755 = scanacc_24751;
-    // grid.fut:120:25-62
+    discard_24349 = scanacc_24345;
+    // grid.fut:112:25-62
     
-    int64_t conc_tmp_18280 = (int64_t) 1 + dz2083U_16399;
+    int64_t conc_tmp_17900 = (int64_t) 1 + dz2083U_16015;
     
-    // grid.fut:8:29-34
+    // grid.fut:89:17-43
     
-    bool y_18282 = slt64((int64_t) 0, dz2081U_16397);
+    int64_t flat_dim_17903 = dz2084U_16016 * dz2085U_16017;
     
-    // grid.fut:8:29-34
+    // grid.fut:90:26-55
     
-    bool index_certs_18283;
+    int64_t binop_x_24500 = (int64_t) 8 * dz2085U_16017;
     
-    if (!y_18282) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) (int64_t) 0, "] out of bounds for array of shape [", (long long) dz2081U_16397, "].", "-> #0  grid.fut:8:29-34\n   #1  grid.fut:121:34-51\n   #2  entry.fut:18:3-65\n"));
-        err = FUTHARK_PROGRAM_ERROR;
-        goto cleanup;
-    }
-    // grid.fut:8:29-34
+    // grid.fut:90:26-55
     
-    double reduce_arg1_18284 = ((double *) xs_mem_24892.mem)[(int64_t) 0];
+    int64_t bytes_24501 = dz2084U_16016 * binop_x_24500;
     
-    // grid.fut:8:14-9:37
-    
-    double defunc_0_reduce_res_24741;
-    double defunc_0_reduce_res_24742;
-    double redout_24756;
-    double redout_24757;
-    
-    redout_24756 = reduce_arg1_18284;
-    redout_24757 = reduce_arg1_18284;
-    for (int64_t i_24758 = 0; i_24758 < dz2081U_16397; i_24758++) {
-        double x_24405 = ((double *) xs_mem_24892.mem)[i_24758];
-        
-        // grid.fut:3:39-61
-        
-        bool cond_18289 = redout_24756 < x_24405;
-        
-        // grid.fut:3:39-61
-        
-        double min_f64_res_18290;
-        
-        if (cond_18289) {
-            min_f64_res_18290 = redout_24756;
-        } else {
-            min_f64_res_18290 = x_24405;
-        }
-        // grid.fut:4:39-61
-        
-        bool cond_18295 = x_24405 < redout_24757;
-        
-        // grid.fut:4:39-61
-        
-        double max_f64_res_18296;
-        
-        if (cond_18295) {
-            max_f64_res_18296 = redout_24757;
-        } else {
-            max_f64_res_18296 = x_24405;
-        }
-        
-        double redout_tmp_25145 = min_f64_res_18290;
-        double redout_tmp_25146 = max_f64_res_18296;
-        
-        redout_24756 = redout_tmp_25145;
-        redout_24757 = redout_tmp_25146;
-    }
-    defunc_0_reduce_res_24741 = redout_24756;
-    defunc_0_reduce_res_24742 = redout_24757;
-    // grid.fut:10:29-34
-    
-    double reduce_arg1_18297 = ((double *) ys_mem_24893.mem)[(int64_t) 0];
-    
-    // grid.fut:10:14-11:37
-    
-    double defunc_0_reduce_res_24743;
-    double defunc_0_reduce_res_24744;
-    double redout_24759;
-    double redout_24760;
-    
-    redout_24759 = reduce_arg1_18297;
-    redout_24760 = reduce_arg1_18297;
-    for (int64_t i_24761 = 0; i_24761 < dz2081U_16397; i_24761++) {
-        double x_24411 = ((double *) ys_mem_24893.mem)[i_24761];
-        
-        // grid.fut:3:39-61
-        
-        bool cond_18302 = redout_24759 < x_24411;
-        
-        // grid.fut:3:39-61
-        
-        double min_f64_res_18303;
-        
-        if (cond_18302) {
-            min_f64_res_18303 = redout_24759;
-        } else {
-            min_f64_res_18303 = x_24411;
-        }
-        // grid.fut:4:39-61
-        
-        bool cond_18308 = x_24411 < redout_24760;
-        
-        // grid.fut:4:39-61
-        
-        double max_f64_res_18309;
-        
-        if (cond_18308) {
-            max_f64_res_18309 = redout_24760;
-        } else {
-            max_f64_res_18309 = x_24411;
-        }
-        
-        double redout_tmp_25147 = min_f64_res_18303;
-        double redout_tmp_25148 = max_f64_res_18309;
-        
-        redout_24759 = redout_tmp_25147;
-        redout_24760 = redout_tmp_25148;
-    }
-    defunc_0_reduce_res_24743 = redout_24759;
-    defunc_0_reduce_res_24744 = redout_24760;
-    // grid.fut:88:3-92:54
-    
-    bool cond_18310 = sle64(nx_16404, (int64_t) 1);
-    
-    // grid.fut:122:12-43
-    
-    int64_t make_grid_by_count_res_18311;
-    
-    if (cond_18310) {
-        make_grid_by_count_res_18311 = (int64_t) 1;
-    } else {
-        make_grid_by_count_res_18311 = nx_16404;
-    }
-    // grid.fut:91:22-29
-    
-    double zs_lhs_18312 = defunc_0_reduce_res_24742 - defunc_0_reduce_res_24741;
-    
-    // grid.fut:91:46-49
-    
-    int64_t i64_arg0_18313 = sub64(nx_16404, (int64_t) 1);
-    
-    // grid.fut:91:33-49
-    
-    double i64_res_18314 = sitofp_i64_f64(i64_arg0_18313);
-    
-    // grid.fut:91:31-50
-    
-    double dxy_18315 = zs_lhs_18312 / i64_res_18314;
-    
-    // grid.fut:92:45-53
-    
-    bool bounds_invalid_upwards_18316 = slt64(nx_16404, (int64_t) 0);
-    
-    // grid.fut:92:45-53
-    
-    bool valid_18317 = !bounds_invalid_upwards_18316;
-    
-    // entry.fut:18:3-65
-    
-    bool protect_assert_disj_18318 = cond_18310 || valid_18317;
-    
-    // grid.fut:92:45-53
-    
-    bool range_valid_c_18319;
-    
-    if (!protect_assert_disj_18318) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) nx_16404, " is invalid.", "-> #0  grid.fut:92:45-53\n   #1  grid.fut:122:12-43\n   #2  entry.fut:18:3-65\n"));
-        err = FUTHARK_PROGRAM_ERROR;
-        goto cleanup;
-    }
-    // grid.fut:92:8-54
-    
-    int64_t bytes_24904 = (int64_t) 8 * nx_16404;
-    
-    // grid.fut:122:12-43
-    
-    int64_t bytes_24912 = (int64_t) 8 * make_grid_by_count_res_18311;
-    
-    if (cond_18310) {
-        // grid.fut:122:12-43
-        if (memblock_alloc(ctx, &mem_24913, bytes_24912, "mem_24913")) {
-            err = 1;
-            goto cleanup;
-        }
-        // grid.fut:122:12-43
-        for (int64_t nest_i_25149 = 0; nest_i_25149 < make_grid_by_count_res_18311; nest_i_25149++) {
-            ((double *) mem_24913.mem)[nest_i_25149] = defunc_0_reduce_res_24741;
-        }
-        if (memblock_set(ctx, &ext_mem_24916, &mem_24913, "mem_24913") != 0)
-            return 1;
-    } else {
-        // grid.fut:92:8-54
-        if (memblock_alloc(ctx, &mem_24905, bytes_24904, "mem_24905")) {
-            err = 1;
-            goto cleanup;
-        }
-        // grid.fut:92:8-54
-        for (int64_t i_24764 = 0; i_24764 < nx_16404; i_24764++) {
-            // grid.fut:92:27-36
-            
-            double i64_res_18325 = sitofp_i64_f64(i_24764);
-            
-            // grid.fut:92:37-42
-            
-            double zp_rhs_18326 = dxy_18315 * i64_res_18325;
-            
-            // grid.fut:92:25-42
-            
-            double lifted_lambda_res_18327 = zp_rhs_18326 + defunc_0_reduce_res_24741;
-            
-            ((double *) mem_24905.mem)[i_24764] = lifted_lambda_res_18327;
-        }
-        if (memblock_set(ctx, &ext_mem_24916, &mem_24905, "mem_24905") != 0)
-            return 1;
-    }
-    // grid.fut:88:3-92:54
-    
-    bool cond_18330 = sle64(ny_16405, (int64_t) 1);
-    
-    // grid.fut:123:12-43
-    
-    int64_t make_grid_by_count_res_18331;
-    
-    if (cond_18330) {
-        make_grid_by_count_res_18331 = (int64_t) 1;
-    } else {
-        make_grid_by_count_res_18331 = ny_16405;
-    }
-    // grid.fut:91:22-29
-    
-    double zs_lhs_18332 = defunc_0_reduce_res_24744 - defunc_0_reduce_res_24743;
-    
-    // grid.fut:91:46-49
-    
-    int64_t i64_arg0_18333 = sub64(ny_16405, (int64_t) 1);
-    
-    // grid.fut:91:33-49
-    
-    double i64_res_18334 = sitofp_i64_f64(i64_arg0_18333);
-    
-    // grid.fut:91:31-50
-    
-    double dxy_18335 = zs_lhs_18332 / i64_res_18334;
-    
-    // grid.fut:92:45-53
-    
-    bool bounds_invalid_upwards_18336 = slt64(ny_16405, (int64_t) 0);
-    
-    // grid.fut:92:45-53
-    
-    bool valid_18337 = !bounds_invalid_upwards_18336;
-    
-    // entry.fut:18:3-65
-    
-    bool protect_assert_disj_18338 = cond_18330 || valid_18337;
-    
-    // grid.fut:92:45-53
-    
-    bool range_valid_c_18339;
-    
-    if (!protect_assert_disj_18338) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) ny_16405, " is invalid.", "-> #0  grid.fut:92:45-53\n   #1  grid.fut:123:12-43\n   #2  entry.fut:18:3-65\n"));
-        err = FUTHARK_PROGRAM_ERROR;
-        goto cleanup;
-    }
-    // grid.fut:92:8-54
-    
-    int64_t bytes_24917 = (int64_t) 8 * ny_16405;
-    
-    // grid.fut:123:12-43
-    
-    int64_t bytes_24925 = (int64_t) 8 * make_grid_by_count_res_18331;
-    
-    if (cond_18330) {
-        // grid.fut:123:12-43
-        if (memblock_alloc(ctx, &mem_24926, bytes_24925, "mem_24926")) {
-            err = 1;
-            goto cleanup;
-        }
-        // grid.fut:123:12-43
-        for (int64_t nest_i_25151 = 0; nest_i_25151 < make_grid_by_count_res_18331; nest_i_25151++) {
-            ((double *) mem_24926.mem)[nest_i_25151] = defunc_0_reduce_res_24743;
-        }
-        if (memblock_set(ctx, &ext_mem_24929, &mem_24926, "mem_24926") != 0)
-            return 1;
-    } else {
-        // grid.fut:92:8-54
-        if (memblock_alloc(ctx, &mem_24918, bytes_24917, "mem_24918")) {
-            err = 1;
-            goto cleanup;
-        }
-        // grid.fut:92:8-54
-        for (int64_t i_24768 = 0; i_24768 < ny_16405; i_24768++) {
-            // grid.fut:92:27-36
-            
-            double i64_res_18345 = sitofp_i64_f64(i_24768);
-            
-            // grid.fut:92:37-42
-            
-            double zp_rhs_18346 = dxy_18335 * i64_res_18345;
-            
-            // grid.fut:92:25-42
-            
-            double lifted_lambda_res_18347 = zp_rhs_18346 + defunc_0_reduce_res_24743;
-            
-            ((double *) mem_24918.mem)[i_24768] = lifted_lambda_res_18347;
-        }
-        if (memblock_set(ctx, &ext_mem_24929, &mem_24918, "mem_24918") != 0)
-            return 1;
-    }
-    // grid.fut:97:17-43
-    
-    int64_t flat_dim_18351 = make_grid_by_count_res_18311 * make_grid_by_count_res_18331;
-    
-    // grid.fut:98:26-55
-    
-    int64_t bytes_24931 = make_grid_by_count_res_18311 * bytes_24925;
-    
-    // grid.fut:98:26-55
-    if (mem_24932_cached_sizze_25236 < bytes_24931) {
-        err = lexical_realloc(ctx, &mem_24932, &mem_24932_cached_sizze_25236, bytes_24931);
+    // grid.fut:90:26-55
+    if (mem_24502_cached_sizze_24830 < bytes_24501) {
+        err = lexical_realloc(ctx, &mem_24502, &mem_24502_cached_sizze_24830, bytes_24501);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    // grid.fut:98:26-55
-    for (int64_t i_24772 = 0; i_24772 < make_grid_by_count_res_18331; i_24772++) {
-        double eta_p_18354 = ((double *) ext_mem_24929.mem)[i_24772];
+    // grid.fut:90:26-55
+    for (int64_t i_24352 = 0; i_24352 < dz2085U_16017; i_24352++) {
+        double eta_p_17906 = ((double *) gy_mem_24491.mem)[i_24352];
         
-        // grid.fut:98:37-51
-        for (int64_t nest_i_25154 = 0; nest_i_25154 < make_grid_by_count_res_18311; nest_i_25154++) {
-            ((double *) mem_24932)[i_24772 * make_grid_by_count_res_18311 + nest_i_25154] = eta_p_18354;
+        // grid.fut:90:37-51
+        for (int64_t nest_i_24740 = 0; nest_i_24740 < dz2084U_16016; nest_i_24740++) {
+            ((double *) mem_24502)[i_24352 * dz2084U_16016 + nest_i_24740] = eta_p_17906;
         }
     }
-    if (memblock_unref(ctx, &ext_mem_24929, "ext_mem_24929") != 0)
-        return 1;
-    // grid.fut:129:13-46
-    if (mem_24943_cached_sizze_25237 < (int64_t) 8) {
-        err = lexical_realloc(ctx, &mem_24943, &mem_24943_cached_sizze_25237, (int64_t) 8);
+    // grid.fut:118:13-46
+    if (mem_24513_cached_sizze_24831 < (int64_t) 8) {
+        err = lexical_realloc(ctx, &mem_24513, &mem_24513_cached_sizze_24831, (int64_t) 8);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    // grid.fut:129:13-46
-    for (int64_t nest_i_25155 = 0; nest_i_25155 < (int64_t) 1; nest_i_25155++) {
-        ((int64_t *) mem_24943)[nest_i_25155] = flat_dim_18351;
+    // grid.fut:118:13-46
+    for (int64_t nest_i_24741 = 0; nest_i_24741 < (int64_t) 1; nest_i_24741++) {
+        ((int64_t *) mem_24513)[nest_i_24741] = flat_dim_17903;
     }
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    int64_t zeze_rhs_18453 = sub64(flat_dim_18351, (int64_t) 1);
+    int64_t zeze_rhs_18005 = sub64(flat_dim_17903, (int64_t) 1);
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    int64_t bytes_24944 = (int64_t) 8 * flat_dim_18351;
+    int64_t bytes_24514 = (int64_t) 8 * flat_dim_17903;
     
-    // grid.fut:129:13-46
-    if (mem_24945_cached_sizze_25238 < bytes_24944) {
-        err = lexical_realloc(ctx, &mem_24945, &mem_24945_cached_sizze_25238, bytes_24944);
+    // grid.fut:118:13-46
+    if (mem_24515_cached_sizze_24832 < bytes_24514) {
+        err = lexical_realloc(ctx, &mem_24515, &mem_24515_cached_sizze_24832, bytes_24514);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    // grid.fut:127:5-128:23
-    if (mem_24946_cached_sizze_25239 < flat_dim_18351) {
-        err = lexical_realloc(ctx, &mem_24946, &mem_24946_cached_sizze_25239, flat_dim_18351);
+    // grid.fut:116:5-117:23
+    if (mem_24516_cached_sizze_24833 < flat_dim_17903) {
+        err = lexical_realloc(ctx, &mem_24516, &mem_24516_cached_sizze_24833, flat_dim_17903);
         if (err != FUTHARK_SUCCESS)
             goto cleanup;
     }
-    // grid.fut:127:5-128:23
-    for (int64_t i_24784 = 0; i_24784 < flat_dim_18351; i_24784++) {
-        int64_t binop_x_24850 = squot64(i_24784, make_grid_by_count_res_18311);
-        int64_t binop_y_24851 = make_grid_by_count_res_18311 * binop_x_24850;
-        int64_t new_index_24852 = i_24784 - binop_y_24851;
-        double eta_p_23589 = ((double *) ext_mem_24916.mem)[new_index_24852];
-        double eta_p_23590 = ((double *) mem_24932)[binop_x_24850 * make_grid_by_count_res_18311 + new_index_24852];
+    // grid.fut:116:5-117:23
+    for (int64_t i_24364 = 0; i_24364 < flat_dim_17903; i_24364++) {
+        int64_t binop_x_24444 = squot64(i_24364, dz2084U_16016);
+        int64_t binop_y_24445 = dz2084U_16016 * binop_x_24444;
+        int64_t new_index_24446 = i_24364 - binop_y_24445;
+        double eta_p_23207 = ((double *) gx_mem_24490.mem)[new_index_24446];
+        double eta_p_23208 = ((double *) mem_24502)[binop_x_24444 * dz2084U_16016 + new_index_24446];
         
         // grid.fut:82:6-84:22
         
-        bool defunc_0_reduce_res_24729;
-        bool redout_24780 = 0;
+        bool defunc_0_reduce_res_24327;
+        bool redout_24360 = 0;
         
-        for (int64_t i_24781 = 0; i_24781 < dz2083U_16399; i_24781++) {
+        for (int64_t i_24361 = 0; i_24361 < dz2083U_16015; i_24361++) {
             // grid.fut:59:12-30
             
-            bool y_23804 = slt64(i_24781, conc_tmp_18280);
+            bool y_23422 = slt64(i_24361, conc_tmp_17900);
             
             // grid.fut:59:12-30
             
-            bool index_certs_23806;
+            bool index_certs_23424;
             
-            if (!y_23804) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i_24781, "] out of bounds for array of shape [", (long long) conc_tmp_18280, "].", "-> #0  grid.fut:59:12-30\n   #1  grid.fut:83:20-79\n   #2  grid.fut:127:21-82\n   #3  entry.fut:18:3-65\n"));
+            if (!y_23422) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) i_24361, "] out of bounds for array of shape [", (long long) conc_tmp_17900, "].", "-> #0  grid.fut:59:12-30\n   #1  grid.fut:83:20-79\n   #2  grid.fut:116:21-82\n   #3  entry.fut:18:3-65\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             
-            bool index_concat_cmp_23807 = sle64((int64_t) 1, i_24781);
-            int64_t index_concat_branch_23808;
+            bool index_concat_cmp_23425 = sle64((int64_t) 1, i_24361);
+            int64_t index_concat_branch_23426;
             
-            if (index_concat_cmp_23807) {
-                int64_t index_concat_i_24721 = sub64(i_24781, (int64_t) 1);
-                int64_t index_concat_24722 = ((int64_t *) mem_24897)[index_concat_i_24721];
+            if (index_concat_cmp_23425) {
+                int64_t index_concat_i_24319 = sub64(i_24361, (int64_t) 1);
+                int64_t index_concat_24320 = ((int64_t *) mem_24493)[index_concat_i_24319];
                 
-                index_concat_branch_23808 = index_concat_24722;
+                index_concat_branch_23426 = index_concat_24320;
             } else {
-                index_concat_branch_23808 = (int64_t) 0;
+                index_concat_branch_23426 = (int64_t) 0;
             }
             // grid.fut:60:30-33
             
-            int64_t re_23811 = add64((int64_t) 1, i_24781);
+            int64_t re_23429 = add64((int64_t) 1, i_24361);
             
             // grid.fut:60:12-34
             
-            bool x_23812 = sle64((int64_t) 0, re_23811);
+            bool x_23430 = sle64((int64_t) 0, re_23429);
             
             // grid.fut:60:12-34
             
-            bool y_23813 = slt64(re_23811, conc_tmp_18280);
+            bool y_23431 = slt64(re_23429, conc_tmp_17900);
             
             // grid.fut:60:12-34
             
-            bool bounds_check_23814 = x_23812 && y_23813;
+            bool bounds_check_23432 = x_23430 && y_23431;
             
             // grid.fut:60:12-34
             
-            bool index_certs_23815;
+            bool index_certs_23433;
             
-            if (!bounds_check_23814) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) re_23811, "] out of bounds for array of shape [", (long long) conc_tmp_18280, "].", "-> #0  grid.fut:60:12-34\n   #1  grid.fut:83:20-79\n   #2  grid.fut:127:21-82\n   #3  entry.fut:18:3-65\n"));
+            if (!bounds_check_23432) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) re_23429, "] out of bounds for array of shape [", (long long) conc_tmp_17900, "].", "-> #0  grid.fut:60:12-34\n   #1  grid.fut:83:20-79\n   #2  grid.fut:116:21-82\n   #3  entry.fut:18:3-65\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             
-            bool index_concat_cmp_23816 = sle64((int64_t) 1, re_23811);
-            int64_t index_concat_branch_23817;
+            bool index_concat_cmp_23434 = sle64((int64_t) 1, re_23429);
+            int64_t index_concat_branch_23435;
             
-            if (index_concat_cmp_23816) {
-                int64_t index_concat_24723 = ((int64_t *) mem_24897)[i_24781];
+            if (index_concat_cmp_23434) {
+                int64_t index_concat_24321 = ((int64_t *) mem_24493)[i_24361];
                 
-                index_concat_branch_23817 = index_concat_24723;
+                index_concat_branch_23435 = index_concat_24321;
             } else {
-                index_concat_branch_23817 = (int64_t) 0;
+                index_concat_branch_23435 = (int64_t) 0;
             }
             // grid.fut:61:6-72:38
             
-            bool cond_23819 = sle64(index_concat_branch_23817, index_concat_branch_23808);
+            bool cond_23437 = sle64(index_concat_branch_23435, index_concat_branch_23426);
             
             // grid.fut:33:11-26
             
-            bool x_23823 = sle64((int64_t) 0, index_concat_branch_23808);
+            bool x_23441 = sle64((int64_t) 0, index_concat_branch_23426);
             
             // grid.fut:33:11-26
             
-            bool y_23824 = slt64(index_concat_branch_23808, dz2082U_16398);
+            bool y_23442 = slt64(index_concat_branch_23426, dz2082U_16014);
             
             // grid.fut:33:11-26
             
-            bool bounds_check_23825 = x_23823 && y_23824;
-            bool protect_assert_disj_23826 = cond_23819 || bounds_check_23825;
+            bool bounds_check_23443 = x_23441 && y_23442;
+            bool protect_assert_disj_23444 = cond_23437 || bounds_check_23443;
             
             // grid.fut:33:11-26
             
-            bool index_certs_23827;
+            bool index_certs_23445;
             
-            if (!protect_assert_disj_23826) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) index_concat_branch_23808, "] out of bounds for array of shape [", (long long) dz2082U_16398, "].", "-> #0  grid.fut:33:11-26\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+            if (!protect_assert_disj_23444) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) index_concat_branch_23426, "] out of bounds for array of shape [", (long long) dz2082U_16014, "].", "-> #0  grid.fut:33:11-26\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // grid.fut:34:26-29
             
-            int64_t e_23830 = add64((int64_t) 1, index_concat_branch_23808);
+            int64_t e_23448 = add64((int64_t) 1, index_concat_branch_23426);
             
             // grid.fut:34:11-30
             
-            bool x_23831 = sle64((int64_t) 0, e_23830);
+            bool x_23449 = sle64((int64_t) 0, e_23448);
             
             // grid.fut:34:11-30
             
-            bool y_23832 = slt64(e_23830, dz2082U_16398);
+            bool y_23450 = slt64(e_23448, dz2082U_16014);
             
             // grid.fut:34:11-30
             
-            bool bounds_check_23833 = x_23831 && y_23832;
-            bool protect_assert_disj_23834 = cond_23819 || bounds_check_23833;
+            bool bounds_check_23451 = x_23449 && y_23450;
+            bool protect_assert_disj_23452 = cond_23437 || bounds_check_23451;
             
             // grid.fut:34:11-30
             
-            bool index_certs_23835;
+            bool index_certs_23453;
             
-            if (!protect_assert_disj_23834) {
-                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) e_23830, "] out of bounds for array of shape [", (long long) dz2082U_16398, "].", "-> #0  grid.fut:34:11-30\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+            if (!protect_assert_disj_23452) {
+                set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) e_23448, "] out of bounds for array of shape [", (long long) dz2082U_16014, "].", "-> #0  grid.fut:34:11-30\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                 err = FUTHARK_PROGRAM_ERROR;
                 goto cleanup;
             }
             // grid.fut:65:32-36
             
-            int64_t zm_lhs_23820 = sub64(index_concat_branch_23817, index_concat_branch_23808);
+            int64_t zm_lhs_23438 = sub64(index_concat_branch_23435, index_concat_branch_23426);
             
             // grid.fut:65:37-40
             
-            int64_t iota_arg0_23821 = sub64(zm_lhs_23820, (int64_t) 1);
-            bool x_23822 = !cond_23819;
+            int64_t iota_arg0_23439 = sub64(zm_lhs_23438, (int64_t) 1);
+            bool x_23440 = !cond_23437;
             
             // grid.fut:33:11-26
             
-            int64_t s_23828;
+            int64_t s_23446;
             
-            if (x_23822) {
-                int64_t x_24724 = ((int64_t *) ring_offsets_mem_24894.mem)[index_concat_branch_23808];
+            if (x_23440) {
+                int64_t x_24322 = ((int64_t *) ring_offsets_mem_24488.mem)[index_concat_branch_23426];
                 
-                s_23828 = x_24724;
+                s_23446 = x_24322;
             } else {
-                s_23828 = (int64_t) 0;
+                s_23446 = (int64_t) 0;
             }
             // grid.fut:34:11-30
             
-            int64_t e_23836;
+            int64_t e_23454;
             
-            if (x_23822) {
-                int64_t x_24725 = ((int64_t *) ring_offsets_mem_24894.mem)[e_23830];
+            if (x_23440) {
+                int64_t x_24323 = ((int64_t *) ring_offsets_mem_24488.mem)[e_23448];
                 
-                e_23836 = x_24725;
+                e_23454 = x_24323;
             } else {
-                e_23836 = (int64_t) 0;
+                e_23454 = (int64_t) 0;
             }
             // grid.fut:35:13-16
             
-            int64_t m_23838 = sub64(e_23836, s_23828);
+            int64_t m_23456 = sub64(e_23454, s_23446);
             
             // grid.fut:61:6-72:38
             
-            bool point_in_polygon_res_23839;
+            bool point_in_polygon_res_23457;
             
-            if (cond_23819) {
-                point_in_polygon_res_23839 = 0;
+            if (cond_23437) {
+                point_in_polygon_res_23457 = 0;
             } else {
                 // grid.fut:36:14-20
                 
-                bool bounds_invalid_upwards_23840 = slt64(m_23838, (int64_t) 0);
+                bool bounds_invalid_upwards_23458 = slt64(m_23456, (int64_t) 0);
                 
                 // grid.fut:36:14-20
                 
-                bool valid_23841 = !bounds_invalid_upwards_23840;
+                bool valid_23459 = !bounds_invalid_upwards_23458;
                 
                 // grid.fut:36:14-20
                 
-                bool range_valid_c_23842;
+                bool range_valid_c_23460;
                 
-                if (!valid_23841) {
-                    set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) m_23838, " is invalid.", "-> #0  grid.fut:36:14-20\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                if (!valid_23459) {
+                    set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) m_23456, " is invalid.", "-> #0  grid.fut:36:14-20\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                     err = FUTHARK_PROGRAM_ERROR;
                     goto cleanup;
                 }
                 // grid.fut:65:23-40
                 
-                bool bounds_invalid_upwards_23883 = slt64(iota_arg0_23821, (int64_t) 0);
+                bool bounds_invalid_upwards_23501 = slt64(iota_arg0_23439, (int64_t) 0);
                 
                 // grid.fut:65:23-40
                 
-                bool valid_23884 = !bounds_invalid_upwards_23883;
+                bool valid_23502 = !bounds_invalid_upwards_23501;
                 
                 // grid.fut:65:23-40
                 
-                bool range_valid_c_23885;
+                bool range_valid_c_23503;
                 
-                if (!valid_23884) {
-                    set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) iota_arg0_23821, " is invalid.", "-> #0  grid.fut:65:23-40\n   #1  grid.fut:83:20-79\n   #2  grid.fut:127:21-82\n   #3  entry.fut:18:3-65\n"));
+                if (!valid_23502) {
+                    set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) iota_arg0_23439, " is invalid.", "-> #0  grid.fut:65:23-40\n   #1  grid.fut:83:20-79\n   #2  grid.fut:116:21-82\n   #3  entry.fut:18:3-65\n"));
                     err = FUTHARK_PROGRAM_ERROR;
                     goto cleanup;
                 }
                 // grid.fut:38:5-47:40
                 
-                int32_t defunc_0_reduce_res_24727;
-                int32_t redout_24774 = 0;
+                int32_t defunc_0_reduce_res_24325;
+                int32_t redout_24354 = 0;
                 
-                for (int64_t i_24775 = 0; i_24775 < m_23838; i_24775++) {
+                for (int64_t i_24355 = 0; i_24355 < m_23456; i_24355++) {
                     // grid.fut:39:17-20
                     
-                    int64_t j_24038 = add64(s_23828, i_24775);
+                    int64_t j_23656 = add64(s_23446, i_24355);
                     
                     // grid.fut:40:20-23
                     
-                    int64_t zl_lhs_24039 = add64((int64_t) 1, j_24038);
+                    int64_t zl_lhs_23657 = add64((int64_t) 1, j_23656);
                     
                     // grid.fut:40:15-45
                     
-                    bool cond_24040 = slt64(zl_lhs_24039, e_23836);
+                    bool cond_23658 = slt64(zl_lhs_23657, e_23454);
                     
                     // grid.fut:40:15-45
                     
-                    int64_t k_24041;
+                    int64_t k_23659;
                     
-                    if (cond_24040) {
-                        k_24041 = zl_lhs_24039;
+                    if (cond_23658) {
+                        k_23659 = zl_lhs_23657;
                     } else {
-                        k_24041 = s_23828;
+                        k_23659 = s_23446;
                     }
                     // grid.fut:41:16-21
                     
-                    bool x_24042 = sle64((int64_t) 0, j_24038);
+                    bool x_23660 = sle64((int64_t) 0, j_23656);
                     
                     // grid.fut:41:16-21
                     
-                    bool y_24043 = slt64(j_24038, dz2081U_16397);
+                    bool y_23661 = slt64(j_23656, dz2081U_16013);
                     
                     // grid.fut:41:16-21
                     
-                    bool bounds_check_24044 = x_24042 && y_24043;
+                    bool bounds_check_23662 = x_23660 && y_23661;
                     
                     // grid.fut:41:16-21
                     
-                    bool index_certs_24045;
+                    bool index_certs_23663;
                     
-                    if (!bounds_check_24044) {
-                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) j_24038, "] out of bounds for array of shape [", (long long) dz2081U_16397, "].", "-> #0  grid.fut:41:16-21\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                    if (!bounds_check_23662) {
+                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) j_23656, "] out of bounds for array of shape [", (long long) dz2081U_16013, "].", "-> #0  grid.fut:41:16-21\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                         err = FUTHARK_PROGRAM_ERROR;
                         goto cleanup;
                     }
                     // grid.fut:43:16-21
                     
-                    bool x_24048 = sle64((int64_t) 0, k_24041);
+                    bool x_23666 = sle64((int64_t) 0, k_23659);
                     
                     // grid.fut:43:16-21
                     
-                    bool y_24049 = slt64(k_24041, dz2081U_16397);
+                    bool y_23667 = slt64(k_23659, dz2081U_16013);
                     
                     // grid.fut:43:16-21
                     
-                    bool bounds_check_24050 = x_24048 && y_24049;
+                    bool bounds_check_23668 = x_23666 && y_23667;
                     
                     // grid.fut:43:16-21
                     
-                    bool index_certs_24051;
+                    bool index_certs_23669;
                     
-                    if (!bounds_check_24050) {
-                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) k_24041, "] out of bounds for array of shape [", (long long) dz2081U_16397, "].", "-> #0  grid.fut:43:16-21\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                    if (!bounds_check_23668) {
+                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) k_23659, "] out of bounds for array of shape [", (long long) dz2081U_16013, "].", "-> #0  grid.fut:43:16-21\n   #1  grid.fut:64:27-68\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                         err = FUTHARK_PROGRAM_ERROR;
                         goto cleanup;
                     }
                     // grid.fut:41:16-21
                     
-                    double x1_24046 = ((double *) xs_mem_24892.mem)[j_24038];
+                    double x1_23664 = ((double *) xs_mem_24486.mem)[j_23656];
                     
                     // grid.fut:42:16-21
                     
-                    double y1_24047 = ((double *) ys_mem_24893.mem)[j_24038];
+                    double y1_23665 = ((double *) ys_mem_24487.mem)[j_23656];
                     
                     // grid.fut:43:16-21
                     
-                    double x2_24052 = ((double *) xs_mem_24892.mem)[k_24041];
+                    double x2_23670 = ((double *) xs_mem_24486.mem)[k_23659];
                     
                     // grid.fut:44:16-21
                     
-                    double y2_24053 = ((double *) ys_mem_24893.mem)[k_24041];
+                    double y2_23671 = ((double *) ys_mem_24487.mem)[k_23659];
                     
                     // grid.fut:20:10-14
                     
-                    bool znze_lhs_24054 = eta_p_23590 < y1_24047;
+                    bool znze_lhs_23672 = eta_p_23208 < y1_23665;
                     
                     // grid.fut:20:23-27
                     
-                    bool znze_rhs_24055 = eta_p_23590 < y2_24053;
+                    bool znze_rhs_23673 = eta_p_23208 < y2_23671;
                     
                     // grid.fut:20:3-24:13
                     
-                    bool cond_24056 = znze_lhs_24054 == znze_rhs_24055;
+                    bool cond_23674 = znze_lhs_23672 == znze_rhs_23673;
                     
                     // grid.fut:20:3-24:13
                     
-                    bool cond_24057 = !cond_24056;
+                    bool cond_23675 = !cond_23674;
                     
                     // grid.fut:22:25-29
                     
-                    double zt_lhs_24058 = eta_p_23590 - y1_24047;
+                    double zt_lhs_23676 = eta_p_23208 - y1_23665;
                     
                     // grid.fut:22:37-41
                     
-                    double zt_rhs_24059 = x2_24052 - x1_24046;
+                    double zt_rhs_23677 = x2_23670 - x1_23664;
                     
                     // grid.fut:22:31-41
                     
-                    double zs_lhs_24060 = zt_lhs_24058 * zt_rhs_24059;
+                    double zs_lhs_23678 = zt_lhs_23676 * zt_rhs_23677;
                     
                     // grid.fut:22:49-53
                     
-                    double zs_rhs_24061 = y2_24053 - y1_24047;
+                    double zs_rhs_23679 = y2_23671 - y1_23665;
                     
                     // grid.fut:22:43-53
                     
-                    double zp_rhs_24062 = zs_lhs_24060 / zs_rhs_24061;
+                    double zp_rhs_23680 = zs_lhs_23678 / zs_rhs_23679;
                     
                     // grid.fut:22:19-53
                     
-                    double xint_24063 = x1_24046 + zp_rhs_24062;
+                    double xint_23681 = x1_23664 + zp_rhs_23680;
                     
                     // grid.fut:23:13-17
                     
-                    bool ray_crosses_edge_res_t_res_24064 = eta_p_23589 < xint_24063;
+                    bool ray_crosses_edge_res_t_res_23682 = eta_p_23207 < xint_23681;
                     
                     // grid.fut:45:10-67
                     
-                    bool x_24065 = cond_24057 && ray_crosses_edge_res_t_res_24064;
+                    bool x_23683 = cond_23675 && ray_crosses_edge_res_t_res_23682;
                     
                     // grid.fut:38:5-46:11
                     
-                    int32_t lifted_lambda_res_24066 = btoi_bool_i32(x_24065);
+                    int32_t lifted_lambda_res_23684 = btoi_bool_i32(x_23683);
                     
                     // grid.fut:47:22-25
                     
-                    int32_t defunc_0_op_res_23880 = add32(lifted_lambda_res_24066, redout_24774);
-                    int32_t redout_tmp_25158 = defunc_0_op_res_23880;
+                    int32_t defunc_0_op_res_23498 = add32(lifted_lambda_res_23684, redout_24354);
+                    int32_t redout_tmp_24744 = defunc_0_op_res_23498;
                     
-                    redout_24774 = redout_tmp_25158;
+                    redout_24354 = redout_tmp_24744;
                 }
-                defunc_0_reduce_res_24727 = redout_24774;
+                defunc_0_reduce_res_24325 = redout_24354;
                 // grid.fut:48:13-19
                 
-                int32_t zeze_lhs_23881 = smod32(defunc_0_reduce_res_24727, 2);
+                int32_t zeze_lhs_23499 = smod32(defunc_0_reduce_res_24325, 2);
                 
                 // grid.fut:48:21-28
                 
-                bool point_in_ring_res_23882 = zeze_lhs_23881 == 1;
+                bool point_in_ring_res_23500 = zeze_lhs_23499 == 1;
                 
                 // grid.fut:67:10-71:24
                 
-                bool defunc_0_reduce_res_24728;
-                bool redout_24778 = 0;
+                bool defunc_0_reduce_res_24326;
+                bool redout_24358 = 0;
                 
-                for (int64_t i_24779 = 0; i_24779 < iota_arg0_23821; i_24779++) {
+                for (int64_t i_24359 = 0; i_24359 < iota_arg0_23439; i_24359++) {
                     // grid.fut:69:30-33
                     
-                    int64_t r_23970 = add64(e_23830, i_24779);
+                    int64_t r_23588 = add64(e_23448, i_24359);
                     
                     // grid.fut:33:11-26
                     
-                    bool x_23971 = sle64((int64_t) 0, r_23970);
+                    bool x_23589 = sle64((int64_t) 0, r_23588);
                     
                     // grid.fut:33:11-26
                     
-                    bool y_23972 = slt64(r_23970, dz2082U_16398);
+                    bool y_23590 = slt64(r_23588, dz2082U_16014);
                     
                     // grid.fut:33:11-26
                     
-                    bool bounds_check_23973 = x_23971 && y_23972;
+                    bool bounds_check_23591 = x_23589 && y_23590;
                     
                     // grid.fut:33:11-26
                     
-                    bool index_certs_23974;
+                    bool index_certs_23592;
                     
-                    if (!bounds_check_23973) {
-                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) r_23970, "] out of bounds for array of shape [", (long long) dz2082U_16398, "].", "-> #0  grid.fut:33:11-26\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                    if (!bounds_check_23591) {
+                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) r_23588, "] out of bounds for array of shape [", (long long) dz2082U_16014, "].", "-> #0  grid.fut:33:11-26\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                         err = FUTHARK_PROGRAM_ERROR;
                         goto cleanup;
                     }
                     // grid.fut:33:11-26
                     
-                    int64_t s_23975 = ((int64_t *) ring_offsets_mem_24894.mem)[r_23970];
+                    int64_t s_23593 = ((int64_t *) ring_offsets_mem_24488.mem)[r_23588];
                     
                     // grid.fut:34:26-29
                     
-                    int64_t e_23976 = add64((int64_t) 1, r_23970);
+                    int64_t e_23594 = add64((int64_t) 1, r_23588);
                     
                     // grid.fut:34:11-30
                     
-                    bool x_23977 = sle64((int64_t) 0, e_23976);
+                    bool x_23595 = sle64((int64_t) 0, e_23594);
                     
                     // grid.fut:34:11-30
                     
-                    bool y_23978 = slt64(e_23976, dz2082U_16398);
+                    bool y_23596 = slt64(e_23594, dz2082U_16014);
                     
                     // grid.fut:34:11-30
                     
-                    bool bounds_check_23979 = x_23977 && y_23978;
+                    bool bounds_check_23597 = x_23595 && y_23596;
                     
                     // grid.fut:34:11-30
                     
-                    bool index_certs_23980;
+                    bool index_certs_23598;
                     
-                    if (!bounds_check_23979) {
-                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) e_23976, "] out of bounds for array of shape [", (long long) dz2082U_16398, "].", "-> #0  grid.fut:34:11-30\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                    if (!bounds_check_23597) {
+                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) e_23594, "] out of bounds for array of shape [", (long long) dz2082U_16014, "].", "-> #0  grid.fut:34:11-30\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                         err = FUTHARK_PROGRAM_ERROR;
                         goto cleanup;
                     }
                     // grid.fut:34:11-30
                     
-                    int64_t e_23981 = ((int64_t *) ring_offsets_mem_24894.mem)[e_23976];
+                    int64_t e_23599 = ((int64_t *) ring_offsets_mem_24488.mem)[e_23594];
                     
                     // grid.fut:35:13-16
                     
-                    int64_t m_23982 = sub64(e_23981, s_23975);
+                    int64_t m_23600 = sub64(e_23599, s_23593);
                     
                     // grid.fut:36:14-20
                     
-                    bool bounds_invalid_upwards_23983 = slt64(m_23982, (int64_t) 0);
+                    bool bounds_invalid_upwards_23601 = slt64(m_23600, (int64_t) 0);
                     
                     // grid.fut:36:14-20
                     
-                    bool valid_23984 = !bounds_invalid_upwards_23983;
+                    bool valid_23602 = !bounds_invalid_upwards_23601;
                     
                     // grid.fut:36:14-20
                     
-                    bool range_valid_c_23985;
+                    bool range_valid_c_23603;
                     
-                    if (!valid_23984) {
-                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) m_23982, " is invalid.", "-> #0  grid.fut:36:14-20\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                    if (!valid_23602) {
+                        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s%lld%s\n\nBacktrace:\n%s", "Range ", (long long) (int64_t) 0, "..", (long long) (int64_t) 1, "..<", (long long) m_23600, " is invalid.", "-> #0  grid.fut:36:14-20\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                         err = FUTHARK_PROGRAM_ERROR;
                         goto cleanup;
                     }
                     // grid.fut:38:5-47:40
                     
-                    int32_t defunc_0_reduce_res_24726;
-                    int32_t redout_24776 = 0;
+                    int32_t defunc_0_reduce_res_24324;
+                    int32_t redout_24356 = 0;
                     
-                    for (int64_t i_24777 = 0; i_24777 < m_23982; i_24777++) {
+                    for (int64_t i_24357 = 0; i_24357 < m_23600; i_24357++) {
                         // grid.fut:39:17-20
                         
-                        int64_t j_24079 = add64(s_23975, i_24777);
+                        int64_t j_23697 = add64(s_23593, i_24357);
                         
                         // grid.fut:40:20-23
                         
-                        int64_t zl_lhs_24080 = add64((int64_t) 1, j_24079);
+                        int64_t zl_lhs_23698 = add64((int64_t) 1, j_23697);
                         
                         // grid.fut:40:15-45
                         
-                        bool cond_24081 = slt64(zl_lhs_24080, e_23981);
+                        bool cond_23699 = slt64(zl_lhs_23698, e_23599);
                         
                         // grid.fut:40:15-45
                         
-                        int64_t k_24082;
+                        int64_t k_23700;
                         
-                        if (cond_24081) {
-                            k_24082 = zl_lhs_24080;
+                        if (cond_23699) {
+                            k_23700 = zl_lhs_23698;
                         } else {
-                            k_24082 = s_23975;
+                            k_23700 = s_23593;
                         }
                         // grid.fut:41:16-21
                         
-                        bool x_24083 = sle64((int64_t) 0, j_24079);
+                        bool x_23701 = sle64((int64_t) 0, j_23697);
                         
                         // grid.fut:41:16-21
                         
-                        bool y_24084 = slt64(j_24079, dz2081U_16397);
+                        bool y_23702 = slt64(j_23697, dz2081U_16013);
                         
                         // grid.fut:41:16-21
                         
-                        bool bounds_check_24085 = x_24083 && y_24084;
+                        bool bounds_check_23703 = x_23701 && y_23702;
                         
                         // grid.fut:41:16-21
                         
-                        bool index_certs_24086;
+                        bool index_certs_23704;
                         
-                        if (!bounds_check_24085) {
-                            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) j_24079, "] out of bounds for array of shape [", (long long) dz2081U_16397, "].", "-> #0  grid.fut:41:16-21\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                        if (!bounds_check_23703) {
+                            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) j_23697, "] out of bounds for array of shape [", (long long) dz2081U_16013, "].", "-> #0  grid.fut:41:16-21\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                             err = FUTHARK_PROGRAM_ERROR;
                             goto cleanup;
                         }
                         // grid.fut:43:16-21
                         
-                        bool x_24089 = sle64((int64_t) 0, k_24082);
+                        bool x_23707 = sle64((int64_t) 0, k_23700);
                         
                         // grid.fut:43:16-21
                         
-                        bool y_24090 = slt64(k_24082, dz2081U_16397);
+                        bool y_23708 = slt64(k_23700, dz2081U_16013);
                         
                         // grid.fut:43:16-21
                         
-                        bool bounds_check_24091 = x_24089 && y_24090;
+                        bool bounds_check_23709 = x_23707 && y_23708;
                         
                         // grid.fut:43:16-21
                         
-                        bool index_certs_24092;
+                        bool index_certs_23710;
                         
-                        if (!bounds_check_24091) {
-                            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) k_24082, "] out of bounds for array of shape [", (long long) dz2081U_16397, "].", "-> #0  grid.fut:43:16-21\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:127:21-82\n   #4  entry.fut:18:3-65\n"));
+                        if (!bounds_check_23709) {
+                            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) k_23700, "] out of bounds for array of shape [", (long long) dz2081U_16013, "].", "-> #0  grid.fut:43:16-21\n   #1  grid.fut:70:18-58\n   #2  grid.fut:83:20-79\n   #3  grid.fut:116:21-82\n   #4  entry.fut:18:3-65\n"));
                             err = FUTHARK_PROGRAM_ERROR;
                             goto cleanup;
                         }
                         // grid.fut:41:16-21
                         
-                        double x1_24087 = ((double *) xs_mem_24892.mem)[j_24079];
+                        double x1_23705 = ((double *) xs_mem_24486.mem)[j_23697];
                         
                         // grid.fut:42:16-21
                         
-                        double y1_24088 = ((double *) ys_mem_24893.mem)[j_24079];
+                        double y1_23706 = ((double *) ys_mem_24487.mem)[j_23697];
                         
                         // grid.fut:43:16-21
                         
-                        double x2_24093 = ((double *) xs_mem_24892.mem)[k_24082];
+                        double x2_23711 = ((double *) xs_mem_24486.mem)[k_23700];
                         
                         // grid.fut:44:16-21
                         
-                        double y2_24094 = ((double *) ys_mem_24893.mem)[k_24082];
+                        double y2_23712 = ((double *) ys_mem_24487.mem)[k_23700];
                         
                         // grid.fut:20:10-14
                         
-                        bool znze_lhs_24095 = eta_p_23590 < y1_24088;
+                        bool znze_lhs_23713 = eta_p_23208 < y1_23706;
                         
                         // grid.fut:20:23-27
                         
-                        bool znze_rhs_24096 = eta_p_23590 < y2_24094;
+                        bool znze_rhs_23714 = eta_p_23208 < y2_23712;
                         
                         // grid.fut:20:3-24:13
                         
-                        bool cond_24097 = znze_lhs_24095 == znze_rhs_24096;
+                        bool cond_23715 = znze_lhs_23713 == znze_rhs_23714;
                         
                         // grid.fut:20:3-24:13
                         
-                        bool cond_24098 = !cond_24097;
+                        bool cond_23716 = !cond_23715;
                         
                         // grid.fut:22:25-29
                         
-                        double zt_lhs_24099 = eta_p_23590 - y1_24088;
+                        double zt_lhs_23717 = eta_p_23208 - y1_23706;
                         
                         // grid.fut:22:37-41
                         
-                        double zt_rhs_24100 = x2_24093 - x1_24087;
+                        double zt_rhs_23718 = x2_23711 - x1_23705;
                         
                         // grid.fut:22:31-41
                         
-                        double zs_lhs_24101 = zt_lhs_24099 * zt_rhs_24100;
+                        double zs_lhs_23719 = zt_lhs_23717 * zt_rhs_23718;
                         
                         // grid.fut:22:49-53
                         
-                        double zs_rhs_24102 = y2_24094 - y1_24088;
+                        double zs_rhs_23720 = y2_23712 - y1_23706;
                         
                         // grid.fut:22:43-53
                         
-                        double zp_rhs_24103 = zs_lhs_24101 / zs_rhs_24102;
+                        double zp_rhs_23721 = zs_lhs_23719 / zs_rhs_23720;
                         
                         // grid.fut:22:19-53
                         
-                        double xint_24104 = x1_24087 + zp_rhs_24103;
+                        double xint_23722 = x1_23705 + zp_rhs_23721;
                         
                         // grid.fut:23:13-17
                         
-                        bool ray_crosses_edge_res_t_res_24105 = eta_p_23589 < xint_24104;
+                        bool ray_crosses_edge_res_t_res_23723 = eta_p_23207 < xint_23722;
                         
                         // grid.fut:45:10-67
                         
-                        bool x_24106 = cond_24098 && ray_crosses_edge_res_t_res_24105;
+                        bool x_23724 = cond_23716 && ray_crosses_edge_res_t_res_23723;
                         
                         // grid.fut:38:5-46:11
                         
-                        int32_t lifted_lambda_res_24107 = btoi_bool_i32(x_24106);
+                        int32_t lifted_lambda_res_23725 = btoi_bool_i32(x_23724);
                         
                         // grid.fut:47:22-25
                         
-                        int32_t defunc_0_op_res_24023 = add32(lifted_lambda_res_24107, redout_24776);
-                        int32_t redout_tmp_25160 = defunc_0_op_res_24023;
+                        int32_t defunc_0_op_res_23641 = add32(lifted_lambda_res_23725, redout_24356);
+                        int32_t redout_tmp_24746 = defunc_0_op_res_23641;
                         
-                        redout_24776 = redout_tmp_25160;
+                        redout_24356 = redout_tmp_24746;
                     }
-                    defunc_0_reduce_res_24726 = redout_24776;
+                    defunc_0_reduce_res_24324 = redout_24356;
                     // grid.fut:48:13-19
                     
-                    int32_t zeze_lhs_24024 = smod32(defunc_0_reduce_res_24726, 2);
+                    int32_t zeze_lhs_23642 = smod32(defunc_0_reduce_res_24324, 2);
                     
                     // grid.fut:48:21-28
                     
-                    bool point_in_ring_res_24025 = zeze_lhs_24024 == 1;
+                    bool point_in_ring_res_23643 = zeze_lhs_23642 == 1;
                     
                     // grid.fut:67:10-71:24
                     
-                    bool defunc_0_op_res_23950 = point_in_ring_res_24025 || redout_24778;
-                    bool redout_tmp_25159 = defunc_0_op_res_23950;
+                    bool defunc_0_op_res_23568 = point_in_ring_res_23643 || redout_24358;
+                    bool redout_tmp_24745 = defunc_0_op_res_23568;
                     
-                    redout_24778 = redout_tmp_25159;
+                    redout_24358 = redout_tmp_24745;
                 }
-                defunc_0_reduce_res_24728 = redout_24778;
+                defunc_0_reduce_res_24326 = redout_24358;
                 // grid.fut:72:27-38
                 
-                bool not_res_23951 = !defunc_0_reduce_res_24728;
+                bool not_res_23569 = !defunc_0_reduce_res_24326;
                 
                 // grid.fut:83:9-84:21
                 
-                bool x_23952 = point_in_ring_res_23882 && not_res_23951;
+                bool x_23570 = point_in_ring_res_23500 && not_res_23569;
                 
-                point_in_polygon_res_23839 = x_23952;
+                point_in_polygon_res_23457 = x_23570;
             }
             // grid.fut:82:6-84:22
             
-            bool defunc_0_op_res_23748 = point_in_polygon_res_23839 || redout_24780;
-            bool redout_tmp_25157 = defunc_0_op_res_23748;
+            bool defunc_0_op_res_23366 = point_in_polygon_res_23457 || redout_24360;
+            bool redout_tmp_24743 = defunc_0_op_res_23366;
             
-            redout_24780 = redout_tmp_25157;
+            redout_24360 = redout_tmp_24743;
         }
-        defunc_0_reduce_res_24729 = redout_24780;
-        ((bool *) mem_24946)[i_24784] = defunc_0_reduce_res_24729;
+        defunc_0_reduce_res_24327 = redout_24360;
+        ((bool *) mem_24516)[i_24364] = defunc_0_reduce_res_24327;
     }
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool acc_cert_23584;
-    bool acc_cert_23585;
+    bool acc_cert_23202;
+    bool acc_cert_23203;
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    int64_t discard_24790;
-    int64_t scanacc_24786 = (int64_t) 0;
+    int64_t discard_24370;
+    int64_t scanacc_24366 = (int64_t) 0;
     
-    for (int64_t i_24789 = 0; i_24789 < flat_dim_18351; i_24789++) {
-        // grid.fut:129:27-36
+    for (int64_t i_24369 = 0; i_24369 < flat_dim_17903; i_24369++) {
+        // grid.fut:118:27-36
         
-        bool lifted_lambda_res_23765 = ((bool *) mem_24946)[i_24789];
+        bool lifted_lambda_res_23383 = ((bool *) mem_24516)[i_24369];
         
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         
-        int64_t defunc_0_f_res_23766 = btoi_bool_i64(lifted_lambda_res_23765);
+        int64_t defunc_0_f_res_23384 = btoi_bool_i64(lifted_lambda_res_23383);
         
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         
-        int64_t defunc_0_op_res_23769 = add64(defunc_0_f_res_23766, scanacc_24786);
+        int64_t defunc_0_op_res_23387 = add64(defunc_0_f_res_23384, scanacc_24366);
         
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         
-        int64_t lifted_lambda_res_23781;
+        int64_t lifted_lambda_res_23399;
         
-        if (lifted_lambda_res_23765) {
-            // grid.fut:129:13-46
+        if (lifted_lambda_res_23383) {
+            // grid.fut:118:13-46
             
-            int64_t lifted_lambda_res_t_res_24730 = sub64(defunc_0_op_res_23769, (int64_t) 1);
+            int64_t lifted_lambda_res_t_res_24328 = sub64(defunc_0_op_res_23387, (int64_t) 1);
             
-            lifted_lambda_res_23781 = lifted_lambda_res_t_res_24730;
+            lifted_lambda_res_23399 = lifted_lambda_res_t_res_24328;
         } else {
-            lifted_lambda_res_23781 = (int64_t) -1;
+            lifted_lambda_res_23399 = (int64_t) -1;
         }
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         // UpdateAcc
-        if (sle64((int64_t) 0, lifted_lambda_res_23781) && slt64(lifted_lambda_res_23781, flat_dim_18351)) {
-            ((int64_t *) mem_24945)[lifted_lambda_res_23781] = i_24789;
+        if (sle64((int64_t) 0, lifted_lambda_res_23399) && slt64(lifted_lambda_res_23399, flat_dim_17903)) {
+            ((int64_t *) mem_24515)[lifted_lambda_res_23399] = i_24369;
         }
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         
-        bool cond_23784 = i_24789 == zeze_rhs_18453;
+        bool cond_23402 = i_24369 == zeze_rhs_18005;
         
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         
-        int64_t lifted_lambda_res_23785;
+        int64_t lifted_lambda_res_23403;
         
-        if (cond_23784) {
-            lifted_lambda_res_23785 = (int64_t) 0;
+        if (cond_23402) {
+            lifted_lambda_res_23403 = (int64_t) 0;
         } else {
-            lifted_lambda_res_23785 = (int64_t) -1;
+            lifted_lambda_res_23403 = (int64_t) -1;
         }
-        // grid.fut:129:13-46
+        // grid.fut:118:13-46
         // UpdateAcc
-        if (sle64((int64_t) 0, lifted_lambda_res_23785) && slt64(lifted_lambda_res_23785, (int64_t) 1)) {
-            ((int64_t *) mem_24943)[lifted_lambda_res_23785] = defunc_0_op_res_23769;
+        if (sle64((int64_t) 0, lifted_lambda_res_23403) && slt64(lifted_lambda_res_23403, (int64_t) 1)) {
+            ((int64_t *) mem_24513)[lifted_lambda_res_23403] = defunc_0_op_res_23387;
         }
         
-        int64_t scanacc_tmp_25161 = defunc_0_op_res_23769;
+        int64_t scanacc_tmp_24747 = defunc_0_op_res_23387;
         
-        scanacc_24786 = scanacc_tmp_25161;
+        scanacc_24366 = scanacc_tmp_24747;
     }
-    discard_24790 = scanacc_24786;
-    // grid.fut:129:13-46
+    discard_24370 = scanacc_24366;
+    // grid.fut:118:13-46
     
-    int64_t dzlz7bUcountZM0ZNz7dUzg_18469 = ((int64_t *) mem_24943)[(int64_t) 0];
+    int64_t dzlz7bUcountZM0ZNz7dUzg_18021 = ((int64_t *) mem_24513)[(int64_t) 0];
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool empty_slice_18470 = dzlz7bUcountZM0ZNz7dUzg_18469 == (int64_t) 0;
+    bool empty_slice_18022 = dzlz7bUcountZM0ZNz7dUzg_18021 == (int64_t) 0;
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    int64_t m_18471 = sub64(dzlz7bUcountZM0ZNz7dUzg_18469, (int64_t) 1);
+    int64_t m_18023 = sub64(dzlz7bUcountZM0ZNz7dUzg_18021, (int64_t) 1);
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool zzero_leq_i_p_m_t_s_18472 = sle64((int64_t) 0, m_18471);
+    bool zzero_leq_i_p_m_t_s_18024 = sle64((int64_t) 0, m_18023);
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool i_p_m_t_s_leq_w_18473 = slt64(m_18471, flat_dim_18351);
+    bool i_p_m_t_s_leq_w_18025 = slt64(m_18023, flat_dim_17903);
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool i_lte_j_18474 = sle64((int64_t) 0, dzlz7bUcountZM0ZNz7dUzg_18469);
+    bool i_lte_j_18026 = sle64((int64_t) 0, dzlz7bUcountZM0ZNz7dUzg_18021);
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool y_18475 = zzero_leq_i_p_m_t_s_18472 && i_p_m_t_s_leq_w_18473;
+    bool y_18027 = zzero_leq_i_p_m_t_s_18024 && i_p_m_t_s_leq_w_18025;
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool forwards_ok_18476 = i_lte_j_18474 && y_18475;
+    bool forwards_ok_18028 = i_lte_j_18026 && y_18027;
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool ok_or_empty_18477 = empty_slice_18470 || forwards_ok_18476;
+    bool ok_or_empty_18029 = empty_slice_18022 || forwards_ok_18028;
     
-    // grid.fut:129:13-46
+    // grid.fut:118:13-46
     
-    bool index_certs_18478;
+    bool index_certs_18030;
     
-    if (!ok_or_empty_18477) {
-        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [:", (long long) dzlz7bUcountZM0ZNz7dUzg_18469, "] out of bounds for array of shape [", (long long) flat_dim_18351, "].", "-> #0  grid.fut:129:13-46\n   #1  entry.fut:18:3-65\n"));
+    if (!ok_or_empty_18029) {
+        set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [:", (long long) dzlz7bUcountZM0ZNz7dUzg_18021, "] out of bounds for array of shape [", (long long) flat_dim_17903, "].", "-> #0  grid.fut:118:13-46\n   #1  entry.fut:18:3-65\n"));
         err = FUTHARK_PROGRAM_ERROR;
         goto cleanup;
     }
-    // grid.fut:130:15-131:40
+    // grid.fut:119:15-120:40
     
-    int64_t bytes_24953 = (int64_t) 8 * dzlz7bUcountZM0ZNz7dUzg_18469;
+    int64_t bytes_24523 = (int64_t) 8 * dzlz7bUcountZM0ZNz7dUzg_18021;
     
-    // grid.fut:130:15-131:40
-    if (memblock_alloc(ctx, &mem_24954, bytes_24953, "mem_24954")) {
+    // grid.fut:119:15-120:40
+    if (memblock_alloc(ctx, &mem_24524, bytes_24523, "mem_24524")) {
         err = 1;
         goto cleanup;
     }
-    // grid.fut:130:15-131:40
-    if (memblock_alloc(ctx, &mem_24956, bytes_24953, "mem_24956")) {
+    // grid.fut:119:15-120:40
+    if (memblock_alloc(ctx, &mem_24526, bytes_24523, "mem_24526")) {
         err = 1;
         goto cleanup;
     }
-    // grid.fut:130:15-131:40
-    for (int64_t i_24795 = 0; i_24795 < dzlz7bUcountZM0ZNz7dUzg_18469; i_24795++) {
-        int64_t eta_p_24423 = ((int64_t *) mem_24945)[i_24795];
+    // grid.fut:119:15-120:40
+    for (int64_t i_24375 = 0; i_24375 < dzlz7bUcountZM0ZNz7dUzg_18021; i_24375++) {
+        int64_t eta_p_24029 = ((int64_t *) mem_24515)[i_24375];
         
-        // grid.fut:130:26-35
+        // grid.fut:119:26-35
         
-        bool x_24425 = sle64((int64_t) 0, eta_p_24423);
+        bool x_24031 = sle64((int64_t) 0, eta_p_24029);
         
-        // grid.fut:130:26-35
+        // grid.fut:119:26-35
         
-        bool y_24426 = slt64(eta_p_24423, flat_dim_18351);
+        bool y_24032 = slt64(eta_p_24029, flat_dim_17903);
         
-        // grid.fut:130:26-35
+        // grid.fut:119:26-35
         
-        bool bounds_check_24427 = x_24425 && y_24426;
+        bool bounds_check_24033 = x_24031 && y_24032;
         
-        // grid.fut:130:26-35
+        // grid.fut:119:26-35
         
-        bool index_certs_24428;
+        bool index_certs_24034;
         
-        if (!bounds_check_24427) {
-            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_24423, "] out of bounds for array of shape [", (long long) flat_dim_18351, "].", "-> #0  grid.fut:130:26-35\n   #1  entry.fut:18:3-65\n"));
+        if (!bounds_check_24033) {
+            set_error(ctx, msgprintf("Error: %s%lld%s%lld%s\n\nBacktrace:\n%s", "Index [", (long long) eta_p_24029, "] out of bounds for array of shape [", (long long) flat_dim_17903, "].", "-> #0  grid.fut:119:26-35\n   #1  entry.fut:18:3-65\n"));
             err = FUTHARK_PROGRAM_ERROR;
             goto cleanup;
         }
         // entry.fut:18:3-65
         
-        int64_t binop_x_24429 = squot64(eta_p_24423, make_grid_by_count_res_18311);
+        int64_t binop_x_24035 = squot64(eta_p_24029, dz2084U_16016);
         
         // entry.fut:18:3-65
         
-        int64_t binop_y_24430 = make_grid_by_count_res_18311 * binop_x_24429;
+        int64_t binop_y_24036 = dz2084U_16016 * binop_x_24035;
         
         // entry.fut:18:3-65
         
-        int64_t new_index_24431 = eta_p_24423 - binop_y_24430;
+        int64_t new_index_24037 = eta_p_24029 - binop_y_24036;
         
         // entry.fut:18:3-65
         
-        double lifted_lambda_res_24432 = ((double *) ext_mem_24916.mem)[new_index_24431];
+        double lifted_lambda_res_24038 = ((double *) gx_mem_24490.mem)[new_index_24037];
         
-        // grid.fut:131:26-35
+        // grid.fut:120:26-35
         
-        double lifted_lambda_res_24442 = ((double *) mem_24932)[binop_x_24429 * make_grid_by_count_res_18311 + new_index_24431];
+        double lifted_lambda_res_24048 = ((double *) mem_24502)[binop_x_24035 * dz2084U_16016 + new_index_24037];
         
-        ((double *) mem_24954.mem)[i_24795] = lifted_lambda_res_24442;
-        ((double *) mem_24956.mem)[i_24795] = lifted_lambda_res_24432;
+        ((double *) mem_24524.mem)[i_24375] = lifted_lambda_res_24048;
+        ((double *) mem_24526.mem)[i_24375] = lifted_lambda_res_24038;
     }
-    if (memblock_unref(ctx, &ext_mem_24916, "ext_mem_24916") != 0)
+    if (memblock_set(ctx, &mem_out_24734, &mem_24526, "mem_24526") != 0)
         return 1;
-    if (memblock_set(ctx, &mem_out_25140, &mem_24956, "mem_24956") != 0)
+    if (memblock_set(ctx, &mem_out_24735, &mem_24524, "mem_24524") != 0)
         return 1;
-    if (memblock_set(ctx, &mem_out_25141, &mem_24954, "mem_24954") != 0)
+    prim_out_24736 = dzlz7bUcountZM0ZNz7dUzg_18021;
+    if (memblock_set(ctx, &*mem_out_p_24826, &mem_out_24734, "mem_out_24734") != 0)
         return 1;
-    prim_out_25142 = dzlz7bUcountZM0ZNz7dUzg_18469;
-    if (memblock_set(ctx, &*mem_out_p_25232, &mem_out_25140, "mem_out_25140") != 0)
+    if (memblock_set(ctx, &*mem_out_p_24827, &mem_out_24735, "mem_out_24735") != 0)
         return 1;
-    if (memblock_set(ctx, &*mem_out_p_25233, &mem_out_25141, "mem_out_25141") != 0)
-        return 1;
-    *out_prim_out_25234 = prim_out_25142;
+    *out_prim_out_24828 = prim_out_24736;
     
   cleanup:
     {
-        free(mem_24897);
-        free(mem_24932);
-        free(mem_24943);
-        free(mem_24945);
-        free(mem_24946);
-        if (memblock_unref(ctx, &mem_24956, "mem_24956") != 0)
+        free(mem_24493);
+        free(mem_24502);
+        free(mem_24513);
+        free(mem_24515);
+        free(mem_24516);
+        if (memblock_unref(ctx, &mem_24526, "mem_24526") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_24954, "mem_24954") != 0)
+        if (memblock_unref(ctx, &mem_24524, "mem_24524") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_24918, "mem_24918") != 0)
+        if (memblock_unref(ctx, &mem_out_24735, "mem_out_24735") != 0)
             return 1;
-        if (memblock_unref(ctx, &mem_24926, "mem_24926") != 0)
-            return 1;
-        if (memblock_unref(ctx, &ext_mem_24929, "ext_mem_24929") != 0)
-            return 1;
-        if (memblock_unref(ctx, &mem_24905, "mem_24905") != 0)
-            return 1;
-        if (memblock_unref(ctx, &mem_24913, "mem_24913") != 0)
-            return 1;
-        if (memblock_unref(ctx, &ext_mem_24916, "ext_mem_24916") != 0)
-            return 1;
-        if (memblock_unref(ctx, &mem_out_25141, "mem_out_25141") != 0)
-            return 1;
-        if (memblock_unref(ctx, &mem_out_25140, "mem_out_25140") != 0)
+        if (memblock_unref(ctx, &mem_out_24734, "mem_out_24734") != 0)
             return 1;
     }
     return err;
@@ -7939,122 +7598,132 @@ FUTHARK_FUN_ATTR int futrts_entry_grid_in_polygons(struct futhark_context *ctx, 
 
 int futhark_entry_arrange_from_coordinates(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_f64_1d *in2, const struct futhark_f64_1d *in3)
 {
-    int64_t dz2080U_14778 = (int64_t) 0;
-    int64_t dz2081U_14779 = (int64_t) 0;
-    int64_t dz2082U_14780 = (int64_t) 0;
-    int64_t dz2083U_14781 = (int64_t) 0;
-    int64_t prim_out_25142 = (int64_t) 0;
+    int64_t dz2080U_14598 = (int64_t) 0;
+    int64_t dz2081U_14599 = (int64_t) 0;
+    int64_t dz2082U_14600 = (int64_t) 0;
+    int64_t dz2083U_14601 = (int64_t) 0;
+    int64_t prim_out_24736 = (int64_t) 0;
     int ret = 0;
     
     lock_lock(&ctx->lock);
     
-    struct memblock mem_out_25141;
+    struct memblock mem_out_24735;
     
-    mem_out_25141.references = NULL;
+    mem_out_24735.references = NULL;
     
-    struct memblock mem_out_25140;
+    struct memblock mem_out_24734;
     
-    mem_out_25140.references = NULL;
+    mem_out_24734.references = NULL;
     
-    struct memblock pts_y_mem_24895;
+    struct memblock pts_y_mem_24489;
     
-    pts_y_mem_24895.references = NULL;
+    pts_y_mem_24489.references = NULL;
     
-    struct memblock pts_x_mem_24894;
+    struct memblock pts_x_mem_24488;
     
-    pts_x_mem_24894.references = NULL;
+    pts_x_mem_24488.references = NULL;
     
-    struct memblock grid_ys_mem_24893;
+    struct memblock grid_ys_mem_24487;
     
-    grid_ys_mem_24893.references = NULL;
+    grid_ys_mem_24487.references = NULL;
     
-    struct memblock grid_xs_mem_24892;
+    struct memblock grid_xs_mem_24486;
     
-    grid_xs_mem_24892.references = NULL;
-    grid_xs_mem_24892 = in0->mem;
-    dz2080U_14778 = in0->shape[0];
-    grid_ys_mem_24893 = in1->mem;
-    dz2081U_14779 = in1->shape[0];
-    pts_x_mem_24894 = in2->mem;
-    dz2082U_14780 = in2->shape[0];
-    pts_y_mem_24895 = in3->mem;
-    dz2083U_14781 = in3->shape[0];
-    if (!(dz2080U_14778 == in0->shape[0] && (dz2081U_14779 == in1->shape[0] && (dz2082U_14780 == in2->shape[0] && dz2083U_14781 == in3->shape[0])))) {
+    grid_xs_mem_24486.references = NULL;
+    grid_xs_mem_24486 = in0->mem;
+    dz2080U_14598 = in0->shape[0];
+    grid_ys_mem_24487 = in1->mem;
+    dz2081U_14599 = in1->shape[0];
+    pts_x_mem_24488 = in2->mem;
+    dz2082U_14600 = in2->shape[0];
+    pts_y_mem_24489 = in3->mem;
+    dz2083U_14601 = in3->shape[0];
+    if (!(dz2080U_14598 == in0->shape[0] && (dz2081U_14599 == in1->shape[0] && (dz2082U_14600 == in2->shape[0] && dz2083U_14601 == in3->shape[0])))) {
         ret = 1;
         set_error(ctx, msgprintf("Error: entry point arguments have invalid sizes.\n"));
     }
     if (ret == 0) {
-        ret = futrts_entry_arrange_from_coordinates(ctx, &mem_out_25140, &mem_out_25141, &prim_out_25142, grid_xs_mem_24892, grid_ys_mem_24893, pts_x_mem_24894, pts_y_mem_24895, dz2080U_14778, dz2081U_14779, dz2082U_14780, dz2083U_14781);
+        ret = futrts_entry_arrange_from_coordinates(ctx, &mem_out_24734, &mem_out_24735, &prim_out_24736, grid_xs_mem_24486, grid_ys_mem_24487, pts_x_mem_24488, pts_y_mem_24489, dz2080U_14598, dz2081U_14599, dz2082U_14600, dz2083U_14601);
         if (ret == 0) {
             assert((*out0 = (struct futhark_f64_1d *) malloc(sizeof(struct futhark_f64_1d))) != NULL);
-            (*out0)->mem = mem_out_25140;
-            (*out0)->shape[0] = prim_out_25142;
+            (*out0)->mem = mem_out_24734;
+            (*out0)->shape[0] = prim_out_24736;
             assert((*out1 = (struct futhark_f64_1d *) malloc(sizeof(struct futhark_f64_1d))) != NULL);
-            (*out1)->mem = mem_out_25141;
-            (*out1)->shape[0] = prim_out_25142;
+            (*out1)->mem = mem_out_24735;
+            (*out1)->shape[0] = prim_out_24736;
         }
     }
     lock_unlock(&ctx->lock);
     return ret;
 }
-int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const int64_t in4, const int64_t in5)
+int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const struct futhark_f64_1d *in4, const struct futhark_f64_1d *in5)
 {
-    int64_t dz2081U_16397 = (int64_t) 0;
-    int64_t dz2082U_16398 = (int64_t) 0;
-    int64_t dz2083U_16399 = (int64_t) 0;
-    int64_t nx_16404 = (int64_t) 0;
-    int64_t ny_16405 = (int64_t) 0;
-    int64_t prim_out_25142 = (int64_t) 0;
+    int64_t dz2081U_16013 = (int64_t) 0;
+    int64_t dz2082U_16014 = (int64_t) 0;
+    int64_t dz2083U_16015 = (int64_t) 0;
+    int64_t dz2084U_16016 = (int64_t) 0;
+    int64_t dz2085U_16017 = (int64_t) 0;
+    int64_t prim_out_24736 = (int64_t) 0;
     int ret = 0;
     
     lock_lock(&ctx->lock);
     
-    struct memblock mem_out_25141;
+    struct memblock mem_out_24735;
     
-    mem_out_25141.references = NULL;
+    mem_out_24735.references = NULL;
     
-    struct memblock mem_out_25140;
+    struct memblock mem_out_24734;
     
-    mem_out_25140.references = NULL;
+    mem_out_24734.references = NULL;
     
-    struct memblock polygon_ring_counts_mem_24895;
+    struct memblock gy_mem_24491;
     
-    polygon_ring_counts_mem_24895.references = NULL;
+    gy_mem_24491.references = NULL;
     
-    struct memblock ring_offsets_mem_24894;
+    struct memblock gx_mem_24490;
     
-    ring_offsets_mem_24894.references = NULL;
+    gx_mem_24490.references = NULL;
     
-    struct memblock ys_mem_24893;
+    struct memblock polygon_ring_counts_mem_24489;
     
-    ys_mem_24893.references = NULL;
+    polygon_ring_counts_mem_24489.references = NULL;
     
-    struct memblock xs_mem_24892;
+    struct memblock ring_offsets_mem_24488;
     
-    xs_mem_24892.references = NULL;
-    xs_mem_24892 = in0->mem;
-    dz2081U_16397 = in0->shape[0];
-    ys_mem_24893 = in1->mem;
-    dz2081U_16397 = in1->shape[0];
-    ring_offsets_mem_24894 = in2->mem;
-    dz2082U_16398 = in2->shape[0];
-    polygon_ring_counts_mem_24895 = in3->mem;
-    dz2083U_16399 = in3->shape[0];
-    nx_16404 = in4;
-    ny_16405 = in5;
-    if (!(dz2081U_16397 == in0->shape[0] && (dz2081U_16397 == in1->shape[0] && (dz2082U_16398 == in2->shape[0] && dz2083U_16399 == in3->shape[0])))) {
+    ring_offsets_mem_24488.references = NULL;
+    
+    struct memblock ys_mem_24487;
+    
+    ys_mem_24487.references = NULL;
+    
+    struct memblock xs_mem_24486;
+    
+    xs_mem_24486.references = NULL;
+    xs_mem_24486 = in0->mem;
+    dz2081U_16013 = in0->shape[0];
+    ys_mem_24487 = in1->mem;
+    dz2081U_16013 = in1->shape[0];
+    ring_offsets_mem_24488 = in2->mem;
+    dz2082U_16014 = in2->shape[0];
+    polygon_ring_counts_mem_24489 = in3->mem;
+    dz2083U_16015 = in3->shape[0];
+    gx_mem_24490 = in4->mem;
+    dz2084U_16016 = in4->shape[0];
+    gy_mem_24491 = in5->mem;
+    dz2085U_16017 = in5->shape[0];
+    if (!(dz2081U_16013 == in0->shape[0] && (dz2081U_16013 == in1->shape[0] && (dz2082U_16014 == in2->shape[0] && (dz2083U_16015 == in3->shape[0] && (dz2084U_16016 == in4->shape[0] && dz2085U_16017 == in5->shape[0])))))) {
         ret = 1;
         set_error(ctx, msgprintf("Error: entry point arguments have invalid sizes.\n"));
     }
     if (ret == 0) {
-        ret = futrts_entry_grid_in_polygons(ctx, &mem_out_25140, &mem_out_25141, &prim_out_25142, xs_mem_24892, ys_mem_24893, ring_offsets_mem_24894, polygon_ring_counts_mem_24895, dz2081U_16397, dz2082U_16398, dz2083U_16399, nx_16404, ny_16405);
+        ret = futrts_entry_grid_in_polygons(ctx, &mem_out_24734, &mem_out_24735, &prim_out_24736, xs_mem_24486, ys_mem_24487, ring_offsets_mem_24488, polygon_ring_counts_mem_24489, gx_mem_24490, gy_mem_24491, dz2081U_16013, dz2082U_16014, dz2083U_16015, dz2084U_16016, dz2085U_16017);
         if (ret == 0) {
             assert((*out0 = (struct futhark_f64_1d *) malloc(sizeof(struct futhark_f64_1d))) != NULL);
-            (*out0)->mem = mem_out_25140;
-            (*out0)->shape[0] = prim_out_25142;
+            (*out0)->mem = mem_out_24734;
+            (*out0)->shape[0] = prim_out_24736;
             assert((*out1 = (struct futhark_f64_1d *) malloc(sizeof(struct futhark_f64_1d))) != NULL);
-            (*out1)->mem = mem_out_25141;
-            (*out1)->shape[0] = prim_out_25142;
+            (*out1)->mem = mem_out_24735;
+            (*out1)->shape[0] = prim_out_24736;
         }
     }
     lock_unlock(&ctx->lock);

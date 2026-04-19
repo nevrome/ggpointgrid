@@ -54,7 +54,7 @@ const int64_t *futhark_shape_i64_1d(struct futhark_context *ctx, struct futhark_
 
 // Entry points
 int futhark_entry_arrange_from_coordinates(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_f64_1d *in2, const struct futhark_f64_1d *in3);
-int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const int64_t in4, const int64_t in5);
+int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_f64_1d **out0, struct futhark_f64_1d **out1, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const struct futhark_f64_1d *in4, const struct futhark_f64_1d *in5);
 
 // Miscellaneous
 int futhark_context_sync(struct futhark_context *ctx);
