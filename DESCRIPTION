@@ -20,5 +20,5 @@ Imports:
   grid,
   Rcpp (>= 1.0.5),
   rlang
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 LinkingTo: Rcpp

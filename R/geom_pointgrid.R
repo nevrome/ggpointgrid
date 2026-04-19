@@ -22,7 +22,7 @@
 #' )
 #' 
 #' ggplot(testdata, aes(x, y)) +
-#' geom_pointgrid(color = "red", grid_x = 40, grid_y = 40)
+# geom_pointgrid(color = "red", grid_x = 40, grid_y = 40)
 #' 
 #' @export
 geom_pointgrid <- function(
