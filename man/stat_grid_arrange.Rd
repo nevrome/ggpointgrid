@@ -3,6 +3,7 @@
 \name{stat_grid_arrange}
 \alias{stat_grid_arrange}
 \alias{StatGridArrange}
+\alias{compute_grid_arrangement}
 \title{stat_grid_arrange}
 \usage{
 stat_grid_arrange(
@@ -20,8 +21,13 @@ stat_grid_arrange(
 )
 
 StatGridArrange
+
+compute_grid_arrangement(data, grid_x = 20L, grid_y = 20L, polygons_sf = NULL)
 }
 \arguments{
+\item{data}{Data.frame. Positions of the input data points. Must have columns
+named "x" and "y" with the coordinates on these axes.}
+
 \item{grid_x}{Single integer or numeric vector. If a single integer is supplied, 
 then the grid's x-axis coordinates are determined as a regular sequence from
 \code{min(x)} to \code{max(x)}, so in relation to the input data points.
@@ -40,5 +46,20 @@ When this is given, then the ranges for \code{grid_x} and \code{grid_y} with
 single integer input are derived from the bounding box of \code{polygons_sf}.}
 }
 \description{
-stat_grid_arrange
+ggplot2 \link[ggplot2]{stat} to perform the grid arrangement.
+\code{compute_grid_arrangement} allows to perform the arrangement directly,
+to avoid recomputation when *grid geoms are combined.
+}
+\examples{
+library(ggplot2)
+testdata <- data.frame(
+  x = c(1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5),
+  y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
+)
+laid_out <- compute_grid_arrangement(testdata, grid_x = 20L, grid_y = 20L)
+ggplot(laid_out) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_point(aes(x = xend, y = yend)) +
+  geom_point(aes(x = x, y = y), colour = "red")
+
 }

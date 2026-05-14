@@ -2,9 +2,24 @@
 % Please edit documentation in R/geom_textgrid.R
 \name{geom_textgrid}
 \alias{geom_textgrid}
+\alias{geom_labelgrid}
 \title{geom_textgrid}
 \usage{
 geom_textgrid(
+  mapping = NULL,
+  data = NULL,
+  grid_x = 20L,
+  grid_y = 20L,
+  polygons_sf = NULL,
+  position = "identity",
+  ...,
+  parse = FALSE,
+  na.rm = FALSE,
+  show.legend = NA,
+  inherit.aes = TRUE
+)
+
+geom_labelgrid(
   mapping = NULL,
   data = NULL,
   grid_x = 20L,
@@ -117,7 +132,8 @@ that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:annotation_borders]{annotation_borders()}}.}
 }
 \description{
-\code{geom_textgrid} is for \link[ggplot2]{geom_text}
+\code{geom_textgrid} and \code{geom_labelgrid} are for
+\link[ggplot2]{geom_text} and \link[ggplot2]{geom_label}
 what \link{geom_pointgrid} is for \link[ggplot2]{geom_point}.
 }
 \examples{
@@ -129,5 +145,11 @@ testdata <- data.frame(
 )
 ggplot(testdata, aes(x, y, label = l)) +
   geom_textgrid(color = "red", grid_x = 20L, grid_y = 20L)
+
+# label arrangement
+ggplot(testdata, aes(x, y, label = l)) +
+  geom_segmentgrid(grid_x = 10L, grid_y = 10L) +
+  geom_point() +
+  geom_labelgrid(color = "red", grid_x = 10L, grid_y = 10L)
 
 }
