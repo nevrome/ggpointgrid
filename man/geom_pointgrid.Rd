@@ -125,7 +125,7 @@ testdata <- data.frame(
   y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
 )
 ggplot(testdata, aes(x, y)) +
-  geom_pointgrid(color = "red", grid_x = 40L, grid_y = 40L)
+  geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
 
 # with polygon constraint
 outer = matrix(c(1,1,5,1,5,5,1,5,1,1), ncol=2, byrow=TRUE)

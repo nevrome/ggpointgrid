@@ -1,11 +1,9 @@
-#' geom_pointgrid
+#' geom_segmentgrid
 #' 
-#' \code{geom_pointgrid} plots points not to their exact coordinates, but 
-#' on a regular grid. This rearrangement avoids any overplotting by
-#' attributing each input point its own grid position. The grid properties are 
-#' controlled with the parameters \code{grid_x} and \code{grid_y}.
+#' \code{geom_segmentgrid} plots connecting lines between points and their
+#' grid-arranged position.
 #'
-#' @inheritParams ggplot2::geom_point
+#' @inheritParams ggplot2::geom_segment
 #' @inheritParams stat_grid_arrange
 #' 
 #' @examples
@@ -15,21 +13,12 @@
 #'   y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
 #' )
 #' ggplot(testdata, aes(x, y)) +
+#'   geom_segmentgrid(grid_x = 20L, grid_y = 20L) +
+#'   geom_point() +
 #'   geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
 #' 
-#' # with polygon constraint
-#' outer = matrix(c(1,1,5,1,5,5,1,5,1,1), ncol=2, byrow=TRUE)
-#' hole = matrix(c(2,2,2,4,4,4,4,2,2,2), ncol=2, byrow=TRUE)
-#' poly = sf::st_polygon(list(outer, hole))
-#' ggplot() +
-#'   geom_sf(data = sf::st_sfc(poly)) +
-#'   geom_pointgrid(
-#'     data = testdata, mapping = aes(x, y),
-#'     color = "red", grid_x = 40L, grid_y = 40L, polygons_sf = poly
-#'   )
-#' 
 #' @export
-geom_pointgrid <- function(
+geom_segmentgrid <- function(
     mapping = NULL,
     data = NULL,
     grid_x = 20L,
@@ -44,7 +33,7 @@ geom_pointgrid <- function(
   stat_grid_arrange(
     mapping = mapping,
     data = data,
-    geom = "point",
+    geom = "segment",
     position = position,
     grid_x = grid_x,
     grid_y = grid_y,

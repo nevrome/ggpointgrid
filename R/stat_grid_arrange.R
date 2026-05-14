@@ -74,8 +74,8 @@ compute_grid_arrangement <- function(data, grid_x = 20L, grid_y = 20L, polygons_
   # perform grid arrangement
   axes <- make_grid_axes_in_geom(data, grid_x, grid_y, polygons_sf)
   paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
-  data$x_orig <- data$x
-  data$y_orig <- data$y
+  data$xend <- data$x
+  data$yend <- data$y
   data$x <- paog[,1]
   data$y <- paog[,2]
   return(data)
