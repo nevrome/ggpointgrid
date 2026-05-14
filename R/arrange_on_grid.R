@@ -3,8 +3,8 @@
 #' @description \code{arrange_points_on_grid} is an interface to the grid arrange
 #' algorithm used for \link{geom_pointgrid}. \code{make_grid_sequence} is a little
 #' helper function to prepare regular sequences of coordinates along one dimension.
-#' \code{filter_grid_in_polygons}, finally, allows to filter a set of points to the
-#' subset that falls inside one or multiple polygons.
+#' \code{filter_grid_in_polygons} filters a grid of candidate points to those
+#' falling inside polygonal regions supplied as \code{sf} geometries.
 #'
 #' @param grid_xy Numeric matrix. Grid coordinates to which the points should be
 #' mapped. 2-column matrix with x-axis coordinates in the first, and y-axis
@@ -23,6 +23,9 @@
 #' the same number and order of rows as \code{pts_xy}. It contains the grid-mapped
 #' x-axis coordinates in the first, and y-axis coordinates in the second column.
 #' \code{make_grid_sequence} returns a numeric vector of grid coordinates.
+#' \code{filter_grid_in_polygons} returns a 2-column numeric matrix containing
+#' the subset of points from \code{grid_xy} that fall inside the supplied
+#' polygon geometry.
 #' 
 #' @examples
 #' set.seed(123)
@@ -105,6 +108,11 @@ make_grid_sequence <- function(grid_length, data_axis, mode = "continuous") {
   }
 }
 
+#' @param polygons_sf An \code{sf} or \code{sfc} object of type
+#' \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
+#' inside which grid points are retained. See \link[sf]{st_polygon} for more on
+#' how to create these region definitions. Polygon holes are supported automatically.
+#'   
 #' @rdname grid_arrange_algorithm
 #' @export
 filter_grid_in_polygons <- function(
