@@ -75,10 +75,7 @@ circle_poly <- cbind(
   y = 3 * sin(theta)
 )
 small_grid <- filter_grid_in_polygons(
-  as.matrix(expand.grid(
-    make_grid_sequence(30L, df$x),
-    make_grid_sequence(30L, df$y)
-  )),
+  as.matrix(expand.grid(axis_x, axis_y)),
   circle_poly
 )
 res <- arrange_points_on_grid(
