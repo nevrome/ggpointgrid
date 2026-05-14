@@ -4,7 +4,7 @@
 #' what \link{geom_pointgrid} is for \link[ggplot2]{geom_point}.
 #'
 #' @inheritParams ggplot2::geom_text
-#' @inheritParams geom_pointgrid
+#' @inheritParams stat_grid_arrange
 #' 
 #' @examples
 #' library(ggplot2)
@@ -18,87 +18,30 @@
 #' 
 #' @export
 geom_textgrid <- function(
-  mapping = NULL,
-  data = NULL,
-  grid_x = 20L,
-  grid_y = 20L,
-  polygons_sf = NULL,
-  stat = "identity",
-  position = "identity",
-  ...,
-  parse = FALSE,
-  na.rm = FALSE,
-  show.legend = NA,
-  inherit.aes = TRUE
+    mapping = NULL,
+    data = NULL,
+    grid_x = 20L,
+    grid_y = 20L,
+    polygons_sf = NULL,
+    position = "identity",
+    ...,
+    parse = FALSE,
+    na.rm = FALSE,
+    show.legend = NA,
+    inherit.aes = TRUE
 ) {
-  # call layer function
-  ggplot2::layer(
+  stat_grid_arrange(
     mapping = mapping,
     data = data,
-    stat = stat,
-    geom = GeomTextGrid,
+    geom = "text",
     position = position,
+    grid_x = grid_x,
+    grid_y = grid_y,
+    polygons_sf = polygons_sf,
+    parse = parse,
+    na.rm = na.rm,
     show.legend = show.legend,
     inherit.aes = inherit.aes,
-    params = list(
-      parse = parse,
-      na.rm = na.rm,
-      grid_x = grid_x,
-      grid_y = grid_y,
-      polygons_sf = polygons_sf,
-      ...
-    )
+    ...
   )
 }
-
-#' geom object for use in geom_textgrid
-#' @export
-GeomTextGrid <- ggplot2::ggproto(
-  "GeomTextGrid", ggplot2::Geom,
-  required_aes = c("x", "y", "label"),
-
-  default_aes = ggplot2::aes(
-    colour = "black", size = 3.88, angle = 0, hjust = 0.5,
-    vjust = 0.5, alpha = NA, family = "", fontface = 1, lineheight = 1.2
-  ),
-  setup_data = function(data, params) {
-    # these lines are the main difference to geom_point!
-    # the point coordinates are manipulated to map to a grid layout
-    axes <- make_grid_axes_in_geom(data, params$grid_x, params$grid_y, params$polygons_sf)
-    paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
-    data$x <- paog[,1]
-    data$y <- paog[,2]
-    return(data)
-  },
-  draw_panel = function(data, panel_params, coord, 
-                        parse = FALSE, na.rm = FALSE,
-                        grid_x, grid_y, polygons_sf) {
-    lab <- data$label
-    if (parse) {
-      lab <- parse_safe(as.character(lab))
-    }
-    if (is.character(data$vjust)) {
-      data$vjust <- compute_just(data$vjust, data$y)
-    }
-    if (is.character(data$hjust)) {
-      data$hjust <- compute_just(data$hjust, data$x)
-    }
-    coords <- coord$transform(data, panel_params)
-    ggname(
-      "geom_textgrid",
-       grid::textGrob(
-         lab,
-         coords$x, coords$y, default.units = "native",
-         hjust = coords$hjust, vjust = coords$vjust,
-         rot = coords$angle,
-         gp = grid::gpar(
-           col = ggplot2::alpha(coords$colour, coords$alpha),
-           fontsize = coords$size * ggplot2::.pt,
-           fontfamily = coords$family,
-           fontface = coords$fontface,
-           lineheight = coords$lineheight
-         )
-       )
-    )
-  }
-)

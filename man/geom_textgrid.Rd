@@ -10,7 +10,6 @@ geom_textgrid(
   grid_x = 20L,
   grid_y = 20L,
   polygons_sf = NULL,
-  stat = "identity",
   position = "identity",
   ...,
   parse = FALSE,
@@ -56,19 +55,6 @@ inside which grid points are retained. See \link[sf]{st_polygon} for more on
 how to create the region definitions. Polygon holes are supported automatically.
 When this is given, then the ranges for \code{grid_x} and \code{grid_y} with
 single integer input are derived from the bounding box of \code{polygons_sf}.}
-
-\item{stat}{The statistical transformation to use on the data for this layer.
-When using a \verb{geom_*()} function to construct a layer, the \code{stat}
-argument can be used to override the default coupling between geoms and
-stats. The \code{stat} argument accepts the following:
-\itemize{
-\item A \code{Stat} ggproto subclass, for example \code{StatCount}.
-\item A string naming the stat. To give the stat as a string, strip the
-function name of the \code{stat_} prefix. For example, to use \code{stat_count()},
-give the stat as \code{"count"}.
-\item For more information and other ways to specify the stat, see the
-\link[ggplot2:layer_stats]{layer stat} documentation.
-}}
 
 \item{position}{A position adjustment to use on the data for this layer. This
 can be used in various ways, including to prevent overplotting and
