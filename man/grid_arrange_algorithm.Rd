@@ -66,13 +66,9 @@ segments(df$x, df$y, res[,"x"], res[,"y"])
 points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
 
 # limit the grid to a certain polygon
-theta <- seq(0, 2*pi, length.out = 100)[-100]
-circle_xy <- cbind(
-  x = 3 * cos(theta),
-  y = 3 * sin(theta)
-)
-# close polygon for sf
-circle_xy <- rbind(circle_xy, circle_xy[1, , drop = FALSE])
+theta <- seq(0, 2*pi, length.out = 99)
+circle_xy <- cbind(x = 3 * cos(theta), y = 3 * sin(theta))
+circle_xy <- rbind(circle_xy, circle_xy[1, , drop = FALSE]) # close polygon
 circle_poly <- sf::st_sfc(sf::st_polygon(list(circle_xy)))
 
 small_grid <- filter_grid_in_polygons(

@@ -46,13 +46,9 @@
 #' points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
 #' 
 #' # limit the grid to a certain polygon
-#' theta <- seq(0, 2*pi, length.out = 100)[-100]
-#' circle_xy <- cbind(
-#'   x = 3 * cos(theta),
-#'   y = 3 * sin(theta)
-#' )
-#' # close polygon for sf
-#' circle_xy <- rbind(circle_xy, circle_xy[1, , drop = FALSE])
+#' theta <- seq(0, 2*pi, length.out = 99)
+#' circle_xy <- cbind(x = 3 * cos(theta), y = 3 * sin(theta))
+#' circle_xy <- rbind(circle_xy, circle_xy[1, , drop = FALSE]) # close polygon
 #' circle_poly <- sf::st_sfc(sf::st_polygon(list(circle_xy)))
 #' 
 #' small_grid <- filter_grid_in_polygons(
@@ -162,12 +158,12 @@ as_futhark_polygon_format_sf <- function(geom) {
     g_type <- as.character(sf::st_geometry_type(geom[i], by_geometry = TRUE))
     if (g_type == "POLYGON") {
       # g is list of rings
-      poly_rings <- purrr::map(g, drop_closing_vertex)
+      poly_rings <- purrr::map(g, \(ring) {as.matrix(ring)[, 1:2, drop = FALSE]})
       all_polygons[[length(all_polygons) + 1]] <- poly_rings
     } else if (g_type == "MULTIPOLYGON") {
       # g is list of polygons; each polygon is list of rings
       for (j in seq_along(g)) {
-        poly_rings <- purrr::map(g[[j]], drop_closing_vertex)
+        poly_rings <- purrr::map(g, \(ring) {as.matrix(ring)[, 1:2, drop = FALSE]})
         all_polygons[[length(all_polygons) + 1]] <- poly_rings
       }
     }
@@ -184,12 +180,3 @@ as_futhark_polygon_format_sf <- function(geom) {
     polygon_ring_counts = as.numeric(polygon_ring_counts)
   ))
 }
-
-drop_closing_vertex <- function(ring) {
-  ring <- as.matrix(ring)
-  if (nrow(ring) >= 2 && all(ring[1, 1:2] == ring[nrow(ring), 1:2])) {
-    ring <- ring[-nrow(ring), , drop = FALSE]
-  }
-  ring[, 1:2, drop = FALSE]
-}
-
