@@ -20,5 +20,7 @@ Imports:
   grid,
   Rcpp (>= 1.0.5),
   rlang
+Suggests:
+  sf
 LinkingTo: Rcpp
 Config/roxygen2/version: 8.0.0

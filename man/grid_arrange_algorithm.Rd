@@ -11,12 +11,7 @@ arrange_points_on_grid(grid_xy, pts_xy)
 
 make_grid_sequence(grid_length, data_axis, mode = "continuous")
 
-filter_grid_in_polygons(
-  grid_xy,
-  polygons_xy,
-  ring_offsets = c(0, nrow(polygons_xy)),
-  polygon_ring_counts = c(1)
-)
+filter_grid_in_polygons(grid_xy, polygons_sf)
 }
 \arguments{
 \item{grid_xy}{Numeric matrix. Grid coordinates to which the points should be
@@ -46,6 +41,8 @@ x-axis coordinates in the first, and y-axis coordinates in the second column.
 \code{arrange_points_on_grid} is an interface to the grid arrange
 algorithm used for \link{geom_pointgrid}. \code{make_grid_sequence} is a little
 helper function to prepare regular sequences of coordinates along one dimension.
+\code{filter_grid_in_polygons}, finally, allows to filter a set of points to the
+subset that falls inside one or multiple polygons.
 }
 \examples{
 set.seed(123)
@@ -69,11 +66,15 @@ segments(df$x, df$y, res[,"x"], res[,"y"])
 points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
 
 # limit the grid to a certain polygon
-theta <- seq(0, 2*pi, length.out = 100)
-circle_poly <- cbind(
+theta <- seq(0, 2*pi, length.out = 100)[-100]
+circle_xy <- cbind(
   x = 3 * cos(theta),
   y = 3 * sin(theta)
 )
+# close polygon for sf
+circle_xy <- rbind(circle_xy, circle_xy[1, , drop = FALSE])
+circle_poly <- sf::st_sfc(sf::st_polygon(list(circle_xy)))
+
 small_grid <- filter_grid_in_polygons(
   as.matrix(expand.grid(axis_x, axis_y)),
   circle_poly
@@ -83,7 +84,7 @@ res <- arrange_points_on_grid(
  as.matrix(df[c("x", "y")])
 )
 plot(df$x, df$y, pch = 20, cex = 0.7, asp = 1)
-polygon(circle_poly[,1], circle_poly[,2], border = "blue", lwd = 2)
+polygon(circle_xy[,1], circle_xy[,2], border = "blue", lwd = 2)
 segments(df$x, df$y, res[,"x"], res[,"y"])
 points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
 
