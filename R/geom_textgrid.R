@@ -5,7 +5,7 @@
 #' what \link{geom_pointgrid} is for \link[ggplot2]{geom_point}.
 #'
 #' @inheritParams ggplot2::geom_text
-#' @inheritParams stat_grid_arrange
+#' @inheritParams grid_arrange_params
 #' 
 #' @examples
 #' library(ggplot2)
@@ -26,6 +26,7 @@
 #' @name geom_textgrid
 NULL
 
+#' @family ggpointgrid geoms
 #' @rdname geom_textgrid
 #' @export
 geom_textgrid <- function(
@@ -57,6 +58,7 @@ geom_textgrid <- function(
   )
 }
 
+#' @family ggpointgrid geoms
 #' @rdname geom_textgrid
 #' @export
 geom_labelgrid <- function(

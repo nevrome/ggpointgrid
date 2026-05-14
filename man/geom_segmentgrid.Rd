@@ -38,22 +38,20 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{grid_x}{Single integer or numeric vector. If a single integer is supplied, 
-then the grid's x-axis coordinates are determined as a regular sequence from
-\code{min(x)} to \code{max(x)}, so in relation to the input data points.
-If a numeric vector is supplied, then this vector is directly used for the
-grid's x-axis coordinates.
-Note that integers in R are marked with a trailing L, so e.g. grid_x = 40L.}
+\item{grid_x}{Single integer or numeric vector. If a single integer is
+supplied, the grid's x-axis coordinates are determined as a regular
+sequence from \code{min(x)} to \code{max(x)}. If a numeric vector is
+supplied, it is used directly as the grid's x-axis coordinates.}
 
-\item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for the 
-y-axis.}
+\item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for
+the y-axis.}
 
 \item{polygons_sf}{An \code{sf} or \code{sfc} object of type
 \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
-inside which grid points are retained. See \link[sf]{st_polygon} for more on
-how to create the region definitions. Polygon holes are supported automatically.
-When this is given, then the ranges for \code{grid_x} and \code{grid_y} with
-single integer input are derived from the bounding box of \code{polygons_sf}.}
+inside which grid points are retained. Polygon holes are supported
+automatically. When this is given, the ranges for \code{grid_x} and
+\code{grid_y} with single integer input are derived from the bounding box
+of \code{polygons_sf}.}
 
 \item{position}{A position adjustment to use on the data for this layer. This
 can be used in various ways, including to prevent overplotting and
@@ -128,3 +126,10 @@ ggplot(testdata, aes(x, y)) +
   geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
 
 }
+\seealso{
+Other ggpointgrid geoms:
+\code{\link[=geom_pointgrid]{geom_pointgrid()}},
+\code{\link[=geom_textgrid]{geom_textgrid()}},
+\code{\link[=stat_grid_arrange]{stat_grid_arrange()}}
+}
+\concept{ggpointgrid geoms}

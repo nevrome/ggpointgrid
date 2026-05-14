@@ -169,12 +169,12 @@ as_futhark_polygon_format_sf <- function(geom) {
     g_type <- as.character(sf::st_geometry_type(geom[i], by_geometry = TRUE))
     if (g_type == "POLYGON") {
       # g is list of rings
-      poly_rings <- purrr::map(g, \(ring) {as.matrix(ring)[, 1:2, drop = FALSE]})
+      poly_rings <- purrr::map(g, function(ring) {as.matrix(ring)[, 1:2, drop = FALSE]})
       all_polygons[[length(all_polygons) + 1]] <- poly_rings
     } else if (g_type == "MULTIPOLYGON") {
       # g is list of polygons; each polygon is list of rings
       for (j in seq_along(g)) {
-        poly_rings <- purrr::map(g, \(ring) {as.matrix(ring)[, 1:2, drop = FALSE]})
+        poly_rings <- purrr::map(g, function(ring) {as.matrix(ring)[, 1:2, drop = FALSE]})
         all_polygons[[length(all_polygons) + 1]] <- poly_rings
       }
     }

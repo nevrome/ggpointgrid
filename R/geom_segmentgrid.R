@@ -4,7 +4,7 @@
 #' grid-arranged position.
 #'
 #' @inheritParams ggplot2::geom_segment
-#' @inheritParams stat_grid_arrange
+#' @inheritParams grid_arrange_params
 #' 
 #' @examples
 #' library(ggplot2)
@@ -17,6 +17,7 @@
 #'   geom_point() +
 #'   geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
 #' 
+#' @family ggpointgrid geoms
 #' @export
 geom_segmentgrid <- function(
     mapping = NULL,

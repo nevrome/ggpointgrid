@@ -1,23 +1,28 @@
+#' Shared parameters for grid arrangement
+#'
+#' @param grid_x Single integer or numeric vector. If a single integer is
+#'   supplied, the grid's x-axis coordinates are determined as a regular
+#'   sequence from \code{min(x)} to \code{max(x)}. If a numeric vector is
+#'   supplied, it is used directly as the grid's x-axis coordinates.
+#' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for
+#'   the y-axis.
+#' @param polygons_sf An \code{sf} or \code{sfc} object of type
+#'   \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
+#'   inside which grid points are retained. Polygon holes are supported
+#'   automatically. When this is given, the ranges for \code{grid_x} and
+#'   \code{grid_y} with single integer input are derived from the bounding box
+#'   of \code{polygons_sf}.
+#'
+#' @name grid_arrange_params
+NULL
+
 #' stat_grid_arrange
 #' 
 #' ggplot2 \link[ggplot2]{stat} to perform the grid arrangement.
 #' \code{compute_grid_arrangement} allows to perform the arrangement directly,
 #' to avoid recomputation when *grid geoms are combined.
 #' 
-#' @param grid_x Single integer or numeric vector. If a single integer is supplied, 
-#' then the grid's x-axis coordinates are determined as a regular sequence from
-#' \code{min(x)} to \code{max(x)}, so in relation to the input data points.
-#' If a numeric vector is supplied, then this vector is directly used for the
-#' grid's x-axis coordinates.
-#' Note that integers in R are marked with a trailing L, so e.g. grid_x = 40L.
-#' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for the 
-#' y-axis.
-#' @param polygons_sf An \code{sf} or \code{sfc} object of type
-#' \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
-#' inside which grid points are retained. See \link[sf]{st_polygon} for more on
-#' how to create the region definitions. Polygon holes are supported automatically.
-#' When this is given, then the ranges for \code{grid_x} and \code{grid_y} with
-#' single integer input are derived from the bounding box of \code{polygons_sf}.
+#' @inheritParams grid_arrange_params
 #' 
 #' @examples
 #' library(ggplot2)
@@ -31,9 +36,12 @@
 #'   geom_point(aes(x = xend, y = yend)) +
 #'   geom_point(aes(x = x, y = y), colour = "red")
 #' 
+#' @family ggpointgrid geoms
 #' @name stat_grid_arrange
 NULL
 
+#' @inheritParams ggplot2::stat_identity
+#'
 #' @rdname stat_grid_arrange
 #' @export
 stat_grid_arrange <- function(
@@ -75,7 +83,7 @@ StatGridArrange <- ggplot2::ggproto(
   
   compute_panel = function(data, scales, grid_x = 20L, grid_y = 20L, polygons_sf = NULL) {
     compute_grid_arrangement(
-      data = data,
+      x = data,
       grid_x = grid_x,
       grid_y = grid_y,
       polygons_sf = polygons_sf
@@ -83,23 +91,23 @@ StatGridArrange <- ggplot2::ggproto(
   }
 )
 
-#' @param data Data.frame. Positions of the input data points. Must have columns
+#' @param x Data.frame. Positions of the input data points. Must have columns
 #' named "x" and "y" with the coordinates on these axes.
 #' 
 #' @rdname stat_grid_arrange
 #' @export
-compute_grid_arrangement <- function(data, grid_x = 20L, grid_y = 20L, polygons_sf = NULL) {
+compute_grid_arrangement <- function(x, grid_x = 20L, grid_y = 20L, polygons_sf = NULL) {
   # input checks
-  checkmate::assert_data_frame(data)
-  checkmate::assert_names(c("x", "y"), subset.of = names(data))
+  checkmate::assert_data_frame(x)
+  checkmate::assert_names(c("x", "y"), subset.of = names(x))
   # perform grid arrangement
-  axes <- make_grid_axes_in_geom(data, grid_x, grid_y, polygons_sf)
-  paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
-  data$xend <- data$x
-  data$yend <- data$y
-  data$x <- paog[,1]
-  data$y <- paog[,2]
-  return(data)
+  axes <- make_grid_axes_in_geom(x, grid_x, grid_y, polygons_sf)
+  paog <- arrange_points_on_grid(axes, as.matrix(x[c("x", "y")]))
+  x$xend <- x$x
+  x$yend <- x$y
+  x$x <- paog[,1]
+  x$y <- paog[,2]
+  return(x)
 }
 
 # prepare the axes coordinates from the grid input values

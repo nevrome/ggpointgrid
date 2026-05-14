@@ -6,7 +6,7 @@
 #' controlled with the parameters \code{grid_x} and \code{grid_y}.
 #'
 #' @inheritParams ggplot2::geom_point
-#' @inheritParams stat_grid_arrange
+#' @inheritParams grid_arrange_params
 #' 
 #' @examples
 #' library(ggplot2)
@@ -28,6 +28,7 @@
 #'     color = "red", grid_x = 40L, grid_y = 40L, polygons_sf = poly
 #'   )
 #' 
+#' @family ggpointgrid geoms
 #' @export
 geom_pointgrid <- function(
     mapping = NULL,
