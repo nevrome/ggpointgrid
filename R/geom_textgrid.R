@@ -8,13 +8,11 @@
 #' 
 #' @examples
 #' library(ggplot2)
-#' 
 #' testdata <- data.frame(
 #'   x = c(1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5),
 #'   y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5),
 #'   l = LETTERS[1:14]
 #' )
-#' 
 #' ggplot(testdata, aes(x, y, label = l)) +
 #'   geom_textgrid(color = "red", grid_x = 40L, grid_y = 40L)
 #' 
@@ -22,8 +20,9 @@
 geom_textgrid <- function(
   mapping = NULL,
   data = NULL,
-  grid_x = 20,
-  grid_y = 20,
+  grid_x = 20L,
+  grid_y = 20L,
+  polygons_sf = NULL,
   stat = "identity",
   position = "identity",
   ...,
@@ -46,6 +45,7 @@ geom_textgrid <- function(
       na.rm = na.rm,
       grid_x = grid_x,
       grid_y = grid_y,
+      polygons_sf = polygons_sf,
       ...
     )
   )
@@ -64,7 +64,7 @@ GeomTextGrid <- ggplot2::ggproto(
 
   draw_panel = function(data, panel_params, coord, 
                         parse = FALSE, na.rm = FALSE,
-                        grid_x, grid_y) {
+                        grid_x, grid_y, polygons_sf) {
     
     lab <- data$label
     if (parse) {
@@ -73,7 +73,7 @@ GeomTextGrid <- ggplot2::ggproto(
     
     # these lines are the main difference to geom_point!
     # the point coordinates are manipulated to map to a grid layout
-    axes <- make_grid_axes_in_geom(data, grid_x, grid_y)
+    axes <- make_grid_axes_in_geom(data, grid_x, grid_y, polygons_sf)
     paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
     data[["x"]] <- paog[,1]
     data[["y"]] <- paog[,2]

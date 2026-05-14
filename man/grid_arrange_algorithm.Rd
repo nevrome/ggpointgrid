@@ -34,7 +34,7 @@ Either "discrete" or "continuous".}
 \item{polygons_sf}{An \code{sf} or \code{sfc} object of type
 \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
 inside which grid points are retained. See \link[sf]{st_polygon} for more on
-how to create these region definitions. Polygon holes are supported automatically.}
+how to create the region definitions. Polygon holes are supported automatically.}
 }
 \value{
 \code{arrange_points_on_grid} returns a 2-column numeric matrix with

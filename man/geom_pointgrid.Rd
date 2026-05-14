@@ -9,6 +9,7 @@ geom_pointgrid(
   data = NULL,
   grid_x = 20L,
   grid_y = 20L,
+  polygons_sf = NULL,
   stat = "identity",
   position = "identity",
   ...,
@@ -40,12 +41,20 @@ from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
 \item{grid_x}{Single integer or numeric vector. If a single integer is supplied, 
 then the grid's x-axis coordinates are determined as a regular sequence from
-\code{min(x)} to \code{max(x)}. If a numeric vector is supplied, then this 
-vector is directly used for the grid's x-axis coordinates.
+\code{min(x)} to \code{max(x)}, so in relation to the input data points.
+If a numeric vector is supplied, then this vector is directly used for the
+grid's x-axis coordinates.
 Note that integers in R are marked with a trailing L, so e.g. grid_x = 40L.}
 
 \item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for the 
 y-axis.}
+
+\item{polygons_sf}{An \code{sf} or \code{sfc} object of type
+\code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
+inside which grid points are retained. See \link[sf]{st_polygon} for more on
+how to create the region definitions. Polygon holes are supported automatically.
+When this is given, then the ranges for \code{grid_x} and \code{grid_y} with
+single integer input are derived from the bounding box of \code{polygons_sf}.}
 
 \item{stat}{The statistical transformation to use on the data for this layer.
 When using a \verb{geom_*()} function to construct a layer, the \code{stat}
@@ -125,13 +134,22 @@ controlled with the parameters \code{grid_x} and \code{grid_y}.
 }
 \examples{
 library(ggplot2)
-
 testdata <- data.frame(
   x = c(1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5),
   y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
 )
-
 ggplot(testdata, aes(x, y)) +
   geom_pointgrid(color = "red", grid_x = 40L, grid_y = 40L)
+
+# with polygon constraint
+outer = matrix(c(1,1,5,1,5,5,1,5,1,1), ncol=2, byrow=TRUE)
+hole = matrix(c(2,2,2,4,4,4,4,2,2,2), ncol=2, byrow=TRUE)
+poly = sf::st_polygon(list(outer, hole))
+ggplot() +
+  geom_sf(data = sf::st_sfc(poly)) +
+  geom_pointgrid(
+    data = testdata, mapping = aes(x, y),
+    color = "red", grid_x = 40L, grid_y = 40L, polygons_sf = poly
+  )
 
 }

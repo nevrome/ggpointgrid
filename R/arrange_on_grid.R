@@ -111,7 +111,7 @@ make_grid_sequence <- function(grid_length, data_axis, mode = "continuous") {
 #' @param polygons_sf An \code{sf} or \code{sfc} object of type
 #' \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
 #' inside which grid points are retained. See \link[sf]{st_polygon} for more on
-#' how to create these region definitions. Polygon holes are supported automatically.
+#' how to create the region definitions. Polygon holes are supported automatically.
 #'   
 #' @rdname grid_arrange_algorithm
 #' @export
@@ -149,7 +149,10 @@ as_futhark_polygon_format <- function(polygons) {
   if (inherits(polygons, "sfc")) {
     return(as_futhark_polygon_format_sf(polygons))
   }
-  stop("Unsupported polygon format.")
+  if (inherits(polygons, "sfg")) {
+    return(as_futhark_polygon_format_sf(sf::st_sfc(polygons)))
+  }
+  stop("Unsupported sf polygon format.")
 }
 
 as_futhark_polygon_format_sf <- function(geom) {
