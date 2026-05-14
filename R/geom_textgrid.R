@@ -61,23 +61,22 @@ GeomTextGrid <- ggplot2::ggproto(
     colour = "black", size = 3.88, angle = 0, hjust = 0.5,
     vjust = 0.5, alpha = NA, family = "", fontface = 1, lineheight = 1.2
   ),
-
+  setup_data = function(data, params) {
+    # these lines are the main difference to geom_point!
+    # the point coordinates are manipulated to map to a grid layout
+    axes <- make_grid_axes_in_geom(data, params$grid_x, params$grid_y, params$polygons_sf)
+    paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
+    data$x <- paog[,1]
+    data$y <- paog[,2]
+    return(data)
+  },
   draw_panel = function(data, panel_params, coord, 
                         parse = FALSE, na.rm = FALSE,
                         grid_x, grid_y, polygons_sf) {
-    
     lab <- data$label
     if (parse) {
       lab <- parse_safe(as.character(lab))
     }
-    
-    # these lines are the main difference to geom_point!
-    # the point coordinates are manipulated to map to a grid layout
-    axes <- make_grid_axes_in_geom(data, grid_x, grid_y, polygons_sf)
-    paog <- arrange_points_on_grid(axes, as.matrix(data[c("x", "y")]))
-    data[["x"]] <- paog[,1]
-    data[["y"]] <- paog[,2]
-    
     if (is.character(data$vjust)) {
       data$vjust <- compute_just(data$vjust, data$y)
     }
@@ -85,7 +84,6 @@ GeomTextGrid <- ggplot2::ggproto(
       data$hjust <- compute_just(data$hjust, data$x)
     }
     coords <- coord$transform(data, panel_params)
-        
     ggname(
       "geom_textgrid",
        grid::textGrob(
