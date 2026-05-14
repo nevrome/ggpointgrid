@@ -78,14 +78,13 @@ GeomTextGrid <- ggplot2::ggproto(
     data[["x"]] <- paog[,1]
     data[["y"]] <- paog[,2]
     
-    coords <- coord$transform(data, panel_params)
-
     if (is.character(data$vjust)) {
       data$vjust <- compute_just(data$vjust, data$y)
     }
     if (is.character(data$hjust)) {
       data$hjust <- compute_just(data$hjust, data$x)
     }
+    coords <- coord$transform(data, panel_params)
         
     ggname(
       "geom_textgrid",
