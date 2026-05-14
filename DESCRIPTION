@@ -18,6 +18,7 @@ Imports:
   checkmate,
   ggplot2,
   grid,
+  purrr,
   Rcpp (>= 1.0.5),
   rlang
 Suggests:
