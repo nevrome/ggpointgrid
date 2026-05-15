@@ -119,8 +119,8 @@ controlled with the parameters \code{grid_x} and \code{grid_y}.
 \examples{
 library(ggplot2)
 testdata <- data.frame(
-  x = c(1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5),
-  y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
+  x = c(1, 1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5, 5),
+  y = c(5, 1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5, 1)
 )
 ggplot(testdata, aes(x, y)) +
   geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
