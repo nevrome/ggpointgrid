@@ -3,13 +3,23 @@
 
 # ggpointgrid
 
-This package provides geoms to rearrange scatter-plot coordinates on
-regular grids while strictly avoiding over-plotting. The applications
-are similar to `geom_jitter`.
+This package provides a core algorithm, a [ggplot2
+`stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and
+multiple [ggplot2
+`geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to
+rearrange scatter-plot coordinates on regular grids. This has multiple
+applications, but primarily serves to strictly avoid over-plotting. It
+is therefore useful in cases where every individual observation should
+be clearly visible in a scatter plot.
+
+ggpointgrid uses [futhark](https://futhark-lang.org) for the
+implementation of its essential algorithms. Read more about this setup
+in a blog post here:
+<https://nevrome.de/blog/posts/2026-01-12-futhark-in-ggpointgrid.html>.
 
 ### Installation
 
-You can install the development version from github with the following
+You can install the development version from GitHub with the following
 command (in your R console):
 
     if(!require('remotes')) install.packages('remotes')
@@ -21,7 +31,7 @@ package.
 
 ### Examples
 
-#### `geom_pointgrid`
+#### Point arrangement with `geom_pointgrid`
 
 `geom_pointgrid` aims to optimize the arrangement of observations on a
 regular grid. This works well for figures with continuously scaled x-
@@ -35,7 +45,7 @@ The grid properties are controlled with the parameters `grid_x` and
 
 ``` r
 library(ggplot2)
-set.seed(5)
+set.seed(5) # the seed is for geom_jitter
 
 df <- tibble::tibble(
   x = rep(c(1,1,2,3,3), times = 10),
@@ -70,10 +80,7 @@ cowplot::plot_grid(p1, p2, p3, p4)
 
 ![](README_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
-`geom_textgrid` performs the same arrangement operation on text data. It
-is to `geom_text` what `geom_pointgrid` is to `geom_point`.
-
-#### `geom_pointrect`
+#### Point arrangement with `geom_pointrect`
 
 `geom_pointrect` was designed for a slightly different use-case than
 `geom_pointgrid`. Here all observations that share the x- and
@@ -120,3 +127,55 @@ cowplot::plot_grid(p4, p5, p6, p7)
 ```
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
+#### Label arrangement with `geom_labelgrid` and `geom_segmentgrid`
+
+`geom_textgrid` and `geom_labelgrid` perform the same arrangement
+operation for text labels as `geom_pointgrid` for points.
+`geom_segmentgrid` draws segments between the original point positions
+and the grid positions. All of these geoms allow to set polygons
+(defined with the [sf package](https://r-spatial.github.io/sf)) to
+specify the extend of the grid. This enables a mechanism for label
+placement, both for arbitrary scatter plots, and for maps.
+
+``` r
+library(magrittr)
+library(sf)
+
+# get germany polygon
+germany <- rnaturalearthdata::countries50 %>%
+  dplyr::filter(adm0_a3 == "DEU")
+# get airports
+temp <- tempfile()
+download.file("https://naciscdn.org/naturalearth/10m/cultural/ne_10m_airports.zip", temp)
+airports_world <- sf::st_read(grepv(".shp", unzip(temp, exdir = tempdir())))
+airports_germany <- airports_world %>%
+  sf::st_intersection(germany)
+
+# prepare spatial data
+germany_4647 <- germany %>% sf::st_transform(4647)
+germany_buffer_4647 <- germany_4647 %>%
+  sf::st_buffer(dist = 200000) %>%
+  sf::st_difference(germany_4647 %>% sf::st_buffer(dist = 50000)) %>%
+  sf::st_geometry()
+airports_df <- airports_germany %>%
+  sf::st_transform(4647) %>%
+  dplyr::mutate(
+    x = sf::st_coordinates(.)[,1],
+    y = sf::st_coordinates(.)[,2]
+  ) %>% sf::st_drop_geometry()
+
+# label plot
+ggplot() +
+  geom_sf(data = germany_4647) +
+  geom_sf(data = germany_buffer_4647, fill = "white", colour = NA, alpha = 0.5) +
+  geom_point(data = airports_df, aes(x, y)) +
+  ggpointgrid::geom_segmentgrid(
+    data = airports_df, aes(x, y),
+    polygons_sf = germany_buffer_4647, grid_x = 7L, grid_y = 10L) +
+  ggpointgrid::geom_labelgrid(
+    data = airports_df, aes(x, y, label = abbrev),
+    polygons_sf = germany_buffer_4647, grid_x = 7L, grid_y = 10L)
+```
+
+![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
