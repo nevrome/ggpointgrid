@@ -123,6 +123,7 @@ testdata <- data.frame(
   y = c(5, 1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5, 1)
 )
 ggplot(testdata, aes(x, y)) +
+  geom_point() +
   geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
 
 # with polygon constraint
@@ -131,9 +132,10 @@ hole = matrix(c(2,2,2,4,4,4,4,2,2,2), ncol=2, byrow=TRUE)
 poly = sf::st_polygon(list(outer, hole))
 ggplot() +
   geom_sf(data = sf::st_sfc(poly)) +
+  geom_point(data = testdata, mapping = aes(x, y)) +
   geom_pointgrid(
     data = testdata, mapping = aes(x, y),
-    color = "red", grid_x = 40L, grid_y = 40L, polygons_sf = poly
+    color = "red", grid_x = 21L, grid_y = 21L, polygons_sf = poly
   )
 
 }
