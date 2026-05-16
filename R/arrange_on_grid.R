@@ -74,8 +74,8 @@ NULL
 #' @export
 arrange_points_on_grid <- function(grid_xy, pts_xy) {
   # input checks
-  checkmate::assert_matrix(grid_xy, any.missing = FALSE, ncols = 2)
-  checkmate::assert_matrix(pts_xy, any.missing = FALSE, ncols = 2)
+  checkmate::assert_matrix(grid_xy, any.missing = FALSE, min.cols = 2)
+  checkmate::assert_matrix(pts_xy, any.missing = FALSE, min.cols = 2)
   # creating grid
   if (nrow(grid_xy) < nrow(pts_xy)) {
     stop("The grid is not big enough to accommodate all input points.")

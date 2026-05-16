@@ -133,10 +133,8 @@ cowplot::plot_grid(p4, p5, p6, p7)
 `geom_textgrid` and `geom_labelgrid` perform the same arrangement
 operation for text labels as `geom_pointgrid` for points.
 `geom_segmentgrid` draws segments between the original point positions
-and the grid positions. All of these geoms allow to set polygons
-(defined with the [sf package](https://r-spatial.github.io/sf)) to
-specify the extend of the grid. This enables a mechanism for label
-placement, both for arbitrary scatter plots, and for maps.
+and the grid positions. This enables a mechanism for label placement,
+both for arbitrary scatter plots, and for maps.
 
 ``` r
 library(magrittr)
@@ -154,10 +152,10 @@ airports_germany <- airports_world %>%
 
 # prepare spatial data
 germany_4647 <- germany %>% sf::st_transform(4647)
-germany_buffer_4647 <- germany_4647 %>%
-  sf::st_buffer(dist = 200000) %>%
-  sf::st_difference(germany_4647 %>% sf::st_buffer(dist = 50000)) %>%
-  sf::st_geometry()
+germany_buffer_points_4647 <- germany_4647 %>%
+  sf::st_buffer(dist = 60000) %>%
+  sf::st_boundary() %>%
+  sf::st_line_sample(n = 20)
 airports_df <- airports_germany %>%
   sf::st_transform(4647) %>%
   dplyr::mutate(
@@ -168,14 +166,15 @@ airports_df <- airports_germany %>%
 # label plot
 ggplot() +
   geom_sf(data = germany_4647) +
-  geom_sf(data = germany_buffer_4647, fill = "white", colour = NA, alpha = 0.5) +
+  geom_sf(data = germany_buffer_points_4647) +
   geom_point(data = airports_df, aes(x, y)) +
   ggpointgrid::geom_segmentgrid(
     data = airports_df, aes(x, y),
-    polygons_sf = germany_buffer_4647, grid_x = 7L, grid_y = 10L) +
+    grid_xy = sf::st_coordinates(germany_buffer_points_4647)) +
   ggpointgrid::geom_labelgrid(
     data = airports_df, aes(x, y, label = abbrev),
-    polygons_sf = germany_buffer_4647, grid_x = 7L, grid_y = 10L)
+    grid_xy = sf::st_coordinates(germany_buffer_points_4647)) +
+  coord_sf(clip = "off")
 ```
 
 ![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
