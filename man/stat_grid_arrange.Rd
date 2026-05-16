@@ -14,6 +14,7 @@ stat_grid_arrange(
   ...,
   grid_x = 20L,
   grid_y = 20L,
+  grid_xy = NULL,
   polygons_sf = NULL,
   na.rm = FALSE,
   show.legend = NA,
@@ -22,7 +23,13 @@ stat_grid_arrange(
 
 StatGridArrange
 
-compute_grid_arrangement(x, grid_x = 20L, grid_y = 20L, polygons_sf = NULL)
+compute_grid_arrangement(
+  x,
+  grid_x = 20L,
+  grid_y = 20L,
+  grid_xy = NULL,
+  polygons_sf = NULL
+)
 }
 \arguments{
 \item{mapping}{Set of aesthetic mappings created by \code{\link[ggplot2:aes]{aes()}}. If specified and
@@ -107,12 +114,17 @@ supplied, it is used directly as the grid's x-axis coordinates.}
 \item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for
 the y-axis.}
 
+\item{grid_xy}{Numeric matrix. Grid coordinates to which the points should be
+mapped. 2-column matrix with x-axis coordinates in the first, and y-axis
+coordinates in the second column. If this is given, then \code{grid_x} and
+\code{grid_y} are ignored.}
+
 \item{polygons_sf}{An \code{sf} or \code{sfc} object of type
 \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
 inside which grid points are retained. Polygon holes are supported
-automatically. When this is given, the ranges for \code{grid_x} and
-\code{grid_y} with single integer input are derived from the bounding box
-of \code{polygons_sf}.}
+automatically. When this is given, then the ranges for \code{grid_x} 
+and \code{grid_y} with single integer input are derived from the bounding
+box of \code{polygons_sf}.}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with
 a warning. If \code{TRUE}, missing values are silently removed.}

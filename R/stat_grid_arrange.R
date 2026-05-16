@@ -1,17 +1,21 @@
 #' Shared parameters for grid arrangement
 #'
 #' @param grid_x Single integer or numeric vector. If a single integer is
-#'   supplied, the grid's x-axis coordinates are determined as a regular
-#'   sequence from \code{min(x)} to \code{max(x)}. If a numeric vector is
-#'   supplied, it is used directly as the grid's x-axis coordinates.
+#' supplied, the grid's x-axis coordinates are determined as a regular
+#' sequence from \code{min(x)} to \code{max(x)}. If a numeric vector is
+#' supplied, it is used directly as the grid's x-axis coordinates.
 #' @param grid_y Single integer or numeric vector. Like \code{grid_x}, but for
-#'   the y-axis.
+#' the y-axis.
+#' @param grid_xy Numeric matrix. Grid coordinates to which the points should be
+#' mapped. 2-column matrix with x-axis coordinates in the first, and y-axis
+#' coordinates in the second column. If this is given, then \code{grid_x} and
+#' \code{grid_y} are ignored.
 #' @param polygons_sf An \code{sf} or \code{sfc} object of type
-#'   \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
-#'   inside which grid points are retained. Polygon holes are supported
-#'   automatically. When this is given, the ranges for \code{grid_x} and
-#'   \code{grid_y} with single integer input are derived from the bounding box
-#'   of \code{polygons_sf}.
+#' \code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
+#' inside which grid points are retained. Polygon holes are supported
+#' automatically. When this is given, then the ranges for \code{grid_x} 
+#' and \code{grid_y} with single integer input are derived from the bounding
+#' box of \code{polygons_sf}.
 #'
 #' @name grid_arrange_params
 NULL
@@ -52,6 +56,7 @@ stat_grid_arrange <- function(
     ...,
     grid_x = 20L,
     grid_y = 20L,
+    grid_xy = NULL,
     polygons_sf = NULL,
     na.rm = FALSE,
     show.legend = NA,
@@ -68,6 +73,7 @@ stat_grid_arrange <- function(
     params = list(
       grid_x = grid_x,
       grid_y = grid_y,
+      grid_xy = grid_xy,
       polygons_sf = polygons_sf,
       na.rm = na.rm,
       ...
@@ -80,12 +86,12 @@ stat_grid_arrange <- function(
 StatGridArrange <- ggplot2::ggproto(
   "StatGridArrange", ggplot2::Stat,
   required_aes = c("x", "y"),
-  
-  compute_panel = function(data, scales, grid_x = 20L, grid_y = 20L, polygons_sf = NULL) {
+  compute_panel = function(data, scales, grid_x = 20L, grid_y = 20L, grid_xy, polygons_sf = NULL) {
     compute_grid_arrangement(
       x = data,
       grid_x = grid_x,
       grid_y = grid_y,
+      grid_xy = grid_xy,
       polygons_sf = polygons_sf
     )
   }
@@ -96,13 +102,28 @@ StatGridArrange <- ggplot2::ggproto(
 #' 
 #' @rdname stat_grid_arrange
 #' @export
-compute_grid_arrangement <- function(x, grid_x = 20L, grid_y = 20L, polygons_sf = NULL) {
+compute_grid_arrangement <- function(x, grid_x = 20L, grid_y = 20L, grid_xy = NULL, polygons_sf = NULL) {
   # input checks
   checkmate::assert_data_frame(x)
   checkmate::assert_names(c("x", "y"), subset.of = names(x))
-  # perform grid arrangement
-  axes <- make_grid_axes_in_geom(x, grid_x, grid_y, polygons_sf)
-  paog <- arrange_points_on_grid(axes, as.matrix(x[c("x", "y")]))
+  # make grid
+  axes_matrix <- if (!is.null(grid_xy)) {
+    grid_xy
+  } else {
+    make_grid_axes_in_geom(x, grid_x, grid_y, polygons_sf)
+  }
+  # filter by polygons if given
+  axes_matrix_in_polygons <- if (is.null(polygons_sf)) {
+    axes_matrix
+  } else {
+    filter_grid_in_polygons(axes_matrix, polygons_sf)
+  }
+  # arrange points on grid
+  paog <- arrange_points_on_grid(
+    axes_matrix_in_polygons,
+    as.matrix(x[c("x", "y")])
+  )
+  # compile output columns
   x$xend <- x$x
   x$yend <- x$y
   x$x <- paog[,1]
@@ -152,12 +173,6 @@ make_grid_axes_in_geom <- function(tab, grid_x, grid_y, polygons_sf) {
   }
   # expand
   axes_df <- expand.grid(axis_x, axis_y)
-  # filter by polygons if given
-  axes_matrix <- if (is.null(polygons_sf)) {
-    as.matrix(axes_df)
-  } else {
-    filter_grid_in_polygons(as.matrix(axes_df), polygons_sf)
-  }
   # return axes matrix
-  return(axes_matrix)
+  return(as.matrix(axes_df))
 }
