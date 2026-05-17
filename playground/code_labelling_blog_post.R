@@ -39,6 +39,7 @@ ggplot(data = dat, aes(x = mpg, y = hp)) +
 #### labels around a polygon ####
 
 library(magrittr)
+library(ggplot2)
 library(sf)
 
 # get germany polygon
@@ -79,18 +80,45 @@ ggplot() +
 
 #### labels on a grid ####
 
-set.seed(1)
+library(magrittr)
+library(ggplot2)
 
-n <- 2000
+set.seed(124)
+
+n <- 1000
 r1 <- 1
 r2 <- 2
-
 theta <- runif(n, 0, 2*pi)
 r <- sqrt(runif(n, r1^2, r2^2))
 
-x <- r * cos(theta)
-y <- r * sin(theta)
+torus <- tibble::tibble(
+  x = r * cos(theta), y = r * sin(theta),
+  label = 1:n
+)
 
-dat <- data.frame(x = x, y = y)
+points <- sf::st_multipoint(as.matrix(torus[,c(1,2)]), dim = "XY")
+outline <- points %>% sf::st_convex_hull() %>% sf::st_buffer(dist = 1)
+torus_polygon <- points %>% sf::st_buffer(dist = 0.2)
+torus_polygon_inv <- sf::st_difference(outline, torus_polygon)
 
-plot(dat$x, dat$y, asp = 1, pch = 16, cex = 0.4)
+torus_sample <- torus %>%
+  dplyr::slice_sample(n = 100)
+
+ggplot() +
+  #geom_sf(data = torus_polygon_inv) +
+  ggpointgrid::geom_segmentgrid(
+    data = torus_sample, aes(x, y),
+    grid_x = 25L, grid_y = 25L, polygons_sf = torus_polygon_inv,
+    colour = "darkgrey"
+  ) +
+  geom_point(data = torus, aes(x, y)) +
+  ggpointgrid::geom_labelgrid(
+    data = torus_sample, aes(x, y, label = label), polygons_sf = torus_polygon_inv,
+    grid_x = 25L, grid_y = 25L
+  ) +
+  coord_sf() +
+  theme_bw()
+
+
+
+
