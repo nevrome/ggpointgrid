@@ -10,7 +10,10 @@ editor_options:
 
 This package provides a core algorithm, a [ggplot2 `stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and multiple [ggplot2 `geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to rearrange scatter-plot coordinates on regular grids. This has multiple applications, but primarily serves to strictly avoid over-plotting. It is therefore useful in cases where every individual observation should be clearly visible in a scatter plot.
 
-ggpointgrid uses [futhark](https://futhark-lang.org) for the implementation of its essential algorithms. Read more about this setup in a blog post here: <https://nevrome.de/blog/posts/2026-01-12-futhark-in-ggpointgrid.html>.
+**Blog posts:**
+
+- `geom_textgrid` and `geom_labelgrid` perform the same arrangement operation for text labels as `geom_pointgrid` for points. `geom_segmentgrid` draws segments between the original point positions and the grid positions. Together these geoms enable a mechanism for label placement, both for arbitrary scatter plots, and for maps. See three examples here: <https://...>
+- ggpointgrid uses [futhark](https://futhark-lang.org) for the implementation of its essential algorithms. Read more about this special setup here: <https://nevrome.de/blog/posts/2026-01-12-futhark-in-ggpointgrid.html>.
 
 ### Installation
 
@@ -102,49 +105,4 @@ p7 <- ggplot(df) +
   coord + ggtitle("geom_pointrect, scaling set")
 
 cowplot::plot_grid(p4, p5, p6, p7)
-```
-
-#### Label arrangement with `geom_labelgrid` and `geom_segmentgrid`
-
-`geom_textgrid` and `geom_labelgrid` perform the same arrangement operation for text labels as `geom_pointgrid` for points. `geom_segmentgrid` draws segments between the original point positions and the grid positions. This enables a mechanism for label placement, both for arbitrary scatter plots, and for maps.
-
-```{r, warning=FALSE, message=FALSE, results=FALSE}
-library(magrittr)
-library(sf)
-
-# get germany polygon
-germany <- rnaturalearthdata::countries50 %>%
-  dplyr::filter(adm0_a3 == "DEU")
-# get airports
-temp <- tempfile()
-download.file("https://naciscdn.org/naturalearth/10m/cultural/ne_10m_airports.zip", temp)
-airports_world <- sf::st_read(grepv(".shp", unzip(temp, exdir = tempdir())))
-airports_germany <- airports_world %>%
-  sf::st_intersection(germany)
-
-# prepare spatial data
-germany_4647 <- germany %>% sf::st_transform(4647)
-germany_buffer_points_4647 <- germany_4647 %>%
-  sf::st_buffer(dist = 60000) %>%
-  sf::st_boundary() %>%
-  sf::st_line_sample(n = 20)
-airports_df <- airports_germany %>%
-  sf::st_transform(4647) %>%
-  dplyr::mutate(
-    x = sf::st_coordinates(.)[,1],
-    y = sf::st_coordinates(.)[,2]
-  ) %>% sf::st_drop_geometry()
-
-# label plot
-ggplot() +
-  geom_sf(data = germany_4647) +
-  geom_sf(data = germany_buffer_points_4647) +
-  geom_point(data = airports_df, aes(x, y)) +
-  ggpointgrid::geom_segmentgrid(
-    data = airports_df, aes(x, y),
-    grid_xy = sf::st_coordinates(germany_buffer_points_4647)) +
-  ggpointgrid::geom_labelgrid(
-    data = airports_df, aes(x, y, label = abbrev),
-    grid_xy = sf::st_coordinates(germany_buffer_points_4647)) +
-  coord_sf(clip = "off")
 ```
