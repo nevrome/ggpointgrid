@@ -16,6 +16,12 @@
 #' automatically. When this is given, then the ranges for \code{grid_x} 
 #' and \code{grid_y} with single integer input are derived from the bounding
 #' box of \code{polygons_sf}.
+#' @param scale_xy Logical. If \code{TRUE}, both \code{x} and \code{y}
+#' coordinates are temporarily rescaled to the unit interval before running
+#' the arrangement algorithm. The resulting coordinates are transformed
+#' back to the original scale before being returned.
+#' This can improve the arrangement when \code{x} and \code{y} are on very
+#' different numeric scales, because the algorithm relies on Euclidean distances.
 #'
 #' @name grid_arrange_params
 NULL
@@ -58,6 +64,7 @@ stat_grid_arrange <- function(
     grid_y = 20L,
     grid_xy = NULL,
     polygons_sf = NULL,
+    scale_xy = FALSE,
     na.rm = FALSE,
     show.legend = NA,
     inherit.aes = TRUE
@@ -75,6 +82,7 @@ stat_grid_arrange <- function(
       grid_y = grid_y,
       grid_xy = grid_xy,
       polygons_sf = polygons_sf,
+      scale_xy = scale_xy,
       na.rm = na.rm,
       ...
     )
@@ -86,13 +94,16 @@ stat_grid_arrange <- function(
 StatGridArrange <- ggplot2::ggproto(
   "StatGridArrange", ggplot2::Stat,
   required_aes = c("x", "y"),
-  compute_panel = function(data, scales, grid_x = 20L, grid_y = 20L, grid_xy, polygons_sf = NULL) {
+  compute_panel = function(
+    data, scales, grid_x = 20L, grid_y = 20L, grid_xy, polygons_sf = NULL, scale_xy = FALSE
+    ) {
     compute_grid_arrangement(
       x = data,
       grid_x = grid_x,
       grid_y = grid_y,
       grid_xy = grid_xy,
-      polygons_sf = polygons_sf
+      polygons_sf = polygons_sf,
+      scale_xy = scale_xy
     )
   }
 )
@@ -102,7 +113,9 @@ StatGridArrange <- ggplot2::ggproto(
 #' 
 #' @rdname stat_grid_arrange
 #' @export
-compute_grid_arrangement <- function(x, grid_x = 20L, grid_y = 20L, grid_xy = NULL, polygons_sf = NULL) {
+compute_grid_arrangement <- function(
+    x, grid_x = 20L, grid_y = 20L, grid_xy = NULL, polygons_sf = NULL, scale_xy = FALSE
+  ) {
   # input checks
   checkmate::assert_data_frame(x)
   checkmate::assert_names(c("x", "y"), subset.of = names(x))
@@ -121,7 +134,8 @@ compute_grid_arrangement <- function(x, grid_x = 20L, grid_y = 20L, grid_xy = NU
   # arrange points on grid
   paog <- arrange_points_on_grid(
     axes_matrix_in_polygons,
-    as.matrix(x[c("x", "y")])
+    as.matrix(x[c("x", "y")]),
+    scale_xy = scale_xy
   )
   # compile output columns
   x$xend <- x$x

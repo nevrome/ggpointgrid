@@ -12,6 +12,14 @@
 #' @param pts_xy Numeric matrix. Point (observation) coordinates that should be
 #' mapped to the grid. 2-column matrix with x-axis coordinates in the first, and
 #' y-axis coordinates in the second column.
+#' @param scale_xy Logical. If \code{TRUE}, both \code{x} and \code{y}
+#' coordinates of \code{grid_xy} and \code{pts_xy} are temporarily rescaled
+#' to the unit interval before running the arrangement algorithm, and the
+#' resulting coordinates are transformed back to the original scale before
+#' being returned. This can improve the arrangement when \code{x} and
+#' \code{y} are on very different numeric scales, because the algorithm
+#' relies on Euclidean distances.
+#' 
 #' @param grid_length Integer. Length of the output grid along one axis. Note
 #' that integers in R are marked with a trailing L, so e.g. grid_length = 40L.
 #' @param data_axis Numeric vector. Coordinates of the input data for plotting
@@ -72,10 +80,11 @@ NULL
 
 #' @rdname grid_arrange_algorithm
 #' @export
-arrange_points_on_grid <- function(grid_xy, pts_xy) {
+arrange_points_on_grid <- function(grid_xy, pts_xy, scale_xy = FALSE) {
   # input checks
   checkmate::assert_matrix(grid_xy, any.missing = FALSE, min.cols = 2)
   checkmate::assert_matrix(pts_xy, any.missing = FALSE, min.cols = 2)
+  checkmate::assert_logical(scale_xy, len = 1)
   # creating grid
   if (nrow(grid_xy) < nrow(pts_xy)) {
     stop(paste0(
@@ -86,13 +95,41 @@ arrange_points_on_grid <- function(grid_xy, pts_xy) {
       " positions)."
     ))
   }
-  # run arrange algorithm
+  # optionally scale coordinates to a common system
+  grid_xy_scaled <- grid_xy
+  pts_xy_scaled  <- pts_xy
+  if (scale_xy) {
+    x_all <- c(grid_xy[,1], pts_xy[,1])
+    y_all <- c(grid_xy[,2], pts_xy[,2])
+    x_min <- min(x_all)
+    x_max <- max(x_all)
+    y_min <- min(y_all)
+    y_max <- max(y_all)
+    x_range <- x_max - x_min
+    y_range <- y_max - y_min
+    if (x_range == 0 || y_range == 0) {
+      stop("Cannot scale coordinates: x or y has zero range.")
+    }
+    grid_xy_scaled[,1] <- (grid_xy[,1] - x_min) / x_range
+    grid_xy_scaled[,2] <- (grid_xy[,2] - y_min) / y_range
+    pts_xy_scaled[,1]  <- (pts_xy[,1]  - x_min) / x_range
+    pts_xy_scaled[,2]  <- (pts_xy[,2]  - y_min) / y_range
+  }
+  # perform grid arrangement
   res <- futhark_entry_arrange_from_coordinates_cpp(
-    grid_xy[,1], grid_xy[,2], pts_xy[,1], pts_xy[,2]
+    grid_xy_scaled[, 1], grid_xy_scaled[, 2],
+    pts_xy_scaled[, 1], pts_xy_scaled[, 2]
   )
-  # compile output
-  m <- matrix(c(res[[1]], res[[2]]), ncol = 2)
-  colnames(m) <- c("x", "y")
+  m_scaled <- cbind(x = res[[1]], y = res[[2]])
+  # scale back
+  if (scale_xy) {
+    m <- cbind(
+      x = m_scaled[, "x"] * x_range + x_min,
+      y = m_scaled[, "y"] * y_range + y_min
+    )
+  } else {
+    m <- m_scaled
+  }
   return(m)
 }
 

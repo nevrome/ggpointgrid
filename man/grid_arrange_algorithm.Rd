@@ -7,7 +7,7 @@
 \alias{filter_grid_in_polygons}
 \title{Grid arrange algorithm}
 \usage{
-arrange_points_on_grid(grid_xy, pts_xy)
+arrange_points_on_grid(grid_xy, pts_xy, scale_xy = FALSE)
 
 make_grid_sequence(grid_length, data_axis, mode = "continuous")
 
@@ -21,6 +21,14 @@ coordinates in the second column.}
 \item{pts_xy}{Numeric matrix. Point (observation) coordinates that should be
 mapped to the grid. 2-column matrix with x-axis coordinates in the first, and
 y-axis coordinates in the second column.}
+
+\item{scale_xy}{Logical. If \code{TRUE}, both \code{x} and \code{y}
+coordinates of \code{grid_xy} and \code{pts_xy} are temporarily rescaled
+to the unit interval before running the arrangement algorithm, and the
+resulting coordinates are transformed back to the original scale before
+being returned. This can improve the arrangement when \code{x} and
+\code{y} are on very different numeric scales, because the algorithm
+relies on Euclidean distances.}
 
 \item{grid_length}{Integer. Length of the output grid along one axis. Note
 that integers in R are marked with a trailing L, so e.g. grid_length = 40L.}

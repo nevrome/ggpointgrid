@@ -16,6 +16,7 @@ stat_grid_arrange(
   grid_y = 20L,
   grid_xy = NULL,
   polygons_sf = NULL,
+  scale_xy = FALSE,
   na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
@@ -28,7 +29,8 @@ compute_grid_arrangement(
   grid_x = 20L,
   grid_y = 20L,
   grid_xy = NULL,
-  polygons_sf = NULL
+  polygons_sf = NULL,
+  scale_xy = FALSE
 )
 }
 \arguments{
@@ -125,6 +127,13 @@ inside which grid points are retained. Polygon holes are supported
 automatically. When this is given, then the ranges for \code{grid_x} 
 and \code{grid_y} with single integer input are derived from the bounding
 box of \code{polygons_sf}.}
+
+\item{scale_xy}{Logical. If \code{TRUE}, both \code{x} and \code{y}
+coordinates are temporarily rescaled to the unit interval before running
+the arrangement algorithm. The resulting coordinates are transformed
+back to the original scale before being returned.
+This can improve the arrangement when \code{x} and \code{y} are on very
+different numeric scales, because the algorithm relies on Euclidean distances.}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with
 a warning. If \code{TRUE}, missing values are silently removed.}

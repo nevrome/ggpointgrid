@@ -11,6 +11,7 @@ geom_segmentgrid(
   grid_y = 20L,
   grid_xy = NULL,
   polygons_sf = NULL,
+  scale_xy = FALSE,
   position = "identity",
   ...,
   na.rm = FALSE,
@@ -58,6 +59,13 @@ inside which grid points are retained. Polygon holes are supported
 automatically. When this is given, then the ranges for \code{grid_x} 
 and \code{grid_y} with single integer input are derived from the bounding
 box of \code{polygons_sf}.}
+
+\item{scale_xy}{Logical. If \code{TRUE}, both \code{x} and \code{y}
+coordinates are temporarily rescaled to the unit interval before running
+the arrangement algorithm. The resulting coordinates are transformed
+back to the original scale before being returned.
+This can improve the arrangement when \code{x} and \code{y} are on very
+different numeric scales, because the algorithm relies on Euclidean distances.}
 
 \item{position}{A position adjustment to use on the data for this layer. This
 can be used in various ways, including to prevent overplotting and
