@@ -78,7 +78,13 @@ arrange_points_on_grid <- function(grid_xy, pts_xy) {
   checkmate::assert_matrix(pts_xy, any.missing = FALSE, min.cols = 2)
   # creating grid
   if (nrow(grid_xy) < nrow(pts_xy)) {
-    stop("The grid is not big enough to accommodate all input points.")
+    stop(paste0(
+      "The grid (",
+      nrow(grid_xy),
+      " positions) is not big enough to accommodate all input points (",
+      nrow(pts_xy),
+      " positions)."
+    ))
   }
   # run arrange algorithm
   res <- futhark_entry_arrange_from_coordinates_cpp(
