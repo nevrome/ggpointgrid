@@ -7,21 +7,22 @@ This package provides a core algorithm, a [ggplot2
 `stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and
 multiple [ggplot2
 `geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to
-rearrange scatter-plot coordinates on regular grids. This has multiple
-applications, but primarily serves to strictly avoid over-plotting. It
-is therefore useful in cases where every individual observation should
-be clearly visible in a scatter plot.
+rearrange point coordinates on regular grids. This has multiple
+applications, but primarily serves to strictly avoid overplotting in
+scatter plots. It is useful in situations where every individual
+observation should be clearly distinguishable.
 
-**Blog posts:**
+### Blog posts
 
-- `geom_textgrid` and `geom_labelgrid` perform the same arrangement
-  operation for text labels as `geom_pointgrid` for points.
-  `geom_segmentgrid` draws segments between the original point positions
-  and the grid positions. Together these geoms enable a mechanism for
-  label placement, both for arbitrary scatter plots, and for maps. See
-  three examples here: <https://...>
-- ggpointgrid uses [futhark](https://futhark-lang.org) for the
-  implementation of its essential algorithms. Read more about this
+- **Labelling:** `geom_textgrid` and `geom_labelgrid` perform the same
+  arrangement operation for text labels as `geom_pointgrid` does for
+  points. `geom_segmentgrid` draws segments between the original point
+  positions and the new grid positions. Together these geoms enable a
+  mechanism for label plotting in scatter plots and maps. This post
+  shows three examples of this feature:
+  <https://nevrome.de/blog/posts/2026-05-18-labelling-with-ggpointgrid.html>
+- **Futhark:** ggpointgrid uses [futhark](https://futhark-lang.org) for
+  the implementation of its essential algorithms. Read more about this
   special setup here:
   <https://nevrome.de/blog/posts/2026-01-12-futhark-in-ggpointgrid.html>.
 
