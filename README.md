@@ -28,8 +28,8 @@ observation should be clearly distinguishable.
 
 ### Installation
 
-You can install the development version from GitHub with the following
-command (in your R console):
+You can install ggpointgrid from GitHub with the following command (in
+your R console):
 
     if(!require('remotes')) install.packages('remotes')
     remotes::install_github("nevrome/ggpointgrid")
