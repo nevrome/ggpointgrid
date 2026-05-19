@@ -3,13 +3,32 @@
 
 # ggpointgrid
 
-This package provides geoms to rearrange scatter-plot coordinates on
-regular grids while strictly avoiding over-plotting. The applications
-are similar to `geom_jitter`.
+This package provides a core algorithm, a [ggplot2
+`stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and
+multiple [ggplot2
+`geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to
+rearrange point coordinates on regular grids. This has multiple
+applications, but primarily serves to strictly avoid overplotting in
+scatter plots. It is useful in situations where every individual
+observation should be clearly distinguishable.
+
+### Blog posts
+
+- **Labelling:** `geom_textgrid` and `geom_labelgrid` perform the same
+  arrangement operation for text labels as `geom_pointgrid` does for
+  points. `geom_segmentgrid` draws segments between the original point
+  positions and the new grid positions. Together these geoms enable a
+  mechanism for label plotting in scatter plots and maps. This post
+  shows three examples of this feature:
+  <https://nevrome.de/blog/posts/2026-05-18-labelling-with-ggpointgrid.html>
+- **Futhark:** ggpointgrid uses [futhark](https://futhark-lang.org) for
+  the implementation of its essential algorithms. Read more about this
+  special setup here:
+  <https://nevrome.de/blog/posts/2026-01-12-futhark-in-ggpointgrid.html>.
 
 ### Installation
 
-You can install the development version from github with the following
+You can install the development version from GitHub with the following
 command (in your R console):
 
     if(!require('remotes')) install.packages('remotes')
@@ -21,7 +40,7 @@ package.
 
 ### Examples
 
-#### `geom_pointgrid`
+#### Point arrangement with `geom_pointgrid`
 
 `geom_pointgrid` aims to optimize the arrangement of observations on a
 regular grid. This works well for figures with continuously scaled x-
@@ -35,7 +54,7 @@ The grid properties are controlled with the parameters `grid_x` and
 
 ``` r
 library(ggplot2)
-set.seed(5)
+set.seed(5) # the seed is for geom_jitter
 
 df <- tibble::tibble(
   x = rep(c(1,1,2,3,3), times = 10),
@@ -54,7 +73,7 @@ p2 <- ggplot(df) +
   coord + ggtitle("geom_jitter")
 
 p3 <- ggplot(df) +
-  ggpointgrid::geom_pointgrid(aes(x, y, color = var), grid_x = 15, grid_y = 15) +
+  ggpointgrid::geom_pointgrid(aes(x, y, color = var), grid_x = 15L, grid_y = 15L) +
   coord + ggtitle("geom_pointgrid")
 
 p4 <- ggplot(df) +
@@ -70,10 +89,7 @@ cowplot::plot_grid(p1, p2, p3, p4)
 
 ![](README_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
-`geom_textgrid` performs the same arrangement operation on text data. It
-is to `geom_text` what `geom_pointgrid` is to `geom_point`.
-
-#### `geom_pointrect`
+#### Point arrangement with `geom_pointrect`
 
 `geom_pointrect` was designed for a slightly different use-case than
 `geom_pointgrid`. Here all observations that share the x- and

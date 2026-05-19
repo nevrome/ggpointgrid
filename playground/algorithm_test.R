@@ -17,7 +17,7 @@ ggplot(my_data, aes(x = x, y = y, color = value)) +
   coord_fixed(xlim = c(-5, 5), ylim = c(-5, 5))
 
 ggplot(my_data, aes(x = x, y = y, color = value)) +
-  ggpointgrid::geom_pointgrid(grid_x = 80, grid_y = 80) +
+  ggpointgrid::geom_pointgrid(grid_x = 100L, grid_y = 100L) +
   coord_fixed(xlim = c(-5, 5), ylim = c(-5, 5))
 
 #### algorithm test ####

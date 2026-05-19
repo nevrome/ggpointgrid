@@ -4,11 +4,14 @@
 \alias{grid_arrange_algorithm}
 \alias{arrange_points_on_grid}
 \alias{make_grid_sequence}
+\alias{filter_grid_in_polygons}
 \title{Grid arrange algorithm}
 \usage{
-arrange_points_on_grid(grid_xy, pts_xy)
+arrange_points_on_grid(grid_xy, pts_xy, scale_xy = FALSE)
 
 make_grid_sequence(grid_length, data_axis, mode = "continuous")
+
+filter_grid_in_polygons(grid_xy, polygons_sf)
 }
 \arguments{
 \item{grid_xy}{Numeric matrix. Grid coordinates to which the points should be
@@ -19,6 +22,14 @@ coordinates in the second column.}
 mapped to the grid. 2-column matrix with x-axis coordinates in the first, and
 y-axis coordinates in the second column.}
 
+\item{scale_xy}{Logical. If \code{TRUE}, both \code{x} and \code{y}
+coordinates of \code{grid_xy} and \code{pts_xy} are temporarily rescaled
+to the unit interval before running the arrangement algorithm, and the
+resulting coordinates are transformed back to the original scale before
+being returned. This can improve the arrangement when \code{x} and
+\code{y} are on very different numeric scales, because the algorithm
+relies on Euclidean distances.}
+
 \item{grid_length}{Integer. Length of the output grid along one axis. Note
 that integers in R are marked with a trailing L, so e.g. grid_length = 40L.}
 
@@ -27,17 +38,27 @@ along the respective axis. Is used to inform the sequence range.}
 
 \item{mode}{String option. How the data \code{data_axis} should be interpreted.
 Either "discrete" or "continuous".}
+
+\item{polygons_sf}{An \code{sf} or \code{sfc} object of type
+\code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
+inside which grid points are retained. See \link[sf]{st_polygon} for more on
+how to create the region definitions. Polygon holes are supported automatically.}
 }
 \value{
 \code{arrange_points_on_grid} returns a 2-column numeric matrix with
 the same number and order of rows as \code{pts_xy}. It contains the grid-mapped
 x-axis coordinates in the first, and y-axis coordinates in the second column.
 \code{make_grid_sequence} returns a numeric vector of grid coordinates.
+\code{filter_grid_in_polygons} returns a 2-column numeric matrix containing
+the subset of points from \code{grid_xy} that fall inside the supplied
+polygon geometry.
 }
 \description{
 \code{arrange_points_on_grid} is an interface to the grid arrange
 algorithm used for \link{geom_pointgrid}. \code{make_grid_sequence} is a little
 helper function to prepare regular sequences of coordinates along one dimension.
+\code{filter_grid_in_polygons} filters a grid of candidate points to those
+falling inside polygonal regions supplied as \code{sf} geometries.
 }
 \examples{
 set.seed(123)
@@ -57,6 +78,25 @@ res <- arrange_points_on_grid(
  as.matrix(expand.grid(axis_x, axis_y)),
  as.matrix(df[c("x", "y")])
 )
+segments(df$x, df$y, res[,"x"], res[,"y"])
+points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
+
+# limit the grid to a certain polygon
+theta <- seq(0, 2*pi, length.out = 99)
+circle_xy <- cbind(x = 3 * cos(theta), y = 3 * sin(theta))
+circle_xy <- rbind(circle_xy, circle_xy[1, , drop = FALSE]) # close polygon
+circle_poly <- sf::st_sfc(sf::st_polygon(list(circle_xy)))
+
+small_grid <- filter_grid_in_polygons(
+  as.matrix(expand.grid(axis_x, axis_y)),
+  circle_poly
+)
+res <- arrange_points_on_grid(
+ small_grid,
+ as.matrix(df[c("x", "y")])
+)
+plot(df$x, df$y, pch = 20, cex = 0.7, asp = 1)
+polygon(circle_xy[,1], circle_xy[,2], border = "blue", lwd = 2)
 segments(df$x, df$y, res[,"x"], res[,"y"])
 points(res[,"x"], res[,"y"], pch = 18, cex = 1, col = "red")
 

@@ -7,9 +7,11 @@
 geom_pointgrid(
   mapping = NULL,
   data = NULL,
-  grid_x = 20,
-  grid_y = 20,
-  stat = "identity",
+  grid_x = 20L,
+  grid_y = 20L,
+  grid_xy = NULL,
+  polygons_sf = NULL,
+  scale_xy = FALSE,
   position = "identity",
   ...,
   na.rm = FALSE,
@@ -38,26 +40,32 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{grid_x}{Single integer or numeric vector. If a single integer is supplied, 
-then the grid's x-axis coordinates are determined as a regular sequence from
-\code{min(x)} to \code{max(x)}. If a numeric vector is supplied, then this 
-vector is directly used for the grid's x-axis coordinates.}
+\item{grid_x}{Single integer or numeric vector. If a single integer is
+supplied, the grid's x-axis coordinates are determined as a regular
+sequence from \code{min(x)} to \code{max(x)}. If a numeric vector is
+supplied, it is used directly as the grid's x-axis coordinates.}
 
-\item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for the 
-y-axis.}
+\item{grid_y}{Single integer or numeric vector. Like \code{grid_x}, but for
+the y-axis.}
 
-\item{stat}{The statistical transformation to use on the data for this layer.
-When using a \verb{geom_*()} function to construct a layer, the \code{stat}
-argument can be used the override the default coupling between geoms and
-stats. The \code{stat} argument accepts the following:
-\itemize{
-\item A \code{Stat} ggproto subclass, for example \code{StatCount}.
-\item A string naming the stat. To give the stat as a string, strip the
-function name of the \code{stat_} prefix. For example, to use \code{stat_count()},
-give the stat as \code{"count"}.
-\item For more information and other ways to specify the stat, see the
-\link[ggplot2:layer_stats]{layer stat} documentation.
-}}
+\item{grid_xy}{Numeric matrix. Grid coordinates to which the points should be
+mapped. 2-column matrix with x-axis coordinates in the first, and y-axis
+coordinates in the second column. If this is given, then \code{grid_x} and
+\code{grid_y} are ignored.}
+
+\item{polygons_sf}{An \code{sf} or \code{sfc} object of type
+\code{POLYGON} or \code{MULTIPOLYGON}. These geometries define regions
+inside which grid points are retained. Polygon holes are supported
+automatically. When this is given, then the ranges for \code{grid_x} 
+and \code{grid_y} with single integer input are derived from the bounding
+box of \code{polygons_sf}.}
+
+\item{scale_xy}{Logical. If \code{TRUE}, both \code{x} and \code{y}
+coordinates are temporarily rescaled to the unit interval before running
+the arrangement algorithm. The resulting coordinates are transformed
+back to the original scale before being returned.
+This can improve the arrangement when \code{x} and \code{y} are on very
+different numeric scales, because the algorithm relies on Euclidean distances.}
 
 \item{position}{A position adjustment to use on the data for this layer. This
 can be used in various ways, including to prevent overplotting and
@@ -107,12 +115,14 @@ a warning. If \code{TRUE}, missing values are silently removed.}
 \code{NA}, the default, includes if any aesthetics are mapped.
 \code{FALSE} never includes, and \code{TRUE} always includes.
 It can also be a named logical vector to finely select the aesthetics to
-display.}
+display. To include legend keys for all levels, even
+when no data exists, use \code{TRUE}.  If \code{NA}, all levels are shown in legend,
+but unobserved levels are omitted.}
 
 \item{inherit.aes}{If \code{FALSE}, overrides the default aesthetics,
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
-the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+the default plot specification, e.g. \code{\link[ggplot2:annotation_borders]{annotation_borders()}}.}
 }
 \description{
 \code{geom_pointgrid} plots points not to their exact coordinates, but 
@@ -122,13 +132,31 @@ controlled with the parameters \code{grid_x} and \code{grid_y}.
 }
 \examples{
 library(ggplot2)
-
 testdata <- data.frame(
-  x = c(1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5),
-  y = c(1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5)
+  x = c(1, 1, 2, 1.95, 2, 3, 3, 3, 3, 3, 4, 4.02, 4, 4.01, 5, 5),
+  y = c(5, 1, 2, 1.95, 4, 3, 3, 3, 3, 3, 2, 2.02, 4, 3.97, 5, 1)
 )
-
 ggplot(testdata, aes(x, y)) +
-geom_pointgrid(color = "red", grid_x = 40, grid_y = 40)
+  geom_point() +
+  geom_pointgrid(color = "red", grid_x = 20L, grid_y = 20L)
+
+# with polygon constraint
+outer = matrix(c(1,1,5,1,5,5,1,5,1,1), ncol=2, byrow=TRUE)
+hole = matrix(c(2,2,2,4,4,4,4,2,2,2), ncol=2, byrow=TRUE)
+poly = sf::st_polygon(list(outer, hole))
+ggplot() +
+  geom_sf(data = sf::st_sfc(poly)) +
+  geom_point(data = testdata, mapping = aes(x, y)) +
+  geom_pointgrid(
+    data = testdata, mapping = aes(x, y),
+    color = "red", grid_x = 21L, grid_y = 21L, polygons_sf = poly
+  )
 
 }
+\seealso{
+Other ggpointgrid geoms:
+\code{\link[=geom_segmentgrid]{geom_segmentgrid()}},
+\code{\link[=geom_textgrid]{geom_textgrid()}},
+\code{\link[=stat_grid_arrange]{stat_grid_arrange()}}
+}
+\concept{ggpointgrid geoms}

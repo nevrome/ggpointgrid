@@ -4,8 +4,15 @@
 ^README\.Rmd$
 ^NEWS\.md$
 ^playground$
+^blog$
 ^src/build\.R$
 ^src/arrange$
 ^src/arrange\.fut$
 ^src/arrange\.json$
+^src/grid$
+^src/grid\.fut$
+^src/grid\.json$
+^src/entry$
+^src/entry\.fut$
+^src/entry\.json$
 ^src/futhark\.pkg$

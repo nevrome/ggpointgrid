@@ -48,7 +48,7 @@ def greedy_match_from_sorted_idx
   in (og, op)
 
 -- returns per-point assigned grid coordinates (same order as input points)
-entry arrange_from_coordinates
+entry arrange_from_coordinates_
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64)  (pts_y: []f64)
   : ([]f64, []f64) =
@@ -88,7 +88,7 @@ entry arrange_from_coordinates
 
 -- running on the command line
 -- futhark c arrange.fut
--- echo [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1] | ./arrange
+-- echo [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1] | ./arrange -e arrange_from_coordinates_
 
 -- profiling
 -- see https://futhark.readthedocs.io/en/latest/man/futhark-profile.html
