@@ -17,7 +17,7 @@ This package provides a core algorithm, a [ggplot2 `stat`](https://ggplot2.tidyv
 
 ### Installation
 
-You can install the development version from GitHub with the following command (in your R console):
+You can install the ggpointgrid from GitHub with the following command (in your R console):
 
 ```
 if(!require('remotes')) install.packages('remotes')
