@@ -46,3 +46,6 @@ src/arrange
 src/*.json
 src/*.prof/
 futhark_test.txt
+
+# rendered plots
+blog/*/*.png

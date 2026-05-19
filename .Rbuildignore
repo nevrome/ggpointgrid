@@ -4,6 +4,7 @@
 ^README\.Rmd$
 ^NEWS\.md$
 ^playground$
+^blog$
 ^src/build\.R$
 ^src/arrange$
 ^src/arrange\.fut$
