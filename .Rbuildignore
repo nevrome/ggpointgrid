@@ -6,9 +6,12 @@
 ^playground$
 ^blog$
 ^src/build\.R$
-^src/arrange$
-^src/arrange\.fut$
-^src/arrange\.json$
+^src/arrange_hungarian$
+^src/arrange_hungarian\.fut$
+^src/arrange_hungarian\.json$
+^src/arrange_greedy$
+^src/arrange_greedy\.fut$
+^src/arrange_greedy\.json$
 ^src/grid$
 ^src/grid\.fut$
 ^src/grid\.json$

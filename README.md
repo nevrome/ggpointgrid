@@ -3,7 +3,7 @@
 
 # ggpointgrid
 
-This package provides a core algorithm, a [ggplot2
+This package provides algorithms, a [ggplot2
 `stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and
 multiple [ggplot2
 `geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to

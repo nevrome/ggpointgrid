@@ -48,7 +48,7 @@ def greedy_match_from_sorted_idx
   in (og, op)
 
 -- returns per-point assigned grid coordinates (same order as input points)
-entry arrange_from_coordinates_
+entry greedy
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64)  (pts_y: []f64)
   : ([]f64, []f64) =
@@ -65,30 +65,9 @@ entry arrange_from_coordinates_
 
 ------ for testing/debugging/profiling ------
 
--- -- expand two 1D axes into a flattened grid (optional helper)
--- def expand_grid (xs: []f64) (ys: []f64): ([]f64, []f64) =
---   let gx = length xs
---   let grid_xs_2d = map (\_y -> xs) ys
---   let grid_ys_2d = map (\y  -> replicate gx y) ys
---   in (flatten grid_xs_2d, flatten grid_ys_2d)
---   
--- -- alternativ interface that also does the grid expansion
--- def arrange_points_on_grid_from_gridvectors
---   (grid_x: []f64) (grid_y: []f64)
---   (pts_x: []f64) (pts_y: []f64)
---   : ([]f64, []f64) =
---   let (gx, gy) = expand_grid grid_x grid_y
---   in arrange_from_coordinates gx gy pts_x pts_y
-
--- def main 
---    (grid_xs: []f64) (grid_ys: []f64)
---    (pts_x: []f64)  (pts_y: []f64)
---    : ([]f64, []f64) =
---      arrange_points_on_grid_from_gridvectors grid_xs grid_ys pts_x pts_y
-
 -- running on the command line
 -- futhark c arrange.fut
--- echo [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1] | ./arrange -e arrange_from_coordinates_
+-- echo [1,2,3,4] [1,2,3,4] [1,1,1,1] [1,1,1,1] | ./arrange -e greedy
 
 -- profiling
 -- see https://futhark.readthedocs.io/en/latest/man/futhark-profile.html

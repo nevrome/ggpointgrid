@@ -6,6 +6,7 @@
 #'
 #' @inheritParams ggplot2::geom_text
 #' @inheritParams grid_arrange_params
+#' @inheritParams arrange_points_on_grid method
 #' 
 #' @examples
 #' library(ggplot2)
@@ -37,6 +38,7 @@ geom_textgrid <- function(
     grid_xy = NULL,
     polygons_sf = NULL,
     scale_xy = FALSE,
+    method = "hungarian",
     position = "identity",
     ...,
     parse = FALSE,
@@ -54,6 +56,7 @@ geom_textgrid <- function(
     grid_xy = grid_xy,
     polygons_sf = polygons_sf,
     scale_xy = scale_xy,
+    method = method,
     parse = parse,
     na.rm = na.rm,
     show.legend = show.legend,

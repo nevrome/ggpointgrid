@@ -19,6 +19,13 @@
 #' being returned. This can improve the arrangement when \code{x} and
 #' \code{y} are on very different numeric scales, because the algorithm
 #' relies on Euclidean distances.
+#' @param method String. Algorithm that should be used for the grid arrangement.
+#' The default "hungarian" is an implementation of the
+#' \href{https://en.wikipedia.org/wiki/Hungarian_algorithm}{Hungarian algorithm}
+#' that creates an optimal distance mapping. The alternative "greedy" is a custom
+#' greedy search algorithm that gives preference to point positions with the lowest
+#' distance to grid positions. The latter is the legacy algorithm that was the only
+#' option until ggpoingrid v2.0.0.
 #' 
 #' @param grid_length Integer. Length of the output grid along one axis. Note
 #' that integers in R are marked with a trailing L, so e.g. grid_length = 40L.
@@ -68,7 +75,7 @@
 #' )
 #' res <- arrange_points_on_grid(
 #'  small_grid,
-#'  as.matrix(df[c("x", "y")])
+#'  as.matrix(df[c("x", "y")]), method = "greedy"
 #' )
 #' plot(df$x, df$y, pch = 20, cex = 0.7, asp = 1)
 #' polygon(circle_xy[,1], circle_xy[,2], border = "blue", lwd = 2)
@@ -80,7 +87,7 @@ NULL
 
 #' @rdname grid_arrange_algorithm
 #' @export
-arrange_points_on_grid <- function(grid_xy, pts_xy, scale_xy = FALSE) {
+arrange_points_on_grid <- function(grid_xy, pts_xy, scale_xy = FALSE, method = "hungarian") {
   # input checks
   checkmate::assert_matrix(grid_xy, any.missing = FALSE, min.cols = 2)
   checkmate::assert_matrix(pts_xy, any.missing = FALSE, min.cols = 2)
@@ -116,7 +123,12 @@ arrange_points_on_grid <- function(grid_xy, pts_xy, scale_xy = FALSE) {
     pts_xy_scaled[,2]  <- (pts_xy[,2]  - y_min) / y_range
   }
   # perform grid arrangement
-  res <- futhark_entry_arrange_from_coordinates_cpp(
+  arrangement_function <- switch(
+    tolower(method),
+    "hungarian" = futhark_entry_hungarian_cpp,
+    "greedy" = futhark_entry_greedy_cpp
+  )
+  res <- arrangement_function(
     grid_xy_scaled[, 1], grid_xy_scaled[, 2],
     pts_xy_scaled[, 1], pts_xy_scaled[, 2]
   )

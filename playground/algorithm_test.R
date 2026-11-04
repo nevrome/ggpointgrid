@@ -29,7 +29,8 @@ axes <- expand.grid(axis_x, axis_y)
 system.time(
   res1 <- arrange_points_on_grid(
       as.matrix(axes),
-      as.matrix(my_data[c("x", "y")])
+      as.matrix(my_data[c("x", "y")]),
+      # method = "greedy"
     )
 )
 

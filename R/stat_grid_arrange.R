@@ -22,7 +22,7 @@
 #' back to the original scale before being returned.
 #' This can improve the arrangement when \code{x} and \code{y} are on very
 #' different numeric scales, because the algorithm relies on Euclidean distances.
-#'
+#' 
 #' @name grid_arrange_params
 NULL
 
@@ -33,6 +33,7 @@ NULL
 #' to avoid recomputation when *grid geoms are combined.
 #' 
 #' @inheritParams grid_arrange_params
+#' @inheritParams arrange_points_on_grid method
 #' 
 #' @examples
 #' library(ggplot2)
@@ -65,6 +66,7 @@ stat_grid_arrange <- function(
     grid_xy = NULL,
     polygons_sf = NULL,
     scale_xy = FALSE,
+    method = "hungarian",
     na.rm = FALSE,
     show.legend = NA,
     inherit.aes = TRUE
@@ -83,6 +85,7 @@ stat_grid_arrange <- function(
       grid_xy = grid_xy,
       polygons_sf = polygons_sf,
       scale_xy = scale_xy,
+      method = method,
       na.rm = na.rm,
       ...
     )
@@ -95,7 +98,9 @@ StatGridArrange <- ggplot2::ggproto(
   "StatGridArrange", ggplot2::Stat,
   required_aes = c("x", "y"),
   compute_panel = function(
-    data, scales, grid_x = 20L, grid_y = 20L, grid_xy, polygons_sf = NULL, scale_xy = FALSE
+    data, scales, grid_x = 20L, grid_y = 20L, grid_xy,
+    polygons_sf = NULL, scale_xy = FALSE,
+    method = "hungarian"
     ) {
     compute_grid_arrangement(
       x = data,
@@ -103,7 +108,8 @@ StatGridArrange <- ggplot2::ggproto(
       grid_y = grid_y,
       grid_xy = grid_xy,
       polygons_sf = polygons_sf,
-      scale_xy = scale_xy
+      scale_xy = scale_xy,
+      method = method
     )
   }
 )
@@ -114,7 +120,9 @@ StatGridArrange <- ggplot2::ggproto(
 #' @rdname stat_grid_arrange
 #' @export
 compute_grid_arrangement <- function(
-    x, grid_x = 20L, grid_y = 20L, grid_xy = NULL, polygons_sf = NULL, scale_xy = FALSE
+    x, grid_x = 20L, grid_y = 20L, grid_xy = NULL,
+    polygons_sf = NULL, scale_xy = FALSE,
+    method = "hungarian"
   ) {
   # input checks
   checkmate::assert_data_frame(x)
@@ -135,7 +143,8 @@ compute_grid_arrangement <- function(
   paog <- arrange_points_on_grid(
     axes_matrix_in_polygons,
     as.matrix(x[c("x", "y")]),
-    scale_xy = scale_xy
+    scale_xy = scale_xy,
+    method = method
   )
   # compile output columns
   x$xend <- x$x

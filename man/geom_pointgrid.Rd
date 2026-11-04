@@ -12,6 +12,7 @@ geom_pointgrid(
   grid_xy = NULL,
   polygons_sf = NULL,
   scale_xy = FALSE,
+  method = "hungarian",
   position = "identity",
   ...,
   na.rm = FALSE,
@@ -66,6 +67,14 @@ the arrangement algorithm. The resulting coordinates are transformed
 back to the original scale before being returned.
 This can improve the arrangement when \code{x} and \code{y} are on very
 different numeric scales, because the algorithm relies on Euclidean distances.}
+
+\item{method}{String. Algorithm that should be used for the grid arrangement.
+The default "hungarian" is an implementation of the
+\href{https://en.wikipedia.org/wiki/Hungarian_algorithm}{Hungarian algorithm}
+that creates an optimal distance mapping. The alternative "greedy" is a custom
+greedy search algorithm that gives preference to point positions with the lowest
+distance to grid positions. The latter is the legacy algorithm that was the only
+option until ggpoingrid v2.0.0.}
 
 \item{position}{A position adjustment to use on the data for this layer. This
 can be used in various ways, including to prevent overplotting and

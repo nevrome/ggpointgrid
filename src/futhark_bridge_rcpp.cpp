@@ -6,7 +6,7 @@ extern "C" {
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-Rcpp::List futhark_entry_arrange_from_coordinates_cpp(
+Rcpp::List futhark_entry_hungarian_cpp(
     Rcpp::NumericVector grid_xs,
     Rcpp::NumericVector grid_ys,
     Rcpp::NumericVector pts_x,
@@ -45,7 +45,7 @@ Rcpp::List futhark_entry_arrange_from_coordinates_cpp(
   
   futhark_opaque_tup2_arr1d_f64_arr1d_f64* out = nullptr;
   
-  int rc = futhark_entry_arrange_from_coordinates(ctx, &out, in0, in1, in2, in3);
+  int rc = futhark_entry_hungarian(ctx, &out, in0, in1, in2, in3);
   if (rc != 0) {
     char* err = futhark_context_get_error(ctx);
     futhark_free_f64_1d(ctx, in0);
@@ -56,9 +56,138 @@ Rcpp::List futhark_entry_arrange_from_coordinates_cpp(
     futhark_context_config_free(cfg);
     
     if (err) {
-      Rcpp::stop("futhark_entry_arrange_from_coordinates failed: %s", err);
+      Rcpp::stop("futhark_entry_hungarian failed: %s", err);
     } else {
-      Rcpp::stop("futhark_entry_arrange_from_coordinates failed with error code %d.", rc);
+      Rcpp::stop("futhark_entry_hungarian failed with error code %d.", rc);
+    }
+  }
+  
+  futhark_f64_1d* out0 = nullptr;
+  futhark_f64_1d* out1 = nullptr;
+  
+  if (futhark_project_opaque_tup2_arr1d_f64_arr1d_f64_0(ctx, &out0, out) != 0 ||
+      futhark_project_opaque_tup2_arr1d_f64_arr1d_f64_1(ctx, &out1, out) != 0) {
+    futhark_free_opaque_tup2_arr1d_f64_arr1d_f64(ctx, out);
+    futhark_free_f64_1d(ctx, in0);
+    futhark_free_f64_1d(ctx, in1);
+    futhark_free_f64_1d(ctx, in2);
+    futhark_free_f64_1d(ctx, in3);
+    futhark_context_free(ctx);
+    futhark_context_config_free(cfg);
+    Rcpp::stop("Failed to project tuple result.");
+  }
+  
+  const int64_t* shp0 = futhark_shape_f64_1d(ctx, out0);
+  const int64_t* shp1 = futhark_shape_f64_1d(ctx, out1);
+  R_xlen_t n0 = (R_xlen_t)shp0[0];
+  R_xlen_t n1 = (R_xlen_t)shp1[0];
+  
+  Rcpp::NumericVector res0(n0);
+  Rcpp::NumericVector res1(n1);
+  
+  if (futhark_values_f64_1d(ctx, out0, res0.begin()) != 0 ||
+      futhark_values_f64_1d(ctx, out1, res1.begin()) != 0) {
+    futhark_free_f64_1d(ctx, out0);
+    futhark_free_f64_1d(ctx, out1);
+    futhark_free_opaque_tup2_arr1d_f64_arr1d_f64(ctx, out);
+    futhark_free_f64_1d(ctx, in0);
+    futhark_free_f64_1d(ctx, in1);
+    futhark_free_f64_1d(ctx, in2);
+    futhark_free_f64_1d(ctx, in3);
+    futhark_context_free(ctx);
+    futhark_context_config_free(cfg);
+    Rcpp::stop("Failed to copy Futhark output values.");
+  }
+  
+  if (futhark_context_sync(ctx) != 0) {
+    char* err = futhark_context_get_error(ctx);
+    futhark_free_f64_1d(ctx, out0);
+    futhark_free_f64_1d(ctx, out1);
+    futhark_free_opaque_tup2_arr1d_f64_arr1d_f64(ctx, out);
+    futhark_free_f64_1d(ctx, in0);
+    futhark_free_f64_1d(ctx, in1);
+    futhark_free_f64_1d(ctx, in2);
+    futhark_free_f64_1d(ctx, in3);
+    futhark_context_free(ctx);
+    futhark_context_config_free(cfg);
+    
+    if (err) {
+      Rcpp::stop("Futhark sync failed: %s", err);
+    } else {
+      Rcpp::stop("Futhark sync failed.");
+    }
+  }
+  
+  futhark_free_f64_1d(ctx, out0);
+  futhark_free_f64_1d(ctx, out1);
+  futhark_free_opaque_tup2_arr1d_f64_arr1d_f64(ctx, out);
+  futhark_free_f64_1d(ctx, in0);
+  futhark_free_f64_1d(ctx, in1);
+  futhark_free_f64_1d(ctx, in2);
+  futhark_free_f64_1d(ctx, in3);
+  futhark_context_free(ctx);
+  futhark_context_config_free(cfg);
+  
+  return Rcpp::List::create(
+    Rcpp::Named("x") = res0,
+    Rcpp::Named("y") = res1
+  );
+}
+
+// [[Rcpp::export]]
+Rcpp::List futhark_entry_greedy_cpp(
+    Rcpp::NumericVector grid_xs,
+    Rcpp::NumericVector grid_ys,
+    Rcpp::NumericVector pts_x,
+    Rcpp::NumericVector pts_y
+) {
+  if (grid_xs.size() != grid_ys.size()) {
+    Rcpp::stop("grid_xs and grid_ys must have the same length.");
+  }
+  if (pts_x.size() != pts_y.size()) {
+    Rcpp::stop("pts_x and pts_y must have the same length.");
+  }
+  
+  futhark_context_config* cfg = futhark_context_config_new();
+  if (!cfg) Rcpp::stop("Failed to create Futhark context config.");
+  
+  futhark_context* ctx = futhark_context_new(cfg);
+  if (!ctx) {
+    futhark_context_config_free(cfg);
+    Rcpp::stop("Failed to create Futhark context.");
+  }
+  
+  futhark_f64_1d* in0 = futhark_new_f64_1d(ctx, grid_xs.begin(), (int64_t)grid_xs.size());
+  futhark_f64_1d* in1 = futhark_new_f64_1d(ctx, grid_ys.begin(), (int64_t)grid_ys.size());
+  futhark_f64_1d* in2 = futhark_new_f64_1d(ctx, pts_x.begin(),  (int64_t)pts_x.size());
+  futhark_f64_1d* in3 = futhark_new_f64_1d(ctx, pts_y.begin(),  (int64_t)pts_y.size());
+  
+  if (!in0 || !in1 || !in2 || !in3) {
+    if (in0) futhark_free_f64_1d(ctx, in0);
+    if (in1) futhark_free_f64_1d(ctx, in1);
+    if (in2) futhark_free_f64_1d(ctx, in2);
+    if (in3) futhark_free_f64_1d(ctx, in3);
+    futhark_context_free(ctx);
+    futhark_context_config_free(cfg);
+    Rcpp::stop("Failed to create Futhark input arrays.");
+  }
+  
+  futhark_opaque_tup2_arr1d_f64_arr1d_f64* out = nullptr;
+  
+  int rc = futhark_entry_greedy(ctx, &out, in0, in1, in2, in3);
+  if (rc != 0) {
+    char* err = futhark_context_get_error(ctx);
+    futhark_free_f64_1d(ctx, in0);
+    futhark_free_f64_1d(ctx, in1);
+    futhark_free_f64_1d(ctx, in2);
+    futhark_free_f64_1d(ctx, in3);
+    futhark_context_free(ctx);
+    futhark_context_config_free(cfg);
+    
+    if (err) {
+      Rcpp::stop("futhark_entry_greedy failed: %s", err);
+    } else {
+      Rcpp::stop("futhark_entry_greedy failed with error code %d.", rc);
     }
   }
   
