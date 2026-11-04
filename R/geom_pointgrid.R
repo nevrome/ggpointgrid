@@ -7,6 +7,7 @@
 #'
 #' @inheritParams ggplot2::geom_point
 #' @inheritParams grid_arrange_params
+#' @inheritParams arrange_points_on_grid method
 #' 
 #' @examples
 #' library(ggplot2)
@@ -40,6 +41,7 @@ geom_pointgrid <- function(
     grid_xy = NULL,
     polygons_sf = NULL,
     scale_xy = FALSE,
+    method = "hungarian",
     position = "identity",
     ...,
     na.rm = FALSE,
@@ -56,6 +58,7 @@ geom_pointgrid <- function(
     grid_xy = grid_xy,
     polygons_sf = polygons_sf,
     scale_xy = scale_xy,
+    method = method,
     na.rm = na.rm,
     show.legend = show.legend,
     inherit.aes = inherit.aes,

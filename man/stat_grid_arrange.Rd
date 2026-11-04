@@ -17,6 +17,7 @@ stat_grid_arrange(
   grid_xy = NULL,
   polygons_sf = NULL,
   scale_xy = FALSE,
+  method = "hungarian",
   na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
@@ -30,7 +31,8 @@ compute_grid_arrangement(
   grid_y = 20L,
   grid_xy = NULL,
   polygons_sf = NULL,
-  scale_xy = FALSE
+  scale_xy = FALSE,
+  method = "hungarian"
 )
 }
 \arguments{
@@ -134,6 +136,14 @@ the arrangement algorithm. The resulting coordinates are transformed
 back to the original scale before being returned.
 This can improve the arrangement when \code{x} and \code{y} are on very
 different numeric scales, because the algorithm relies on Euclidean distances.}
+
+\item{method}{String. Algorithm that should be used for the grid arrangement.
+The default "hungarian" is an implementation of the
+\href{https://en.wikipedia.org/wiki/Hungarian_algorithm}{Hungarian algorithm}
+that creates an optimal distance mapping. The alternative "greedy" is a custom
+greedy search algorithm that gives preference to point positions with the lowest
+distance to grid positions. The latter is the legacy algorithm that was the only
+option until ggpoingrid v2.0.0.}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with
 a warning. If \code{TRUE}, missing values are silently removed.}

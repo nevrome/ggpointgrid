@@ -11,7 +11,7 @@ def pairwise_squared_distances [m][n]
     ) (iota m)
   ) (iota n)
 
--- solve a rectangular assignment problem with the Hungarian algorith
+-- solve a rectangular assignment problem with the Hungarian algorithm
 -- cost has shape [number_of_points][number_of_grid_cells]
 -- the result has length n: result[p] = grid cell assigned to point p
 -- every point is assigned, and every selected grid cell is distinct
@@ -93,7 +93,7 @@ def rectangular_assignment [n][m] (cost: [n][m]f64) : [n]i64 =
          else result
   in point_to_grid
 
-entry arrange_from_coordinates2
+entry hungarian
   (grid_xs: []f64) (grid_ys: []f64)
   (pts_x: []f64) (pts_y: []f64)
   : ([]f64, []f64) =

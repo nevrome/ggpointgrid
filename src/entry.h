@@ -58,8 +58,9 @@ int futhark_project_opaque_tup2_arr1d_f64_arr1d_f64_1(struct futhark_context *ct
 int futhark_new_opaque_tup2_arr1d_f64_arr1d_f64(struct futhark_context *ctx, struct futhark_opaque_tup2_arr1d_f64_arr1d_f64 **out, const struct futhark_f64_1d *f_0, const struct futhark_f64_1d *f_1);
 
 // Entry points
-int futhark_entry_arrange_from_coordinates(struct futhark_context *ctx, struct futhark_opaque_tup2_arr1d_f64_arr1d_f64 **out, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_f64_1d *in2, const struct futhark_f64_1d *in3);
+int futhark_entry_greedy(struct futhark_context *ctx, struct futhark_opaque_tup2_arr1d_f64_arr1d_f64 **out, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_f64_1d *in2, const struct futhark_f64_1d *in3);
 int futhark_entry_grid_in_polygons(struct futhark_context *ctx, struct futhark_opaque_tup2_arr1d_f64_arr1d_f64 **out, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_i64_1d *in2, const struct futhark_i64_1d *in3, const struct futhark_f64_1d *in4, const struct futhark_f64_1d *in5);
+int futhark_entry_hungarian(struct futhark_context *ctx, struct futhark_opaque_tup2_arr1d_f64_arr1d_f64 **out, const struct futhark_f64_1d *in0, const struct futhark_f64_1d *in1, const struct futhark_f64_1d *in2, const struct futhark_f64_1d *in3);
 
 // Miscellaneous
 int futhark_context_sync(struct futhark_context *ctx);
