@@ -8,7 +8,7 @@ editor_options:
 
 # ggpointgrid
 
-This package provides a core algorithm, a [ggplot2 `stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and multiple [ggplot2 `geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to rearrange point coordinates on regular grids. This has multiple applications, but primarily serves to strictly avoid overplotting in scatter plots. It is useful in situations where every individual observation should be clearly distinguishable.
+This package provides algorithms, a [ggplot2 `stat`](https://ggplot2.tidyverse.org/reference/layer_stats.html), and multiple [ggplot2 `geom`s](https://ggplot2.tidyverse.org/reference/layer_geoms.html) to rearrange point coordinates on regular grids. This has multiple applications, but primarily serves to strictly avoid overplotting in scatter plots. It is useful in situations where every individual observation should be clearly distinguishable.
 
 ### Blog posts
 
