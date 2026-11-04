@@ -34,7 +34,7 @@ p <- ggplot(data = dat, aes(x = mpg, y = hp)) +
     grid_xy = as.matrix(pred_shifted),
     # hp and mpg are scaled very differently
     # scale_xy unifies that for point-grid distance calculation
-    scale_xy = TRUE,
+    scale_xy = TRUE, method = "greedy",
     colour = "grey", linetype = "dashed"
   ) +
   geom_point() +
@@ -42,7 +42,7 @@ p <- ggplot(data = dat, aes(x = mpg, y = hp)) +
     aes(label = id),
     # the same arguments as for the segments to get the same label arrangement
     grid_xy = as.matrix(pred_shifted),
-    scale_xy = TRUE,
+    scale_xy = TRUE, method = "greedy",
     hjust = 1.05, angle = orth_angle, size = 3
   ) +
   coord_cartesian(clip = FALSE, ratio = x_range/y_range) +
@@ -96,11 +96,14 @@ p <- ggplot() +
   ggpointgrid::geom_segmentgrid(
     data = airports_df, aes(x, y),
     grid_xy = sf::st_coordinates(germany_buffer_points),
+    method = "greedy"
   ) +
   geom_point(data = airports_df, aes(x, y)) +
   ggpointgrid::geom_labelgrid(
     data = airports_df, aes(x, y, label = abbrev),
-    grid_xy = sf::st_coordinates(germany_buffer_points)) +
+    grid_xy = sf::st_coordinates(germany_buffer_points),
+    method = "greedy"
+  ) +
   coord_sf(clip = "off") +
   theme_bw() +
   theme(axis.title = element_blank())
@@ -151,6 +154,7 @@ p <- ggplot() +
     grid_x = 25L, grid_y = 25L,
     # filter grid to only points within the polygons around the point cloud
     polygons_sf = annulus_polygon_inv,
+    method = "greedy",
     colour = "grey"
   ) +
   geom_point(data = annulus, aes(x, y)) +
@@ -158,6 +162,7 @@ p <- ggplot() +
     data = annulus_sample, aes(x, y, label = label),
     grid_x = 25L, grid_y = 25L,
     polygons_sf = annulus_polygon_inv,
+    method = "greedy",
     size = 3
   ) +
   theme_bw()
